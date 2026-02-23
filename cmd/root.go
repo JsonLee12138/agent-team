@@ -66,5 +66,5 @@ func GetApp(cmd *cobra.Command) *App {
 }
 
 func RegisterCommands(rootCmd *cobra.Command) {
-	// Commands will be added in subsequent tasks
+	rootCmd.AddCommand(newCreateCmd())
 }
