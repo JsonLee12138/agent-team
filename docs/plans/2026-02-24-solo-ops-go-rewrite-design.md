@@ -1,14 +1,14 @@
-# solo-ops Go Rewrite Design
+# agent-team Go Rewrite Design
 
 ## Motivation
 
-将 solo-ops 从 Python 脚本重写为 Go，编译成单一二进制文件，通过 Homebrew 分发，消除用户对 Python 环境的依赖。
+将 agent-team 从 Python 脚本重写为 Go，编译成单一二进制文件，通过 Homebrew 分发，消除用户对 Python 环境的依赖。
 
 ## Current State
 
 - `skills/solo-ops/scripts/solo_ops.py` — ~620 行 Python，零第三方依赖
 - 8 个子命令：create, delete, open, open-all, assign, reply, status, merge
-- 终端后端：WezTerm / tmux（通过 `SOLO_OPS_BACKEND` 环境变量切换）
+- 终端后端：WezTerm / tmux（通过 `AGENT_TEAM_BACKEND` 环境变量切换）
 - 配置：每个 role 一个 `config.yaml`（6 个字段），手写行解析
 
 ## Decision
@@ -167,7 +167,7 @@ var LaunchCommands = map[string]string{
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `SOLO_OPS_BACKEND` | Terminal backend selection | `wezterm` |
+| `AGENT_TEAM_BACKEND` | Terminal backend selection | `wezterm` |
 | `WEZTERM_PANE` | Current pane ID (for focus return) | empty |
 
 ## Commands
@@ -214,7 +214,7 @@ Homebrew tap repository (e.g., `leeforge/homebrew-tap`) with formula auto-genera
 
 ```
 brew tap leeforge/tap
-brew install solo-ops
+brew install agent-team
 ```
 
 ## Testing Strategy
@@ -226,5 +226,5 @@ brew install solo-ops
 ## Migration
 
 1. Build and validate Go version against existing Python test cases
-2. Update `skills/solo-ops/SKILL.md` to reference `solo-ops` binary instead of `python3 ... solo_ops.py`
+2. Update `skills/solo-ops/SKILL.md` to reference `agent-team` binary instead of `python3 ... solo_ops.py`
 3. Python scripts remain in repo for reference, removed in a follow-up cleanup

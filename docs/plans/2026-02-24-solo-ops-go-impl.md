@@ -1,8 +1,8 @@
-# solo-ops Go Rewrite Implementation Plan
+# agent-team Go Rewrite Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Rewrite solo-ops from Python to Go, producing a single binary distributable via Homebrew.
+**Goal:** Rewrite agent-team from Python to Go, producing a single binary distributable via Homebrew.
 
 **Architecture:** Strategy pattern for terminal backends (SessionBackend interface), Facade for git operations (GitClient), dependency injection via App struct. All internal logic in `internal/`, cobra subcommands in `cmd/`, wired in `main.go`.
 
@@ -36,7 +36,7 @@ go get gopkg.in/yaml.v3@latest
 **Step 3: Create Makefile**
 
 ```makefile
-BINARY := solo-ops
+BINARY := agent-team
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
 .PHONY: build test lint clean
@@ -216,7 +216,7 @@ import (
 )
 
 func TestNewSessionBackendDefault(t *testing.T) {
-	t.Setenv("SOLO_OPS_BACKEND", "")
+	t.Setenv("AGENT_TEAM_BACKEND", "")
 	b := NewSessionBackend()
 	if _, ok := b.(*WeztermBackend); !ok {
 		t.Errorf("expected WeztermBackend, got %T", b)
@@ -224,7 +224,7 @@ func TestNewSessionBackendDefault(t *testing.T) {
 }
 
 func TestNewSessionBackendTmux(t *testing.T) {
-	t.Setenv("SOLO_OPS_BACKEND", "tmux")
+	t.Setenv("AGENT_TEAM_BACKEND", "tmux")
 	b := NewSessionBackend()
 	if _, ok := b.(*TmuxBackend); !ok {
 		t.Errorf("expected TmuxBackend, got %T", b)
@@ -232,7 +232,7 @@ func TestNewSessionBackendTmux(t *testing.T) {
 }
 
 func TestNewSessionBackendCaseInsensitive(t *testing.T) {
-	t.Setenv("SOLO_OPS_BACKEND", "  TMUX  ")
+	t.Setenv("AGENT_TEAM_BACKEND", "  TMUX  ")
 	b := NewSessionBackend()
 	if _, ok := b.(*TmuxBackend); !ok {
 		t.Errorf("expected TmuxBackend for 'TMUX', got %T", b)
@@ -240,7 +240,7 @@ func TestNewSessionBackendCaseInsensitive(t *testing.T) {
 }
 
 func TestPaneAliveEmptyID(t *testing.T) {
-	t.Setenv("SOLO_OPS_BACKEND", "")
+	t.Setenv("AGENT_TEAM_BACKEND", "")
 	b := NewSessionBackend()
 	if b.PaneAlive("") {
 		t.Error("empty pane ID should not be alive")
@@ -277,7 +277,7 @@ type SessionBackend interface {
 }
 
 func NewSessionBackend() SessionBackend {
-	backend := strings.TrimSpace(strings.ToLower(os.Getenv("SOLO_OPS_BACKEND")))
+	backend := strings.TrimSpace(strings.ToLower(os.Getenv("AGENT_TEAM_BACKEND")))
 	if backend == "tmux" {
 		return &TmuxBackend{}
 	}
@@ -891,7 +891,7 @@ type App struct {
 
 func NewRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
-		Use:     "solo-ops",
+		Use:     "agent-team",
 		Short:   "AI team role manager",
 		Long:    "Manages AI team roles using git worktrees and terminal multiplexer tabs.",
 		Version: Version,
@@ -972,10 +972,10 @@ func RegisterCommands(rootCmd *cobra.Command) {
 
 **Step 4: Build and verify**
 
-Run: `go build -o solo-ops . && ./solo-ops --version`
-Expected: `solo-ops version dev`
+Run: `go build -o agent-team . && ./agent-team --version`
+Expected: `agent-team version dev`
 
-Run: `./solo-ops --help`
+Run: `./agent-team --help`
 Expected: Help text with "AI team role manager"
 
 **Step 5: Commit**
@@ -1558,7 +1558,7 @@ func (a *App) RunOpenAll(provider, model string) error {
 	root := a.Git.Root()
 	roles := internal.ListRoles(root, a.WtBase)
 	if len(roles) == 0 {
-		return fmt.Errorf("no roles found. Create one with: solo-ops create <name>")
+		return fmt.Errorf("no roles found. Create one with: agent-team create <name>")
 	}
 	for _, role := range roles {
 		if err := a.RunOpen(role, provider, model); err != nil {
@@ -1945,7 +1945,7 @@ func (a *App) RunStatus() error {
 	root := a.Git.Root()
 	roles := internal.ListRoles(root, a.WtBase)
 	if len(roles) == 0 {
-		fmt.Println("No roles found. Create one with: solo-ops create <name>")
+		fmt.Println("No roles found. Create one with: agent-team create <name>")
 		return nil
 	}
 
@@ -2018,7 +2018,7 @@ func (a *App) RunMerge(name string) error {
 	}
 
 	fmt.Printf("✓ Merged '%s' into %s\n", name, mainBranch)
-	fmt.Printf("  → Run 'solo-ops delete %s' to remove the worktree when done\n", name)
+	fmt.Printf("  → Run 'agent-team delete %s' to remove the worktree when done\n", name)
 	return nil
 }
 ```
@@ -2069,10 +2069,10 @@ make build
 **Step 3: Smoke test**
 
 ```bash
-./solo-ops --version
-./solo-ops --help
-./solo-ops create --help
-./solo-ops status --help
+./agent-team --version
+./agent-team --help
+./agent-team create --help
+./agent-team status --help
 ```
 
 **Step 4: Commit**
@@ -2095,10 +2095,10 @@ git commit -m "chore: verify build and full test suite"
 ```yaml
 # .goreleaser.yaml
 version: 2
-project_name: solo-ops
+project_name: agent-team
 
 builds:
-  - binary: solo-ops
+  - binary: agent-team
     ldflags:
       - -s -w
       - -X github.com/leeforge/agent-team/cmd.Version={{.Version}}
@@ -2120,7 +2120,7 @@ brews:
     homepage: https://github.com/leeforge/agent-team
     description: AI team role manager — git worktrees + terminal multiplexer
     install: |
-      bin.install "solo-ops"
+      bin.install "agent-team"
 
 checksum:
   name_template: "checksums.txt"
@@ -2131,12 +2131,12 @@ changelog:
 
 **Step 2: Update SKILL.md**
 
-Replace `python3 <base-dir>/scripts/solo_ops.py <command>` references with `solo-ops <command>`.
+Replace `python3 <base-dir>/scripts/solo_ops.py <command>` references with `agent-team <command>`.
 
 Key changes:
-- Usage section: `solo-ops <command>` (no python prefix)
-- Remove tmux-specific `solo_ops_tmux.py` references — backend is now selected via `SOLO_OPS_BACKEND=tmux`
-- Install: `brew tap leeforge/tap && brew install solo-ops`
+- Usage section: `agent-team <command>` (no python prefix)
+- Remove tmux-specific `solo_ops_tmux.py` references — backend is now selected via `AGENT_TEAM_BACKEND=tmux`
+- Install: `brew tap leeforge/tap && brew install agent-team`
 
 **Step 3: Commit**
 
@@ -2150,6 +2150,6 @@ git commit -m "chore: add goreleaser config and update SKILL.md for Go binary"
 ## Execution Notes
 
 - **Test command**: `go test ./... -v` after each task
-- **Build command**: `make build` to produce `./solo-ops`
+- **Build command**: `make build` to produce `./agent-team`
 - **Python reference**: Keep `skills/solo-ops/scripts/` until Go version is validated in production; clean up in a follow-up PR
 - **MockBackend** in `cmd/create_test.go` is shared across all cmd tests via the same package
