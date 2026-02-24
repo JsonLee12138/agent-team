@@ -1,5 +1,5 @@
 # Build output
-agent-team
+./agent-team
 
 # macOS
 .DS_Store
