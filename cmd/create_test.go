@@ -52,6 +52,10 @@ func (m *MockBackend) SetTitle(_, _ string) error         { return nil }
 func (m *MockBackend) ActivatePane(_ string) error        { return nil }
 
 func TestRunCreate(t *testing.T) {
+	// Skip OpenSpec in test environment
+	openSpecSetup = func(wtPath string) error { return nil }
+	defer func() { openSpecSetup = defaultOpenSpecSetup }()
+
 	app, dir := initTestApp(t)
 
 	if err := app.RunCreate("backend"); err != nil {
@@ -83,14 +87,19 @@ func TestRunCreate(t *testing.T) {
 		t.Error("prompt.md not created")
 	}
 
-	// Verify task directories
+	// Verify openspec directory (created by openspec init)
+	// Note: In test environment openspec may not be installed,
+	// so we check that tasks/pending is NOT created (old behavior removed)
 	pendingDir := filepath.Join(wtPath, "agents", "teams", "backend", "tasks", "pending")
-	if _, err := os.Stat(pendingDir); os.IsNotExist(err) {
-		t.Error("tasks/pending not created")
+	if _, err := os.Stat(pendingDir); err == nil {
+		t.Error("tasks/pending should no longer be created")
 	}
 }
 
 func TestRunCreateDuplicate(t *testing.T) {
+	openSpecSetup = func(wtPath string) error { return nil }
+	defer func() { openSpecSetup = defaultOpenSpecSetup }()
+
 	app, _ := initTestApp(t)
 	app.RunCreate("dup")
 	err := app.RunCreate("dup")
