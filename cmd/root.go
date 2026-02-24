@@ -71,4 +71,7 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(newOpenCmd())
 	rootCmd.AddCommand(newOpenAllCmd())
 	rootCmd.AddCommand(newAssignCmd())
+	rootCmd.AddCommand(newReplyCmd())
+	rootCmd.AddCommand(newStatusCmd())
+	rootCmd.AddCommand(newMergeCmd())
 }
