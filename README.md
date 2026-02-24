@@ -4,7 +4,7 @@ English | [中文](./README.zh.md)
 
 AI team role manager for multi-agent development workflows. Orchestrate multiple AI coding agents in isolated Git worktrees with WezTerm or tmux.
 
-Each role gets its own Git branch, worktree, terminal session, and task inbox — all managed through natural language prompts or CLI commands.
+Each role gets its own Git branch, worktree, terminal session, and OpenSpec change pipeline — all managed through natural language prompts or CLI commands.
 
 ## Table of Contents
 
@@ -19,7 +19,7 @@ Each role gets its own Git branch, worktree, terminal session, and task inbox �
 - [Usage as a Skill](#usage-as-a-skill)
   - [Create a role](#create-a-role)
   - [Open a role session](#open-a-role-session)
-  - [Assign a task](#assign-a-task)
+  - [Brainstorm and assign](#brainstorm-and-assign)
   - [Reply to a role](#reply-to-a-role)
   - [Check status](#check-status)
   - [Merge and clean up](#merge-and-clean-up)
@@ -39,13 +39,14 @@ Main branch
     └── .worktrees/qa/           ← team/qa branch + OpenCode session
 ```
 
-Each role runs in isolation. You assign tasks through the main agent, roles work independently, you merge when done.
+Each role runs in isolation. You brainstorm with the controller, assign changes through OpenSpec, roles work independently, you merge when done.
 
 ## Requirements
 
 - Git
 - [WezTerm](https://wezfurlong.org/wezterm/) or [tmux](https://github.com/tmux/tmux)
 - At least one AI provider CLI: [claude](https://github.com/anthropics/claude-code), [codex](https://github.com/openai/codex), or [opencode](https://opencode.ai)
+- [Node.js](https://nodejs.org/) (for OpenSpec auto-install)
 
 ## Installation
 
@@ -122,13 +123,21 @@ A new terminal tab (or tmux window) opens with the AI provider running inside th
 
 ---
 
-### Assign a task
+### Brainstorm and assign
+
+The controller AI runs a brainstorming flow before assigning work:
+
+1. Explores the role's context (`prompt.md`, existing specs)
+2. Asks clarifying questions
+3. Proposes 2–3 approaches with trade-offs
+4. Gets user confirmation
+5. Writes a proposal and assigns via `agent-team assign`
 
 > Assign a task to frontend: implement a responsive navbar with a mobile hamburger menu.
 
 > Tell the backend role to add a JWT authentication middleware.
 
-The task is written to the role's pending inbox and the session is notified. If the session isn't running, it starts automatically.
+The controller brainstorms with you, then creates an OpenSpec change in the role's worktree with the confirmed proposal. The role proceeds through the OpenSpec pipeline: specs → design → tasks → apply → verify.
 
 ---
 
@@ -148,7 +157,7 @@ The message is delivered to the running session prefixed with `[Main Controller 
 
 > Which roles are currently running?
 
-Displays all roles, their session state, and pending task count.
+Displays all roles, their session state, and active OpenSpec change count.
 
 ---
 
@@ -168,12 +177,12 @@ All commands run from within a Git repository.
 
 | Command | Description |
 |---------|-------------|
-| `agent-team create <name>` | Create a new role (branch + worktree + scaffold) |
+| `agent-team create <name>` | Create a new role (branch + worktree + OpenSpec init) |
 | `agent-team open <name> [provider] [--model <m>]` | Open a role session in a new terminal tab |
 | `agent-team open-all [provider] [--model <m>]` | Open sessions for all roles |
-| `agent-team assign <name> "<task>" [provider]` | Assign a task and notify the session |
+| `agent-team assign <name> "<desc>" [provider] [--proposal <file>]` | Create an OpenSpec change and notify the session |
 | `agent-team reply <name> "<message>"` | Send a reply to a running role session |
-| `agent-team status` | Show all roles, status, and pending tasks |
+| `agent-team status` | Show all roles, status, and active changes |
 | `agent-team merge <name>` | Merge role branch into current branch |
 | `agent-team delete <name>` | Close session, remove worktree and branch |
 
@@ -186,12 +195,19 @@ project-root/
 └── .worktrees/
     └── <name>/
         ├── CLAUDE.md                              ← auto-generated from prompt.md
-        └── agents/teams/<name>/
-            ├── config.yaml                        ← provider, model, pane_id
-            ├── prompt.md                          ← role identity (edit this)
-            └── tasks/
-                ├── pending/<timestamp>-<slug>.md  ← active tasks
-                └── done/<timestamp>-<slug>.md     ← completed tasks
+        ├── agents/teams/<name>/
+        │   ├── config.yaml                        ← provider, model, pane_id
+        │   └── prompt.md                          ← role identity (edit this)
+        └── openspec/
+            ├── config.yaml                        ← OpenSpec configuration
+            ├── specs/                             ← project specifications
+            └── changes/
+                └── <change-name>/
+                    ├── .openspec.yaml             ← change metadata
+                    ├── proposal.md                ← brainstorming output
+                    ├── specs/                     ← delta specs
+                    ├── design.md                  ← design artifact
+                    └── tasks.md                   ← task breakdown
 ```
 
 ## Supported Providers

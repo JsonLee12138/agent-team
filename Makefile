@@ -1,4 +1,4 @@
-BINARY := agent-team
+BINARY := output/agent-team
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 GO := $(shell command -v go1.24.2 2>/dev/null || GOROOT=$$HOME/.gvm/gos/go1.24.2 echo $$HOME/.gvm/gos/go1.24.2/bin/go 2>/dev/null || echo go)
 GORUN := GOROOT=$(HOME)/.gvm/gos/go1.24.2 $(HOME)/.gvm/gos/go1.24.2/bin/go

@@ -4,7 +4,7 @@
 
 多智能体开发工作流的 AI 团队角色管理器。借助 WezTerm 或 tmux，在隔离的 Git worktree 中协调多个 AI 编程智能体。
 
-每个角色拥有独立的 Git 分支、worktree、终端会话和任务收件箱 —— 全部通过自然语言提示词或 CLI 命令管理。
+每个角色拥有独立的 Git 分支、worktree、终端会话和 OpenSpec 变更管线 —— 全部通过自然语言提示词或 CLI 命令管理。
 
 ## 目录
 
@@ -19,7 +19,7 @@
 - [作为 Skill 使用](#作为-skill-使用)
   - [创建角色](#创建角色)
   - [打开角色会话](#打开角色会话)
-  - [分配任务](#分配任务)
+  - [头脑风暴与分配](#头脑风暴与分配)
   - [回复角色](#回复角色)
   - [查看状态](#查看状态)
   - [合并与清理](#合并与清理)
@@ -39,13 +39,14 @@
     └── .worktrees/qa/           ← team/qa 分支 + OpenCode 会话
 ```
 
-每个角色在独立环境中运行。你通过主智能体分配任务，各角色独立工作，完成后合并回主分支。
+每个角色在独立环境中运行。你与主控智能体进行头脑风暴，通过 OpenSpec 分配变更，各角色独立工作，完成后合并回主分支。
 
 ## 环境要求
 
 - Git
 - [WezTerm](https://wezfurlong.org/wezterm/) 或 [tmux](https://github.com/tmux/tmux)
 - 至少一个 AI provider CLI：[claude](https://github.com/anthropics/claude-code)、[codex](https://github.com/openai/codex) 或 [opencode](https://opencode.ai)
+- [Node.js](https://nodejs.org/)（用于自动安装 OpenSpec）
 
 ## 安装
 
@@ -122,13 +123,21 @@ go install github.com/JsonLee12138/agent-team@latest
 
 ---
 
-### 分配任务
+### 头脑风暴与分配
+
+主控智能体在分配工作前会运行头脑风暴流程：
+
+1. 了解角色上下文（`prompt.md`、已有 specs）
+2. 提出澄清性问题
+3. 提出 2–3 种方案及权衡分析
+4. 获取用户确认
+5. 编写提案并通过 `agent-team assign` 分配
 
 > 给 frontend 分配一个任务：实现带移动端汉堡菜单的响应式导航栏。
 
 > 告诉 backend 角色添加一个 JWT 鉴权中间件。
 
-任务会写入角色的待处理收件箱，并通知运行中的会话。如果会话未启动，会自动开启。
+主控智能体先与你进行头脑风暴，然后在角色的 worktree 中创建 OpenSpec 变更并附上确认的提案。角色随后按照 OpenSpec 管线推进：specs → design → tasks → apply → verify。
 
 ---
 
@@ -148,7 +157,7 @@ go install github.com/JsonLee12138/agent-team@latest
 
 > 哪些角色正在运行？
 
-显示所有角色、会话运行状态和待处理任务数量。
+显示所有角色、会话运行状态和活跃的 OpenSpec 变更数量。
 
 ---
 
@@ -168,12 +177,12 @@ go install github.com/JsonLee12138/agent-team@latest
 
 | 命令 | 说明 |
 |------|------|
-| `agent-team create <name>` | 创建新角色（分支 + worktree + 目录结构） |
+| `agent-team create <name>` | 创建新角色（分支 + worktree + OpenSpec 初始化） |
 | `agent-team open <name> [provider] [--model <m>]` | 在新终端 tab 中打开角色会话 |
 | `agent-team open-all [provider] [--model <m>]` | 打开所有角色的会话 |
-| `agent-team assign <name> "<task>" [provider]` | 分配任务并通知会话 |
+| `agent-team assign <name> "<desc>" [provider] [--proposal <file>]` | 创建 OpenSpec 变更并通知会话 |
 | `agent-team reply <name> "<message>"` | 向运行中的角色会话发送回复 |
-| `agent-team status` | 查看所有角色状态和待处理任务 |
+| `agent-team status` | 查看所有角色状态和活跃变更 |
 | `agent-team merge <name>` | 将角色分支合并到当前分支 |
 | `agent-team delete <name>` | 关闭会话并删除 worktree 和分支 |
 
@@ -186,12 +195,19 @@ go install github.com/JsonLee12138/agent-team@latest
 └── .worktrees/
     └── <name>/
         ├── CLAUDE.md                              ← 由 prompt.md 自动生成
-        └── agents/teams/<name>/
-            ├── config.yaml                        ← provider、model、pane_id
-            ├── prompt.md                          ← 角色定义（手动编辑）
-            └── tasks/
-                ├── pending/<timestamp>-<slug>.md  ← 待处理任务
-                └── done/<timestamp>-<slug>.md     ← 已完成任务
+        ├── agents/teams/<name>/
+        │   ├── config.yaml                        ← provider、model、pane_id
+        │   └── prompt.md                          ← 角色定义（手动编辑）
+        └── openspec/
+            ├── config.yaml                        ← OpenSpec 配置
+            ├── specs/                             ← 项目规格说明
+            └── changes/
+                └── <change-name>/
+                    ├── .openspec.yaml             ← 变更元数据
+                    ├── proposal.md                ← 头脑风暴产出
+                    ├── specs/                     ← 增量规格说明
+                    ├── design.md                  ← 设计文档
+                    └── tasks.md                   ← 任务拆解
 ```
 
 ## 支持的 Provider
