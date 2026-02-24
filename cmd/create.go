@@ -11,6 +11,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// defaultOpenSpecSetup is the real OpenSpec initialization function.
+var defaultOpenSpecSetup = func(wtPath string) error {
+	if err := internal.EnsureOpenSpec(); err != nil {
+		return fmt.Errorf("install openspec: %w", err)
+	}
+	return internal.OpenSpecInit(wtPath)
+}
+
+// openSpecSetup can be overridden in tests to skip OpenSpec initialization.
+var openSpecSetup = defaultOpenSpecSetup
+
 func newCreateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "create <name>",
@@ -37,10 +48,13 @@ func (a *App) RunCreate(name string) error {
 	}
 
 	teamsDir := internal.TeamsDir(root, a.WtBase, name)
-	for _, sub := range []string{"tasks/pending", "tasks/done"} {
-		if err := os.MkdirAll(filepath.Join(teamsDir, sub), 0755); err != nil {
-			return err
-		}
+	if err := os.MkdirAll(teamsDir, 0755); err != nil {
+		return err
+	}
+
+	// Initialize OpenSpec in worktree
+	if err := openSpecSetup(wtPath); err != nil {
+		return fmt.Errorf("openspec setup: %w", err)
 	}
 
 	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")

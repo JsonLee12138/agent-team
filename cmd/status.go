@@ -13,7 +13,7 @@ import (
 func newStatusCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
-		Short: "Show all roles, running state, and pending task count",
+		Short: "Show all roles, running state, and OpenSpec change status",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return GetApp(cmd).RunStatus()
@@ -29,12 +29,12 @@ func (a *App) RunStatus() error {
 		return nil
 	}
 
-	fmt.Printf("%-16s %-24s %s\n", "Role", "Status", "Pending Tasks")
-	fmt.Printf("%-16s %-24s %s\n", "────────────────", "────────────────────────", "─────────────")
+	fmt.Printf("%-16s %-24s %s\n", "Role", "Status", "Changes")
+	fmt.Printf("%-16s %-24s %s\n", "────────────────", "────────────────────────", "──────────────────────────")
 
 	for _, role := range roles {
 		configPath := internal.ConfigPath(root, a.WtBase, role)
-		pendingDir := filepath.Join(internal.TeamsDir(root, a.WtBase, role), "tasks", "pending")
+		wtPath := internal.WtPath(root, a.WtBase, role)
 
 		cfg, _ := internal.LoadRoleConfig(configPath)
 		status := "✗ offline"
@@ -42,16 +42,24 @@ func (a *App) RunStatus() error {
 			status = fmt.Sprintf("✓ running [p:%s]", cfg.PaneID)
 		}
 
-		count := 0
-		if entries, err := os.ReadDir(pendingDir); err == nil {
+		// Count changes by reading openspec/changes/ directory
+		changesDir := filepath.Join(wtPath, "openspec", "changes")
+		changesSummary := "0"
+		if entries, err := os.ReadDir(changesDir); err == nil {
+			active := 0
 			for _, e := range entries {
-				if filepath.Ext(e.Name()) == ".md" {
-					count++
+				if e.IsDir() && e.Name() != "archive" {
+					active++
 				}
+			}
+			if active > 0 {
+				changesSummary = fmt.Sprintf("%d active", active)
+			} else {
+				changesSummary = "0"
 			}
 		}
 
-		fmt.Printf("%-16s %-24s %d\n", role, status, count)
+		fmt.Printf("%-16s %-24s %s\n", role, status, changesSummary)
 	}
 	return nil
 }

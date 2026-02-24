@@ -14,6 +14,9 @@ import (
 // --- reply ---
 
 func TestRunReply(t *testing.T) {
+	openSpecSetup = func(wtPath string) error { return nil }
+	defer func() { openSpecSetup = defaultOpenSpecSetup }()
+
 	app, dir := initTestApp(t)
 	mock := &MockBackend{
 		SpawnedID:  "50",
@@ -41,6 +44,9 @@ func TestRunReply(t *testing.T) {
 }
 
 func TestRunReplyOffline(t *testing.T) {
+	openSpecSetup = func(wtPath string) error { return nil }
+	defer func() { openSpecSetup = defaultOpenSpecSetup }()
+
 	app, _ := initTestApp(t)
 	app.RunCreate("offline")
 	err := app.RunReply("offline", "hello")
@@ -52,9 +58,17 @@ func TestRunReplyOffline(t *testing.T) {
 // --- status ---
 
 func TestRunStatus(t *testing.T) {
-	app, _ := initTestApp(t)
+	openSpecSetup = func(wtPath string) error { return nil }
+	defer func() { openSpecSetup = defaultOpenSpecSetup }()
+
+	app, dir := initTestApp(t)
 	app.RunCreate("alpha")
 	app.RunCreate("beta")
+
+	// Create openspec/changes/ directories for testing
+	for _, role := range []string{"alpha", "beta"} {
+		os.MkdirAll(filepath.Join(dir, ".worktrees", role, "openspec", "changes"), 0755)
+	}
 
 	// Should not error
 	err := app.RunStatus()
@@ -66,6 +80,9 @@ func TestRunStatus(t *testing.T) {
 // --- merge ---
 
 func TestRunMerge(t *testing.T) {
+	openSpecSetup = func(wtPath string) error { return nil }
+	defer func() { openSpecSetup = defaultOpenSpecSetup }()
+
 	app, dir := initTestApp(t)
 	app.RunCreate("feature")
 
