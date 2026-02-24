@@ -9,12 +9,13 @@ import (
 )
 
 type RoleConfig struct {
-	Name            string `yaml:"name"`
-	Description     string `yaml:"description"`
-	DefaultProvider string `yaml:"default_provider"`
-	DefaultModel    string `yaml:"default_model"`
-	CreatedAt       string `yaml:"created_at"`
-	PaneID          string `yaml:"pane_id"`
+	Name             string `yaml:"name"`
+	Description      string `yaml:"description"`
+	DefaultProvider  string `yaml:"default_provider"`
+	DefaultModel     string `yaml:"default_model"`
+	CreatedAt        string `yaml:"created_at"`
+	PaneID           string `yaml:"pane_id"`
+	ControllerPaneID string `yaml:"controller_pane_id,omitempty"`
 }
 
 func LoadRoleConfig(path string) (*RoleConfig, error) {

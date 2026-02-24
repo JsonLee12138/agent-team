@@ -101,6 +101,12 @@ agent-team reply <name> "<answer>"
 ```
 Sends a reply to a role's running session, prefixed with `[Main Controller Reply]`.
 
+### Reply to main controller (used by roles)
+```bash
+agent-team reply-main "<message>"
+```
+Sends a message from the role back to the main controller's session, prefixed with `[Role: <name>]`. Automatically detects the current role from the worktree directory and reads the controller's pane ID from `config.yaml`.
+
 ### Check status
 ```bash
 agent-team status

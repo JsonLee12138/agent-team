@@ -6,7 +6,7 @@
 .worktrees/<name>/
   CLAUDE.md                          <- auto-generated from prompt.md on open
   agents/teams/<name>/
-    config.yaml                      <- name, default_provider, default_model, pane_id
+    config.yaml                      <- name, default_provider, default_model, pane_id, controller_pane_id
     prompt.md                        <- role system prompt (edit manually)
   openspec/
     specs/                           <- project specifications
@@ -30,16 +30,18 @@ Changes are managed by OpenSpec. The controller creates a change with a proposal
 
 ## Bidirectional communication
 
-Role asks a question:
+Role asks a question to the main controller:
 ```bash
-ask claude "<rolename>: <question>"
+agent-team reply-main "<question>"
 ```
+Message appears in the controller's terminal as `[Role: <name>] <question>`.
 
 Main controller replies:
 ```bash
 agent-team reply <rolename> "<answer>"
 ```
+Reply appears in the role's terminal tab as `[Main Controller Reply]`.
 
-Reply appears in the role's terminal tab as `[Main Controller Reply]`. The role AI must NOT proceed on blocked tasks until it receives a reply.
+The role AI must NOT proceed on blocked tasks until it receives a reply. The `prompt.md` template includes this communication protocol automatically.
 
-The `prompt.md` template includes this communication protocol automatically.
+The controller's pane ID is saved in `config.yaml` (`controller_pane_id`) when `agent-team open` runs, read from `$WEZTERM_PANE` or `$TMUX_PANE`.

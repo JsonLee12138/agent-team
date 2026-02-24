@@ -91,8 +91,13 @@ func (a *App) RunOpen(name, provider, model string) error {
 		a.Session.ActivatePane(currentPane)
 	}
 
-	// Save pane ID
+	// Save pane ID and controller pane ID
 	cfg.PaneID = paneID
+	if controllerPane := os.Getenv("WEZTERM_PANE"); controllerPane != "" {
+		cfg.ControllerPaneID = controllerPane
+	} else if controllerPane := os.Getenv("TMUX_PANE"); controllerPane != "" {
+		cfg.ControllerPaneID = controllerPane
+	}
 	cfg.Save(configPath)
 
 	// Wait for shell init, then launch AI
