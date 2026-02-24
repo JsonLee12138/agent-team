@@ -103,6 +103,13 @@ func TestGenerateClaudeMD(t *testing.T) {
 	if !strings.Contains(content, "team/dev") {
 		t.Error("CLAUDE.md should contain branch name")
 	}
+	// NEW: should NOT contain old task references
+	if strings.Contains(content, "tasks/pending") {
+		t.Error("CLAUDE.md should not reference tasks/pending")
+	}
+	if strings.Contains(content, "tasks/done") {
+		t.Error("CLAUDE.md should not reference tasks/done")
+	}
 }
 
 func TestPromptMDTemplate(t *testing.T) {
@@ -112,5 +119,19 @@ func TestPromptMDTemplate(t *testing.T) {
 	}
 	if !strings.Contains(content, "Communication Protocol") {
 		t.Error("prompt template should contain communication protocol")
+	}
+	// NEW: should contain Workflow section with OpenSpec
+	if !strings.Contains(content, "## Workflow") {
+		t.Error("prompt template should contain Workflow section")
+	}
+	if !strings.Contains(content, "/opsx:continue") {
+		t.Error("prompt template should reference /opsx:continue")
+	}
+	if !strings.Contains(content, "/opsx:apply") {
+		t.Error("prompt template should reference /opsx:apply")
+	}
+	// Should NOT contain old task references
+	if strings.Contains(content, "tasks/pending") {
+		t.Error("prompt template should not reference tasks/pending")
 	}
 }
