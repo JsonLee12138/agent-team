@@ -1,14 +1,14 @@
 ---
-name: solo-ops
+name: agent-team
 description: >
   AI team role manager for multi-agent development workflows.
-  Use when the user wants to create/delete team roles, open role sessions in WezTerm tabs,
+  Use when the user wants to create/delete team roles, open role sessions in terminal tabs,
   assign tasks to roles, check team status, or merge role branches.
-  Triggers on /solo-ops commands, "create a team role", "open role session",
+  Triggers on /agent-team commands, "create a team role", "open role session",
   "assign task to role", "show team status", "merge role branch".
 ---
 
-# solo-ops
+# agent-team
 
 Manages AI team roles using git worktrees + terminal multiplexer tabs. Each role runs in its own isolated worktree (branch `team/<name>`) and opens as a full-permission AI session in a new tab.
 
@@ -22,21 +22,19 @@ brew tap leeforge/tap && brew install agent-team
 
 ## Usage
 
-Run from within the project git repository:
+Run from within a project git repository:
 
 ```bash
 agent-team <command>
 ```
 
-Use tmux backend by setting an environment variable:
+Use tmux backend (default is WezTerm):
 
 ```bash
 AGENT_TEAM_BACKEND=tmux agent-team <command>
 ```
 
 ## Commands
-
-Always run from within the project git repository.
 
 ### Create a role
 ```bash
@@ -53,9 +51,10 @@ After creating, guide the user to edit `prompt.md` to define the role's expertis
 ```bash
 agent-team open <name> [claude|codex|opencode] [--model <model>]
 ```
-- Copies `prompt.md` → `CLAUDE.md` in worktree root (auto-injected as system context)
-- Spawns a new terminal tab titled `<name>` running `claude --dangerously-skip-permissions` (or `codex --dangerously-bypass-approvals-and-sandbox`)
-- Provider priority: argument > `config.yaml default_provider` > claude
+- Generates `CLAUDE.md` in worktree root from `prompt.md` (auto-injected as system context)
+- Spawns a new terminal tab titled `<name>` running the chosen AI provider
+- Provider priority: CLI argument > `config.yaml default_provider` > claude
+- Model priority: `--model` flag > `config.yaml default_model` > provider default
 
 ### Open all sessions
 ```bash
@@ -75,13 +74,13 @@ agent-team assign <name> "<task description>" [claude|codex|opencode] [--model <
 ```bash
 agent-team reply <name> "<answer>"
 ```
-Sends a reply to a role's running session. Used when a role has asked a question via `ask claude` and the main controller wants to respond. The message is prefixed with `[Main Controller Reply]` so the role AI can identify it.
+Sends a reply to a role's running session, prefixed with `[Main Controller Reply]`.
 
 ### Check status
 ```bash
 agent-team status
 ```
-Shows all roles, whether their session is running (by pane-id), and pending task count.
+Shows all roles, session status (running/stopped), and pending task count.
 
 ### Merge completed work
 ```bash
@@ -93,4 +92,4 @@ Merges `team/<name>` into the current branch with `--no-ff`. Run `delete` afterw
 ```bash
 agent-team delete <name>
 ```
-Removes the worktree and deletes the `team/<name>` branch.
+Closes the running session (if any), removes the worktree, and deletes the `team/<name>` branch.
