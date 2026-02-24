@@ -1,0 +1,34 @@
+# .goreleaser.yaml
+version: 2
+project_name: agent-team
+
+builds:
+  - binary: agent-team
+    ldflags:
+      - -s -w
+      - -X github.com/leeforge/agent-team/cmd.Version={{.Version}}
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+
+brews:
+  - repository:
+      owner: leeforge
+      name: homebrew-tap
+    homepage: https://github.com/leeforge/agent-team
+    description: AI team role manager — git worktrees + terminal multiplexer
+    install: |
+      bin.install "agent-team"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
