@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/leeforge/agent-team/internal"
+	"github.com/JsonLee12138/agent-team/internal"
 )
 
 func TestRunAssign(t *testing.T) {

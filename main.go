@@ -4,7 +4,7 @@ package main
 import (
 	"os"
 
-	"github.com/leeforge/agent-team/cmd"
+	"github.com/JsonLee12138/agent-team/cmd"
 )
 
 func main() {

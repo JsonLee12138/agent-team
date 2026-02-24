@@ -1,4 +1,4 @@
-module github.com/leeforge/agent-team
+module github.com/JsonLee12138/agent-team
 
 go 1.24.2
 

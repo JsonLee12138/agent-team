@@ -6,7 +6,7 @@ builds:
   - binary: agent-team
     ldflags:
       - -s -w
-      - -X github.com/leeforge/agent-team/cmd.Version={{.Version}}
+      - -X github.com/JsonLee12138/agent-team/cmd.Version={{.Version}}
     goos:
       - darwin
       - linux
@@ -20,9 +20,11 @@ archives:
 
 brews:
   - repository:
-      owner: leeforge
-      name: homebrew-tap
-    homepage: https://github.com/leeforge/agent-team
+      owner: JsonLee12138
+      name: homebrew-agent-team
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/JsonLee12138/agent-team
     description: AI team role manager — git worktrees + terminal multiplexer
     install: |
       bin.install "agent-team"

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/leeforge/agent-team/internal"
+	"github.com/JsonLee12138/agent-team/internal"
 	"github.com/spf13/cobra"
 )
 

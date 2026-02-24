@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/leeforge/agent-team/internal"
+	"github.com/JsonLee12138/agent-team/internal"
 )
 
 func initTestApp(t *testing.T) (*App, string) {
