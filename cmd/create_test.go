@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/JsonLee12138/agent-team/internal"
@@ -52,8 +53,17 @@ func (m *MockBackend) SetTitle(_, _ string) error         { return nil }
 func (m *MockBackend) ActivatePane(_ string) error        { return nil }
 
 func TestRunCreate(t *testing.T) {
-	// Skip OpenSpec in test environment
-	openSpecSetup = func(wtPath string) error { return nil }
+	// Track whether prompt.md exists when openspec runs
+	promptExistedDuringOpenSpec := false
+	openSpecSetup = func(wtPath string) error {
+		// Check if prompt.md already exists at this point
+		name := filepath.Base(wtPath)
+		promptPath := filepath.Join(wtPath, "agents", "teams", name, "prompt.md")
+		if _, err := os.Stat(promptPath); err == nil {
+			promptExistedDuringOpenSpec = true
+		}
+		return nil
+	}
 	defer func() { openSpecSetup = defaultOpenSpecSetup }()
 
 	app, dir := initTestApp(t)
@@ -87,9 +97,37 @@ func TestRunCreate(t *testing.T) {
 		t.Error("prompt.md not created")
 	}
 
-	// Verify openspec directory (created by openspec init)
-	// Note: In test environment openspec may not be installed,
-	// so we check that tasks/pending is NOT created (old behavior removed)
+	// Verify prompt.md existed before openspec init ran
+	if !promptExistedDuringOpenSpec {
+		t.Error("prompt.md should exist before openspec init runs")
+	}
+
+	// Verify CLAUDE.md contains AGENT_TEAM tags
+	claudeMD := filepath.Join(wtPath, "CLAUDE.md")
+	data, err := os.ReadFile(claudeMD)
+	if err != nil {
+		t.Fatalf("CLAUDE.md not found: %v", err)
+	}
+	content := string(data)
+	if !strings.Contains(content, "<!-- AGENT_TEAM:START -->") {
+		t.Error("CLAUDE.md should contain AGENT_TEAM start marker")
+	}
+	if !strings.Contains(content, "<!-- AGENT_TEAM:END -->") {
+		t.Error("CLAUDE.md should contain AGENT_TEAM end marker")
+	}
+
+	// Verify AGENTS.md contains AGENT_TEAM tags
+	agentsMD := filepath.Join(wtPath, "AGENTS.md")
+	agentsData, err := os.ReadFile(agentsMD)
+	if err != nil {
+		t.Fatalf("AGENTS.md not found: %v", err)
+	}
+	agentsContent := string(agentsData)
+	if !strings.Contains(agentsContent, "<!-- AGENT_TEAM:START -->") {
+		t.Error("AGENTS.md should contain AGENT_TEAM start marker")
+	}
+
+	// Verify old task dirs are NOT created
 	pendingDir := filepath.Join(wtPath, "agents", "teams", "backend", "tasks", "pending")
 	if _, err := os.Stat(pendingDir); err == nil {
 		t.Error("tasks/pending should no longer be created")

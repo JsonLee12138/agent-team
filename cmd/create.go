@@ -52,9 +52,11 @@ func (a *App) RunCreate(name string) error {
 		return err
 	}
 
-	// Initialize OpenSpec in worktree
-	if err := openSpecSetup(wtPath); err != nil {
-		return fmt.Errorf("openspec setup: %w", err)
+	// Write prompt.md and config.yaml BEFORE openspec init
+	// so that OpenSpec can read the role prompt
+	promptPath := filepath.Join(teamsDir, "prompt.md")
+	if err := os.WriteFile(promptPath, []byte(internal.PromptMDContent(name)), 0644); err != nil {
+		return err
 	}
 
 	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
@@ -70,9 +72,14 @@ func (a *App) RunCreate(name string) error {
 		return err
 	}
 
-	promptPath := filepath.Join(teamsDir, "prompt.md")
-	if err := os.WriteFile(promptPath, []byte(internal.PromptMDContent(name)), 0644); err != nil {
-		return err
+	// Initialize OpenSpec in worktree (prompt.md already exists)
+	if err := openSpecSetup(wtPath); err != nil {
+		return fmt.Errorf("openspec setup: %w", err)
+	}
+
+	// Inject role prompt into CLAUDE.md and AGENTS.md (preserves OpenSpec content)
+	if err := internal.InjectRolePrompt(wtPath, name, root); err != nil {
+		return fmt.Errorf("inject role prompt: %w", err)
 	}
 
 	fmt.Printf("✓ Created role '%s' at %s\n", name, wtPath)

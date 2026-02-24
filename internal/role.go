@@ -91,17 +91,47 @@ func Slugify(text string, maxLen int) string {
 	return s
 }
 
-func GenerateClaudeMD(wtPath, name, root string) error {
+// InjectSection injects content into a file within <!-- {tag}:START --> ... <!-- {tag}:END --> markers.
+// If the markers exist, the content between them is replaced. If not, the section is prepended to the file.
+// If the file does not exist, it is created with just the section.
+func InjectSection(filePath, tag, content string) error {
+	startMarker := fmt.Sprintf("<!-- %s:START -->", tag)
+	endMarker := fmt.Sprintf("<!-- %s:END -->", tag)
+	section := startMarker + "\n" + content + "\n" + endMarker
+
+	existing, err := os.ReadFile(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return os.WriteFile(filePath, []byte(section+"\n"), 0644)
+		}
+		return err
+	}
+
+	fileContent := string(existing)
+
+	// Try to find and replace existing section
+	re := regexp.MustCompile(`(?s)` + regexp.QuoteMeta(startMarker) + `.*?` + regexp.QuoteMeta(endMarker))
+	if re.MatchString(fileContent) {
+		fileContent = re.ReplaceAllString(fileContent, section)
+		return os.WriteFile(filePath, []byte(fileContent), 0644)
+	}
+
+	// Not found — prepend to file
+	fileContent = section + "\n\n" + fileContent
+	return os.WriteFile(filePath, []byte(fileContent), 0644)
+}
+
+// buildRoleSection builds the AGENT_TEAM section content from prompt.md and environment info.
+func buildRoleSection(wtPath, name, root string) (string, error) {
 	teamsDir := filepath.Join(wtPath, "agents", "teams", name)
 	promptPath := filepath.Join(teamsDir, "prompt.md")
-	claudePath := filepath.Join(wtPath, "CLAUDE.md")
 
 	prompt, err := os.ReadFile(promptPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil
+			return "", nil
 		}
-		return err
+		return "", err
 	}
 
 	var b strings.Builder
@@ -118,7 +148,31 @@ func GenerateClaudeMD(wtPath, name, root string) error {
 	b.WriteString("- Commit regularly with clear messages as you complete work\n\n")
 	b.WriteString("The main controller will merge your branch back to main when ready.\n")
 
-	return os.WriteFile(claudePath, []byte(b.String()), 0644)
+	return b.String(), nil
+}
+
+// InjectRolePrompt injects the role prompt into CLAUDE.md and AGENTS.md using tagged sections.
+// This preserves any existing content (e.g. OpenSpec sections) in those files.
+func InjectRolePrompt(wtPath, name, root string) error {
+	content, err := buildRoleSection(wtPath, name, root)
+	if err != nil {
+		return err
+	}
+	if content == "" {
+		return nil
+	}
+
+	claudePath := filepath.Join(wtPath, "CLAUDE.md")
+	if err := InjectSection(claudePath, "AGENT_TEAM", content); err != nil {
+		return fmt.Errorf("inject CLAUDE.md: %w", err)
+	}
+
+	agentsPath := filepath.Join(wtPath, "AGENTS.md")
+	if err := InjectSection(agentsPath, "AGENT_TEAM", content); err != nil {
+		return fmt.Errorf("inject AGENTS.md: %w", err)
+	}
+
+	return nil
 }
 
 func PromptMDContent(name string) string {

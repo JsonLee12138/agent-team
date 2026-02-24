@@ -73,9 +73,9 @@ func (a *App) RunOpen(name, provider, model string) error {
 		return nil
 	}
 
-	// Generate CLAUDE.md
-	if err := internal.GenerateClaudeMD(wtPath, name, root); err != nil {
-		return fmt.Errorf("generate CLAUDE.md: %w", err)
+	// Inject role prompt into CLAUDE.md and AGENTS.md
+	if err := internal.InjectRolePrompt(wtPath, name, root); err != nil {
+		return fmt.Errorf("inject role prompt: %w", err)
 	}
 
 	// Spawn pane

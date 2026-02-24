@@ -27,14 +27,28 @@ func TestRunOpen(t *testing.T) {
 		t.Errorf("PaneID = %q, want 77", cfg.PaneID)
 	}
 
-	// CLAUDE.md should exist
+	// CLAUDE.md should exist with AGENT_TEAM tags
 	claudeMD := filepath.Join(dir, ".worktrees", "dev", "CLAUDE.md")
 	data, err := os.ReadFile(claudeMD)
 	if err != nil {
 		t.Fatalf("CLAUDE.md not found: %v", err)
 	}
-	if !strings.Contains(string(data), "team/dev") {
+	content := string(data)
+	if !strings.Contains(content, "<!-- AGENT_TEAM:START -->") {
+		t.Error("CLAUDE.md should contain AGENT_TEAM start marker")
+	}
+	if !strings.Contains(content, "team/dev") {
 		t.Error("CLAUDE.md missing worktree context")
+	}
+
+	// AGENTS.md should also exist with AGENT_TEAM tags
+	agentsMD := filepath.Join(dir, ".worktrees", "dev", "AGENTS.md")
+	agentsData, err := os.ReadFile(agentsMD)
+	if err != nil {
+		t.Fatalf("AGENTS.md not found: %v", err)
+	}
+	if !strings.Contains(string(agentsData), "<!-- AGENT_TEAM:START -->") {
+		t.Error("AGENTS.md should contain AGENT_TEAM start marker")
 	}
 
 	// launch command should be sent

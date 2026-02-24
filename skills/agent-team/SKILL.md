@@ -20,6 +20,12 @@ For directory layout and bidirectional communication details, see [references/de
 brew tap JsonLee12138/agent-team && brew install agent-team
 ```
 
+## Upgrade
+
+```bash
+brew update && brew upgrade agent-team
+```
+
 ## Usage
 
 Run from within a project git repository:
