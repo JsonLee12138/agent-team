@@ -32,7 +32,7 @@ func TestRunAssign(t *testing.T) {
 	cfg.PaneID = "99"
 	cfg.Save(configPath)
 
-	err := app.RunAssign("worker", "Fix the login bug", "", "", "")
+	err := app.RunAssign("worker", "Fix the login bug", "", "", "", false)
 	if err != nil {
 		t.Fatalf("RunAssign: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestRunAssignWithProposal(t *testing.T) {
 	proposalContent := "# Proposal\n\nFix the login flow with JWT."
 	os.WriteFile(proposalFile, []byte(proposalContent), 0644)
 
-	err := app.RunAssign("worker", "Fix the login bug", "", "", proposalFile)
+	err := app.RunAssign("worker", "Fix the login bug", "", "", proposalFile, false)
 	if err != nil {
 		t.Fatalf("RunAssign: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestRunAssignWithProposal(t *testing.T) {
 
 func TestRunAssignNotFound(t *testing.T) {
 	app, _ := initTestApp(t)
-	err := app.RunAssign("ghost", "task", "", "", "")
+	err := app.RunAssign("ghost", "task", "", "", "", false)
 	if err == nil {
 		t.Error("expected error for nonexistent role")
 	}

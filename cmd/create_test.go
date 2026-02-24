@@ -47,7 +47,7 @@ type MockBackend struct {
 
 func (m *MockBackend) PaneAlive(id string) bool          { return m.AlivePanes[id] }
 func (m *MockBackend) PaneSend(_ string, t string) error { m.SentTexts = append(m.SentTexts, t); return nil }
-func (m *MockBackend) SpawnPane(_ string) (string, error) { return m.SpawnedID, nil }
+func (m *MockBackend) SpawnPane(_ string, _ bool) (string, error) { return m.SpawnedID, nil }
 func (m *MockBackend) KillPane(_ string) error            { return nil }
 func (m *MockBackend) SetTitle(_, _ string) error         { return nil }
 func (m *MockBackend) ActivatePane(_ string) error        { return nil }

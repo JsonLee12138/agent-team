@@ -12,7 +12,7 @@ import (
 type SessionBackend interface {
 	PaneAlive(paneID string) bool
 	PaneSend(paneID string, text string) error
-	SpawnPane(cwd string) (paneID string, err error)
+	SpawnPane(cwd string, newWindow bool) (paneID string, err error)
 	KillPane(paneID string) error
 	SetTitle(paneID string, title string) error
 	ActivatePane(paneID string) error
@@ -59,8 +59,12 @@ func (w *WeztermBackend) PaneSend(paneID string, text string) error {
 	return cmd2.Run()
 }
 
-func (w *WeztermBackend) SpawnPane(cwd string) (string, error) {
-	out, err := exec.Command("wezterm", "cli", "spawn", "--cwd", cwd).Output()
+func (w *WeztermBackend) SpawnPane(cwd string, newWindow bool) (string, error) {
+	args := []string{"cli", "spawn", "--cwd", cwd}
+	if newWindow {
+		args = append(args, "--new-window")
+	}
+	out, err := exec.Command("wezterm", args...).Output()
 	if err != nil {
 		return "", err
 	}
@@ -106,7 +110,7 @@ func (t *TmuxBackend) PaneSend(paneID string, text string) error {
 	return exec.Command("tmux", "send-keys", "-t", paneID, "Enter").Run()
 }
 
-func (t *TmuxBackend) SpawnPane(cwd string) (string, error) {
+func (t *TmuxBackend) SpawnPane(cwd string, _ bool) (string, error) {
 	out, err := exec.Command("tmux", "new-session", "-d", "-P", "-F", "#{pane_id}", "-c", cwd).Output()
 	if err != nil {
 		return "", err

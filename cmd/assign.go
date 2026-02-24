@@ -14,6 +14,7 @@ import (
 func newAssignCmd() *cobra.Command {
 	var model string
 	var proposal string
+	var newWindow bool
 	cmd := &cobra.Command{
 		Use:   `assign <name> "<description>" [provider]`,
 		Short: "Create an OpenSpec change and notify the role session",
@@ -23,15 +24,16 @@ func newAssignCmd() *cobra.Command {
 			if len(args) > 2 {
 				provider = args[2]
 			}
-			return GetApp(cmd).RunAssign(args[0], args[1], provider, model, proposal)
+			return GetApp(cmd).RunAssign(args[0], args[1], provider, model, proposal, newWindow)
 		},
 	}
 	cmd.Flags().StringVarP(&model, "model", "m", "", "AI model identifier")
 	cmd.Flags().StringVarP(&proposal, "proposal", "p", "", "Path to proposal file (use - for stdin)")
+	cmd.Flags().BoolVarP(&newWindow, "new-window", "w", false, "Open in a new window instead of a tab")
 	return cmd
 }
 
-func (a *App) RunAssign(name, desc, provider, model, proposalPath string) error {
+func (a *App) RunAssign(name, desc, provider, model, proposalPath string, newWindow bool) error {
 	root := a.Git.Root()
 	teamsDir := internal.TeamsDir(root, a.WtBase, name)
 	configPath := internal.ConfigPath(root, a.WtBase, name)
@@ -76,7 +78,7 @@ func (a *App) RunAssign(name, desc, provider, model, proposalPath string) error 
 
 	if !a.Session.PaneAlive(cfg.PaneID) {
 		fmt.Printf("Role '%s' is not running, opening session first...\n", name)
-		if err := a.RunOpen(name, provider, model); err != nil {
+		if err := a.RunOpen(name, provider, model, newWindow); err != nil {
 			return err
 		}
 		cfg, err = internal.LoadRoleConfig(configPath)

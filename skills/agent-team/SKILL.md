@@ -42,19 +42,15 @@ AGENT_TEAM_BACKEND=tmux agent-team <command>
 
 ## Brainstorming (Required Before Assign)
 
-When the user intends to assign new work to a role, you MUST brainstorm first:
+<HARD-GATE>
+Do NOT execute `agent-team assign`, write any code, or take any implementation action
+until you have presented a design and the user has explicitly approved it.
+This applies to EVERY assignment regardless of perceived simplicity.
+</HARD-GATE>
 
-1. **Explore context** — check the role's `prompt.md`, existing `openspec/specs/`, and project state
-2. **Ask clarifying questions** — one at a time, prefer multiple choice when possible
-3. **Propose 2-3 approaches** — with trade-offs and your recommendation
-4. **User confirms design** — get explicit approval
-5. **Write proposal** — save the confirmed design to a temp file
-6. **Execute assign** — run `agent-team assign <name> "<desc>" --proposal <file>`
+When the user intends to assign new work to a role, you MUST follow the brainstorming process.
 
-**Rules:**
-- Brainstorming is **mandatory** for new work assignments
-- Can be skipped when user explicitly says "just assign" or provides a complete design
-- One question at a time. YAGNI. Explore alternatives before settling.
+For the full checklist, principles, and anti-patterns, see [references/brainstorming.md](references/brainstorming.md).
 
 ## Commands
 
@@ -71,22 +67,23 @@ After creating, guide the user to edit `prompt.md` to define the role's expertis
 
 ### Open a role session
 ```bash
-agent-team open <name> [claude|codex|opencode] [--model <model>]
+agent-team open <name> [claude|codex|opencode] [--model <model>] [--new-window]
 ```
 - Generates `CLAUDE.md` in worktree root from `prompt.md` (auto-injected as system context)
 - Spawns a new terminal tab titled `<name>` running the chosen AI provider
+- `--new-window` / `-w`: Open in a new WezTerm window instead of a tab in the current window
 - Provider priority: CLI argument > `config.yaml default_provider` > claude
 - Model priority: `--model` flag > `config.yaml default_model` > provider default
 
 ### Open all sessions
 ```bash
-agent-team open-all [claude|codex|opencode] [--model <model>]
+agent-team open-all [claude|codex|opencode] [--model <model>] [--new-window]
 ```
-Opens every role that has a config.yaml.
+Opens every role that has a config.yaml. Use `--new-window` / `-w` to open each role in a separate window.
 
 ### Assign a change
 ```bash
-agent-team assign <name> "<description>" [claude|codex|opencode] [--model <model>] [--proposal <file>]
+agent-team assign <name> "<description>" [claude|codex|opencode] [--model <model>] [--proposal <file>] [--new-window]
 ```
 1. Creates an OpenSpec change at `openspec/changes/<timestamp>-<slug>/`
 2. Writes the proposal file from `--proposal` flag (or empty if not provided)
@@ -117,10 +114,12 @@ Shows all roles, session status (running/stopped), and active OpenSpec changes.
 ```bash
 agent-team merge <name>
 ```
-Merges `team/<name>` into the current branch with `--no-ff`. Run `delete` afterward to clean up.
+Merges `team/<name>` into the current branch with `--no-ff`.
+After merging, do NOT automatically delete the role — wait for the user to explicitly request deletion.
 
 ### Delete a role
 ```bash
 agent-team delete <name>
 ```
 Closes the running session (if any), removes the worktree, and deletes the `team/<name>` branch.
+This is a separate, destructive operation — only run when the user explicitly asks to delete.

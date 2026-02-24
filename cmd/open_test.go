@@ -16,7 +16,7 @@ func TestRunOpen(t *testing.T) {
 	app.Session = mock
 	app.RunCreate("dev")
 
-	if err := app.RunOpen("dev", "", ""); err != nil {
+	if err := app.RunOpen("dev", "", "", false); err != nil {
 		t.Fatalf("RunOpen: %v", err)
 	}
 
@@ -74,7 +74,7 @@ func TestRunOpenAlreadyRunning(t *testing.T) {
 	app.Session = mock
 
 	// Should not error, just print message
-	err := app.RunOpen("running", "", "")
+	err := app.RunOpen("running", "", "", false)
 	if err != nil {
 		t.Fatalf("RunOpen on running role should not error: %v", err)
 	}
@@ -86,7 +86,7 @@ func TestRunOpenWithProvider(t *testing.T) {
 	app.Session = mock
 	app.RunCreate("test")
 
-	app.RunOpen("test", "codex", "gpt-5")
+	app.RunOpen("test", "codex", "gpt-5", false)
 
 	if len(mock.SentTexts) == 0 {
 		t.Fatal("no command sent")

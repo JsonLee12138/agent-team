@@ -12,24 +12,27 @@ import (
 
 func newOpenCmd() *cobra.Command {
 	var model string
+	var newWindow bool
 	cmd := &cobra.Command{
 		Use:   "open <name> [provider]",
-		Short: "Open a role session in a new terminal tab",
+		Short: "Open a role session in a new terminal tab or window",
 		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			provider := ""
 			if len(args) > 1 {
 				provider = args[1]
 			}
-			return GetApp(cmd).RunOpen(args[0], provider, model)
+			return GetApp(cmd).RunOpen(args[0], provider, model, newWindow)
 		},
 	}
 	cmd.Flags().StringVarP(&model, "model", "m", "", "AI model identifier")
+	cmd.Flags().BoolVarP(&newWindow, "new-window", "w", false, "Open in a new window instead of a tab")
 	return cmd
 }
 
 func newOpenAllCmd() *cobra.Command {
 	var model string
+	var newWindow bool
 	cmd := &cobra.Command{
 		Use:   "open-all [provider]",
 		Short: "Open all role sessions",
@@ -39,14 +42,15 @@ func newOpenAllCmd() *cobra.Command {
 			if len(args) > 0 {
 				provider = args[0]
 			}
-			return GetApp(cmd).RunOpenAll(provider, model)
+			return GetApp(cmd).RunOpenAll(provider, model, newWindow)
 		},
 	}
 	cmd.Flags().StringVarP(&model, "model", "m", "", "AI model identifier")
+	cmd.Flags().BoolVarP(&newWindow, "new-window", "w", false, "Open in a new window instead of a tab")
 	return cmd
 }
 
-func (a *App) RunOpen(name, provider, model string) error {
+func (a *App) RunOpen(name, provider, model string, newWindow bool) error {
 	root := a.Git.Root()
 	teamsDir := internal.TeamsDir(root, a.WtBase, name)
 	configPath := internal.ConfigPath(root, a.WtBase, name)
@@ -79,16 +83,18 @@ func (a *App) RunOpen(name, provider, model string) error {
 	}
 
 	// Spawn pane
-	paneID, err := a.Session.SpawnPane(wtPath)
+	paneID, err := a.Session.SpawnPane(wtPath, newWindow)
 	if err != nil || paneID == "" {
 		return fmt.Errorf("failed to open session for '%s': %w", name, err)
 	}
 
 	a.Session.SetTitle(paneID, name)
 
-	// Return focus (wezterm only)
-	if currentPane := os.Getenv("WEZTERM_PANE"); currentPane != "" {
-		a.Session.ActivatePane(currentPane)
+	// Return focus (wezterm tab mode only; new window doesn't steal focus)
+	if !newWindow {
+		if currentPane := os.Getenv("WEZTERM_PANE"); currentPane != "" {
+			a.Session.ActivatePane(currentPane)
+		}
 	}
 
 	// Save pane ID and controller pane ID
@@ -111,14 +117,14 @@ func (a *App) RunOpen(name, provider, model string) error {
 	return nil
 }
 
-func (a *App) RunOpenAll(provider, model string) error {
+func (a *App) RunOpenAll(provider, model string, newWindow bool) error {
 	root := a.Git.Root()
 	roles := internal.ListRoles(root, a.WtBase)
 	if len(roles) == 0 {
 		return fmt.Errorf("no roles found. Create one with: agent-team create <name>")
 	}
 	for _, role := range roles {
-		if err := a.RunOpen(role, provider, model); err != nil {
+		if err := a.RunOpen(role, provider, model, newWindow); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to open '%s': %v\n", role, err)
 		}
 	}
