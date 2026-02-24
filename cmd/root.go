@@ -68,4 +68,6 @@ func GetApp(cmd *cobra.Command) *App {
 func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(newCreateCmd())
 	rootCmd.AddCommand(newDeleteCmd())
+	rootCmd.AddCommand(newOpenCmd())
+	rootCmd.AddCommand(newOpenAllCmd())
 }
