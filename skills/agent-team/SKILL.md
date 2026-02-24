@@ -17,7 +17,7 @@ For directory layout, task format, and bidirectional communication details, see 
 ## Install
 
 ```bash
-brew tap leeforge/tap && brew install agent-team
+brew tap JsonLee12138/agent-team && brew install agent-team
 ```
 
 ## Usage
