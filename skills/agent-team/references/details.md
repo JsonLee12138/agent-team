@@ -8,14 +8,25 @@
   agents/teams/<name>/
     config.yaml                      <- name, default_provider, default_model, pane_id
     prompt.md                        <- role system prompt (edit manually)
-    tasks/
-      pending/<timestamp>-<slug>.md  <- active tasks
-      done/<timestamp>-<slug>.md     <- completed/archived tasks
+  openspec/
+    specs/                           <- project specifications
+    changes/                         <- active changes (managed by OpenSpec)
+      <change-name>/
+        .openspec.yaml               <- change metadata
+        proposal.md                  <- brainstorming output from controller
+        specs/                       <- delta specs (created by role)
+        design.md                    <- design artifact (created by role)
+        tasks.md                     <- task breakdown (created by role)
+    config.yaml                      <- OpenSpec configuration
 ```
 
-## Task file format
+## Change workflow
 
-Tasks are Markdown files. When a role completes a task, move the file from `tasks/pending/` to `tasks/done/`.
+Changes are managed by OpenSpec. The controller creates a change with a proposal via `agent-team assign`. The role then proceeds through the OpenSpec workflow:
+
+1. `/opsx:continue` — create remaining artifacts (specs, design, tasks)
+2. `/opsx:apply` — implement the tasks
+3. `/opsx:verify` — validate implementation matches the design
 
 ## Bidirectional communication
 
