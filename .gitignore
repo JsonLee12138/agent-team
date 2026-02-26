@@ -10,4 +10,5 @@ output
 # Python cache
 __pycache__/
 *.pyc
+docs/
 docs-bak/
