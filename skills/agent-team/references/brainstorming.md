@@ -6,16 +6,16 @@ Every assignment goes through this process. A single-file fix, a config change, 
 
 ## Checklist
 
-When the user intends to assign new work to a role, complete these steps in order:
+When the user intends to assign new work to a worker, complete these steps in order:
 
-1. **Explore project context** — check the role's `prompt.md`, existing `openspec/specs/`, project files, docs, and recent commits
+1. **Explore project context** — check the role's `system.md`, existing `openspec/specs/`, project files, docs, and recent commits
 2. **Ask clarifying questions** — one at a time, one question per message; prefer multiple choice when possible; focus on purpose, constraints, and success criteria
 3. **Propose 2-3 approaches** — with trade-offs; lead with your recommendation and reasoning
 4. **Present design** — scale each section to its complexity (a few sentences if straightforward, up to 200-300 words if nuanced); ask after each section whether it looks right; cover: architecture, components, data flow, error handling, testing as relevant
 5. **User approves design** — get explicit approval; be ready to revise if needed
 6. **Write design doc** — save to `docs/brainstorming/YYYY-MM-DD-<topic>.md` and commit
 7. **Write proposal** — save the approved design to a temp file
-8. **Execute assign** — run `agent-team assign <name> "<desc>" --proposal <file>`
+8. **Execute assign** — run `agent-team worker assign <worker-id> "<desc>" --design docs/brainstorming/<file>.md --proposal <file>`
 
 ## Key Principles
 

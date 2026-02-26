@@ -23,24 +23,88 @@ func TestFindWtBase(t *testing.T) {
 	}
 }
 
-func TestListRoles(t *testing.T) {
+func TestListAvailableRoles(t *testing.T) {
 	dir := t.TempDir()
-	wtBase := ".worktrees"
 
 	// empty → no roles
-	roles := ListRoles(dir, wtBase)
+	roles := ListAvailableRoles(dir)
 	if len(roles) != 0 {
-		t.Errorf("ListRoles(empty) = %v, want empty", roles)
+		t.Errorf("ListAvailableRoles(empty) = %v, want empty", roles)
 	}
 
-	// create a role
-	teamsDir := filepath.Join(dir, wtBase, "backend", "agents", "teams", "backend")
-	os.MkdirAll(teamsDir, 0755)
-	os.WriteFile(filepath.Join(teamsDir, "config.yaml"), []byte("name: backend\n"), 0644)
+	// create a role with SKILL.md
+	roleDir := filepath.Join(dir, "agents", "teams", "backend")
+	os.MkdirAll(roleDir, 0755)
+	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# backend\n"), 0644)
 
-	roles = ListRoles(dir, wtBase)
+	roles = ListAvailableRoles(dir)
 	if len(roles) != 1 || roles[0] != "backend" {
-		t.Errorf("ListRoles = %v, want [backend]", roles)
+		t.Errorf("ListAvailableRoles = %v, want [backend]", roles)
+	}
+}
+
+func TestListWorkers(t *testing.T) {
+	dir := t.TempDir()
+
+	// empty → no workers
+	workers := ListWorkers(dir)
+	if len(workers) != 0 {
+		t.Errorf("ListWorkers(empty) = %v, want empty", workers)
+	}
+
+	// create a worker
+	workerDir := filepath.Join(dir, "agents", "workers", "backend-001")
+	os.MkdirAll(workerDir, 0755)
+	cfg := &WorkerConfig{WorkerID: "backend-001", Role: "backend"}
+	cfg.Save(filepath.Join(workerDir, "config.yaml"))
+
+	workers = ListWorkers(dir)
+	if len(workers) != 1 || workers[0].WorkerID != "backend-001" {
+		t.Errorf("ListWorkers = %v, want [backend-001]", workers)
+	}
+	if workers[0].Role != "backend" {
+		t.Errorf("ListWorkers[0].Role = %q, want backend", workers[0].Role)
+	}
+}
+
+func TestNextWorkerID(t *testing.T) {
+	dir := t.TempDir()
+
+	// no workers → 001
+	got := NextWorkerID(dir, "frontend-dev")
+	if got != "frontend-dev-001" {
+		t.Errorf("NextWorkerID(empty) = %q, want frontend-dev-001", got)
+	}
+
+	// create worker 001
+	os.MkdirAll(filepath.Join(dir, "agents", "workers", "frontend-dev-001"), 0755)
+	got = NextWorkerID(dir, "frontend-dev")
+	if got != "frontend-dev-002" {
+		t.Errorf("NextWorkerID(001 exists) = %q, want frontend-dev-002", got)
+	}
+
+	// create worker 005 (gap)
+	os.MkdirAll(filepath.Join(dir, "agents", "workers", "frontend-dev-005"), 0755)
+	got = NextWorkerID(dir, "frontend-dev")
+	if got != "frontend-dev-006" {
+		t.Errorf("NextWorkerID(005 exists) = %q, want frontend-dev-006", got)
+	}
+}
+
+func TestWriteWorktreeGitignore(t *testing.T) {
+	dir := t.TempDir()
+	if err := WriteWorktreeGitignore(dir); err != nil {
+		t.Fatalf("WriteWorktreeGitignore: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
+	if err != nil {
+		t.Fatalf("read .gitignore: %v", err)
+	}
+	content := string(data)
+	for _, expected := range []string{".gitignore", ".claude/", ".codex/", "openspec/"} {
+		if !strings.Contains(content, expected) {
+			t.Errorf(".gitignore should contain %q", expected)
+		}
 	}
 }
 
@@ -142,7 +206,6 @@ func TestInjectSection(t *testing.T) {
 		if !strings.Contains(content, "other stuff") {
 			t.Error("other content should be preserved")
 		}
-		// Should have exactly one start marker
 		if strings.Count(content, "<!-- MY_TAG:START -->") != 1 {
 			t.Error("should have exactly one start marker")
 		}
@@ -170,162 +233,88 @@ func TestInjectSection(t *testing.T) {
 	})
 }
 
-func TestInjectRolePrompt(t *testing.T) {
+func TestInjectRolePromptV2(t *testing.T) {
 	dir := t.TempDir()
-	wtPath := filepath.Join(dir, ".worktrees", "dev")
-	teamsDir := filepath.Join(wtPath, "agents", "teams", "dev")
-	os.MkdirAll(teamsDir, 0755)
+	wtPath := filepath.Join(dir, ".worktrees", "dev-001")
+	os.MkdirAll(wtPath, 0755)
 
-	promptContent := "# Role: dev\n\nA developer role.\n"
-	os.WriteFile(filepath.Join(teamsDir, "prompt.md"), []byte(promptContent), 0644)
+	// Create role system.md in agents/teams/dev/
+	roleDir := filepath.Join(dir, "agents", "teams", "dev")
+	os.MkdirAll(roleDir, 0755)
+	os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# System Prompt: dev\n\nA developer role.\n"), 0644)
 
-	err := InjectRolePrompt(wtPath, "dev", dir)
+	err := InjectRolePrompt(wtPath, "dev-001", "dev", dir)
 	if err != nil {
 		t.Fatalf("InjectRolePrompt: %v", err)
 	}
 
-	// Check CLAUDE.md
 	data, _ := os.ReadFile(filepath.Join(wtPath, "CLAUDE.md"))
 	content := string(data)
 
 	if !strings.Contains(content, "<!-- AGENT_TEAM:START -->") {
 		t.Error("CLAUDE.md should contain AGENT_TEAM start marker")
 	}
-	if !strings.Contains(content, "<!-- AGENT_TEAM:END -->") {
-		t.Error("CLAUDE.md should contain AGENT_TEAM end marker")
-	}
-	if !strings.Contains(content, "# Role: dev") {
-		t.Error("CLAUDE.md should contain prompt.md content")
+	if !strings.Contains(content, "# System Prompt: dev") {
+		t.Error("CLAUDE.md should contain system.md content")
 	}
 	if !strings.Contains(content, "Development Environment") {
 		t.Error("CLAUDE.md should contain worktree context")
 	}
-	if !strings.Contains(content, "team/dev") {
-		t.Error("CLAUDE.md should contain branch name")
+	if !strings.Contains(content, "team/dev-001") {
+		t.Error("CLAUDE.md should contain worker branch name")
 	}
-
-	// Check AGENTS.md
-	agentsData, _ := os.ReadFile(filepath.Join(wtPath, "AGENTS.md"))
-	agentsContent := string(agentsData)
-
-	if !strings.Contains(agentsContent, "<!-- AGENT_TEAM:START -->") {
-		t.Error("AGENTS.md should contain AGENT_TEAM start marker")
-	}
-	if !strings.Contains(agentsContent, "# Role: dev") {
-		t.Error("AGENTS.md should contain prompt.md content")
+	if !strings.Contains(content, "Task Completion Protocol") {
+		t.Error("CLAUDE.md should contain task completion protocol")
 	}
 }
 
-func TestInjectRolePromptPreservesOpenSpec(t *testing.T) {
+func TestInjectRolePromptV1Fallback(t *testing.T) {
 	dir := t.TempDir()
 	wtPath := filepath.Join(dir, ".worktrees", "dev")
 	teamsDir := filepath.Join(wtPath, "agents", "teams", "dev")
 	os.MkdirAll(teamsDir, 0755)
 
-	promptContent := "# Role: dev\n\nA developer role.\n"
-	os.WriteFile(filepath.Join(teamsDir, "prompt.md"), []byte(promptContent), 0644)
+	// No system.md in agents/teams/dev/, but prompt.md in worktree
+	os.WriteFile(filepath.Join(teamsDir, "prompt.md"), []byte("# Role: dev\n\nA developer role.\n"), 0644)
 
-	// Simulate OpenSpec having already written to CLAUDE.md
-	openspecContent := "<!-- OPENSPEC:START -->\nOpenSpec config here\n<!-- OPENSPEC:END -->\n"
-	os.WriteFile(filepath.Join(wtPath, "CLAUDE.md"), []byte(openspecContent), 0644)
-	os.WriteFile(filepath.Join(wtPath, "AGENTS.md"), []byte(openspecContent), 0644)
-
-	err := InjectRolePrompt(wtPath, "dev", dir)
+	err := InjectRolePrompt(wtPath, "dev", "dev", dir)
 	if err != nil {
 		t.Fatalf("InjectRolePrompt: %v", err)
 	}
 
-	// Check CLAUDE.md preserves OpenSpec
 	data, _ := os.ReadFile(filepath.Join(wtPath, "CLAUDE.md"))
 	content := string(data)
-
-	if !strings.Contains(content, "OpenSpec config here") {
-		t.Error("CLAUDE.md should preserve OPENSPEC content")
-	}
-	if !strings.Contains(content, "<!-- AGENT_TEAM:START -->") {
-		t.Error("CLAUDE.md should contain AGENT_TEAM section")
-	}
-
-	// Check AGENTS.md preserves OpenSpec
-	agentsData, _ := os.ReadFile(filepath.Join(wtPath, "AGENTS.md"))
-	agentsContent := string(agentsData)
-
-	if !strings.Contains(agentsContent, "OpenSpec config here") {
-		t.Error("AGENTS.md should preserve OPENSPEC content")
-	}
-	if !strings.Contains(agentsContent, "<!-- AGENT_TEAM:START -->") {
-		t.Error("AGENTS.md should contain AGENT_TEAM section")
+	if !strings.Contains(content, "# Role: dev") {
+		t.Error("CLAUDE.md should contain prompt.md content as fallback")
 	}
 }
 
-func TestInjectRolePromptUpdate(t *testing.T) {
+func TestInjectRolePromptNoSource(t *testing.T) {
 	dir := t.TempDir()
-	wtPath := filepath.Join(dir, ".worktrees", "dev")
-	teamsDir := filepath.Join(wtPath, "agents", "teams", "dev")
-	os.MkdirAll(teamsDir, 0755)
-
-	// First injection
-	os.WriteFile(filepath.Join(teamsDir, "prompt.md"), []byte("# Role: dev v1\n"), 0644)
-	InjectRolePrompt(wtPath, "dev", dir)
-
-	// Update prompt and re-inject
-	os.WriteFile(filepath.Join(teamsDir, "prompt.md"), []byte("# Role: dev v2\n"), 0644)
-	err := InjectRolePrompt(wtPath, "dev", dir)
-	if err != nil {
-		t.Fatalf("InjectRolePrompt (update): %v", err)
-	}
-
-	data, _ := os.ReadFile(filepath.Join(wtPath, "CLAUDE.md"))
-	content := string(data)
-
-	if strings.Contains(content, "dev v1") {
-		t.Error("old prompt content should be replaced")
-	}
-	if !strings.Contains(content, "dev v2") {
-		t.Error("new prompt content should be present")
-	}
-	if strings.Count(content, "<!-- AGENT_TEAM:START -->") != 1 {
-		t.Error("should have exactly one AGENT_TEAM section")
-	}
-}
-
-func TestInjectRolePromptNoPromptFile(t *testing.T) {
-	dir := t.TempDir()
-	wtPath := filepath.Join(dir, ".worktrees", "dev")
+	wtPath := filepath.Join(dir, ".worktrees", "dev-001")
 	os.MkdirAll(wtPath, 0755)
 
-	// No prompt.md — should be a no-op
-	err := InjectRolePrompt(wtPath, "dev", dir)
+	// No system.md, no prompt.md — should be a no-op
+	err := InjectRolePrompt(wtPath, "dev-001", "dev", dir)
 	if err != nil {
-		t.Fatalf("InjectRolePrompt should not error without prompt.md: %v", err)
+		t.Fatalf("InjectRolePrompt should not error without source: %v", err)
 	}
 
-	// CLAUDE.md should not be created
 	if _, err := os.Stat(filepath.Join(wtPath, "CLAUDE.md")); !os.IsNotExist(err) {
-		t.Error("CLAUDE.md should not be created without prompt.md")
+		t.Error("CLAUDE.md should not be created without source")
 	}
 }
 
-func TestPromptMDTemplate(t *testing.T) {
-	content := PromptMDContent("backend")
-	if !strings.Contains(content, "# Role: backend") {
-		t.Error("prompt template should contain role name")
+func TestRolePathFunctions(t *testing.T) {
+	root := "/project"
+
+	if got := RoleDir(root, "frontend-dev"); got != "/project/agents/teams/frontend-dev" {
+		t.Errorf("RoleDir = %q", got)
 	}
-	if !strings.Contains(content, "Communication Protocol") {
-		t.Error("prompt template should contain communication protocol")
+	if got := WorkerDir(root, "frontend-dev-001"); got != "/project/agents/workers/frontend-dev-001" {
+		t.Errorf("WorkerDir = %q", got)
 	}
-	// NEW: should contain Workflow section with OpenSpec
-	if !strings.Contains(content, "## Workflow") {
-		t.Error("prompt template should contain Workflow section")
-	}
-	if !strings.Contains(content, "/opsx:continue") {
-		t.Error("prompt template should reference /opsx:continue")
-	}
-	if !strings.Contains(content, "/opsx:apply") {
-		t.Error("prompt template should reference /opsx:apply")
-	}
-	// Should NOT contain old task references
-	if strings.Contains(content, "tasks/pending") {
-		t.Error("prompt template should not reference tasks/pending")
+	if got := WorkerConfigPath(root, "frontend-dev-001"); got != "/project/agents/workers/frontend-dev-001/config.yaml" {
+		t.Errorf("WorkerConfigPath = %q", got)
 	}
 }

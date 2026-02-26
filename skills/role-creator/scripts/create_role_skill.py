@@ -227,14 +227,18 @@ def create_or_update_role(
     overwrite_mode: str = "ask",
     input_fn: Callable[[str], str] = input,
     now_fn: Callable[[], datetime] = datetime.now,
+    target_dir_name: str = "skills",
 ) -> GenerationResult:
     validate_role_name(config.role_name)
 
-    skills_root = repo_root / "skills"
-    target_dir = skills_root / config.role_name
+    if target_dir_name == "agents/teams":
+        base_dir = repo_root / "agents" / "teams"
+    else:
+        base_dir = repo_root / target_dir_name
+    target_dir = base_dir / config.role_name
     backup_path: Path | None = None
 
-    skills_root.mkdir(parents=True, exist_ok=True)
+    base_dir.mkdir(parents=True, exist_ok=True)
     if target_dir.exists():
         if not target_dir.is_dir():
             raise FileExistsError(f"target path exists and is not a directory: {target_dir}")
@@ -317,6 +321,13 @@ def build_parser() -> argparse.ArgumentParser:
         default="ask",
         help="How to handle existing role directory",
     )
+    parser.add_argument(
+        "--target-dir",
+        default="skills",
+        help="Target directory for the role skill package. "
+        "Use 'skills' for open-source publishing (default), "
+        "'agents/teams' for team use, or a custom path.",
+    )
     return parser
 
 
@@ -352,6 +363,7 @@ def main() -> int:
         config=config,
         templates_dir=DEFAULT_TEMPLATE_DIR,
         overwrite_mode=args.overwrite,
+        target_dir_name=args.target_dir,
     )
 
     print(f"Generated role skill at {result.target_dir}")

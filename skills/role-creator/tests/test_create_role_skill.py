@@ -248,6 +248,54 @@ class RoleCreatorScriptTests(unittest.TestCase):
             ["a", "b", "c"],
         )
 
+    def test_target_dir_agents_teams(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            config = self.module.RoleConfig(
+                role_name="backend-dev",
+                description="Backend development role",
+                system_goal="Build reliable backend services",
+                in_scope=["API design", "Database queries"],
+                out_of_scope=["Frontend work"],
+                skills=["vitest"],
+            )
+            result = self.module.create_or_update_role(
+                repo_root=repo_root,
+                config=config,
+                templates_dir=self.templates_dir,
+                overwrite_mode="ask",
+                target_dir_name="agents/teams",
+            )
+            target = repo_root / "agents" / "teams" / "backend-dev"
+            self.assertEqual(result.target_dir, target)
+            self.assertTrue((target / "SKILL.md").exists())
+            self.assertTrue((target / "references" / "role.yaml").exists())
+            self.assertTrue((target / "system.md").exists())
+            # Verify skills/ directory was NOT created
+            self.assertFalse((repo_root / "skills" / "backend-dev").exists())
+
+    def test_target_dir_custom_path(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            config = self.module.RoleConfig(
+                role_name="custom-role",
+                description="Custom role",
+                system_goal="Do custom work",
+                in_scope=["Custom tasks"],
+                out_of_scope=["Other tasks"],
+                skills=[],
+            )
+            result = self.module.create_or_update_role(
+                repo_root=repo_root,
+                config=config,
+                templates_dir=self.templates_dir,
+                overwrite_mode="ask",
+                target_dir_name="my-custom-dir",
+            )
+            target = repo_root / "my-custom-dir" / "custom-role"
+            self.assertEqual(result.target_dir, target)
+            self.assertTrue((target / "SKILL.md").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

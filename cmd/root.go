@@ -66,13 +66,8 @@ func GetApp(cmd *cobra.Command) *App {
 }
 
 func RegisterCommands(rootCmd *cobra.Command) {
-	rootCmd.AddCommand(newCreateCmd())
-	rootCmd.AddCommand(newDeleteCmd())
-	rootCmd.AddCommand(newOpenCmd())
-	rootCmd.AddCommand(newOpenAllCmd())
-	rootCmd.AddCommand(newAssignCmd())
+	rootCmd.AddCommand(newWorkerCmd())
+	rootCmd.AddCommand(newRoleCmd())
 	rootCmd.AddCommand(newReplyCmd())
 	rootCmd.AddCommand(newReplyMainCmd())
-	rootCmd.AddCommand(newStatusCmd())
-	rootCmd.AddCommand(newMergeCmd())
 }

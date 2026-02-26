@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -30,6 +32,127 @@ func FindWtBase(root string) string {
 	}
 	return ".worktrees"
 }
+
+// --- v2 path functions ---
+
+// RoleDir returns the path to a role definition: agents/teams/<role-name>/
+func RoleDir(root, roleName string) string {
+	return filepath.Join(root, "agents", "teams", roleName)
+}
+
+// RoleYAMLPath returns the path to a role's role.yaml.
+func RoleYAMLPath(root, roleName string) string {
+	return filepath.Join(RoleDir(root, roleName), "references", "role.yaml")
+}
+
+// RoleSystemMDPath returns the path to a role's system.md.
+func RoleSystemMDPath(root, roleName string) string {
+	return filepath.Join(RoleDir(root, roleName), "system.md")
+}
+
+// WorkerDir returns the path to a worker config directory: agents/workers/<worker-id>/
+func WorkerDir(root, workerID string) string {
+	return filepath.Join(root, "agents", "workers", workerID)
+}
+
+// WorkerConfigPath returns the path to a worker's config.yaml.
+func WorkerConfigPath(root, workerID string) string {
+	return filepath.Join(WorkerDir(root, workerID), "config.yaml")
+}
+
+// WorkerInfo holds summary info for a worker.
+type WorkerInfo struct {
+	WorkerID string
+	Role     string
+	Config   *WorkerConfig
+}
+
+// ListAvailableRoles scans agents/teams/ for directories containing SKILL.md.
+func ListAvailableRoles(root string) []string {
+	teamsDir := filepath.Join(root, "agents", "teams")
+	entries, err := os.ReadDir(teamsDir)
+	if err != nil {
+		return nil
+	}
+	var roles []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		skillPath := filepath.Join(teamsDir, e.Name(), "SKILL.md")
+		if _, err := os.Stat(skillPath); err == nil {
+			roles = append(roles, e.Name())
+		}
+	}
+	sort.Strings(roles)
+	return roles
+}
+
+// ListWorkers scans agents/workers/ for directories containing config.yaml.
+func ListWorkers(root string) []WorkerInfo {
+	workersDir := filepath.Join(root, "agents", "workers")
+	entries, err := os.ReadDir(workersDir)
+	if err != nil {
+		return nil
+	}
+	var workers []WorkerInfo
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		configPath := filepath.Join(workersDir, e.Name(), "config.yaml")
+		cfg, err := LoadWorkerConfig(configPath)
+		if err != nil {
+			continue
+		}
+		workers = append(workers, WorkerInfo{
+			WorkerID: e.Name(),
+			Role:     cfg.Role,
+			Config:   cfg,
+		})
+	}
+	return workers
+}
+
+// workerIDPattern matches <role-name>-<3-digit-number>
+var workerIDPattern = regexp.MustCompile(`^(.+)-(\d{3})$`)
+
+// NextWorkerID computes the next worker ID for a given role (e.g., frontend-dev-001).
+func NextWorkerID(root, roleName string) string {
+	workersDir := filepath.Join(root, "agents", "workers")
+	entries, err := os.ReadDir(workersDir)
+	if err != nil {
+		return fmt.Sprintf("%s-001", roleName)
+	}
+
+	maxNum := 0
+	prefix := roleName + "-"
+	for _, e := range entries {
+		if !e.IsDir() || !strings.HasPrefix(e.Name(), prefix) {
+			continue
+		}
+		m := workerIDPattern.FindStringSubmatch(e.Name())
+		if m == nil || m[1] != roleName {
+			continue
+		}
+		num, err := strconv.Atoi(m[2])
+		if err != nil {
+			continue
+		}
+		if num > maxNum {
+			maxNum = num
+		}
+	}
+	return fmt.Sprintf("%s-%03d", roleName, maxNum+1)
+}
+
+// WriteWorktreeGitignore writes a .gitignore to exclude worker-local files.
+func WriteWorktreeGitignore(wtPath string) error {
+	content := ".gitignore\n.claude/\n.codex/\nopenspec/\n"
+	return os.WriteFile(filepath.Join(wtPath, ".gitignore"), []byte(content), 0644)
+}
+
+// --- Legacy v1 path functions (kept for backward compat during migration) ---
 
 func ListRoles(root, wtBase string) []string {
 	base := filepath.Join(root, wtBase)
@@ -63,6 +186,8 @@ func ConfigPath(root, wtBase, name string) string {
 	return filepath.Join(TeamsDir(root, wtBase, name), "config.yaml")
 }
 
+// --- Shared utilities ---
+
 func BuildLaunchCmd(provider, model string) string {
 	if provider == "" {
 		provider = "claude"
@@ -92,8 +217,6 @@ func Slugify(text string, maxLen int) string {
 }
 
 // InjectSection injects content into a file within <!-- {tag}:START --> ... <!-- {tag}:END --> markers.
-// If the markers exist, the content between them is replaced. If not, the section is prepended to the file.
-// If the file does not exist, it is created with just the section.
 func InjectSection(filePath, tag, content string) error {
 	startMarker := fmt.Sprintf("<!-- %s:START -->", tag)
 	endMarker := fmt.Sprintf("<!-- %s:END -->", tag)
@@ -109,29 +232,32 @@ func InjectSection(filePath, tag, content string) error {
 
 	fileContent := string(existing)
 
-	// Try to find and replace existing section
 	re := regexp.MustCompile(`(?s)` + regexp.QuoteMeta(startMarker) + `.*?` + regexp.QuoteMeta(endMarker))
 	if re.MatchString(fileContent) {
 		fileContent = re.ReplaceAllString(fileContent, section)
 		return os.WriteFile(filePath, []byte(fileContent), 0644)
 	}
 
-	// Not found — prepend to file
 	fileContent = section + "\n\n" + fileContent
 	return os.WriteFile(filePath, []byte(fileContent), 0644)
 }
 
-// buildRoleSection builds the AGENT_TEAM section content from prompt.md and environment info.
-func buildRoleSection(wtPath, name, root string) (string, error) {
-	teamsDir := filepath.Join(wtPath, "agents", "teams", name)
-	promptPath := filepath.Join(teamsDir, "prompt.md")
-
-	prompt, err := os.ReadFile(promptPath)
+// buildRoleSection builds the AGENT_TEAM section content from system.md (v2) or prompt.md (v1 fallback).
+func buildRoleSection(wtPath, workerID, roleName, root string) (string, error) {
+	// v2: try reading system.md from role definition in main repo
+	roleSystemPath := RoleSystemMDPath(root, roleName)
+	prompt, err := os.ReadFile(roleSystemPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return "", nil
+		// v1 fallback: try prompt.md in worktree
+		teamsDir := filepath.Join(wtPath, "agents", "teams", workerID)
+		promptPath := filepath.Join(teamsDir, "prompt.md")
+		prompt, err = os.ReadFile(promptPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return "", nil
+			}
+			return "", err
 		}
-		return "", err
 	}
 
 	var b strings.Builder
@@ -139,22 +265,28 @@ func buildRoleSection(wtPath, name, root string) (string, error) {
 	b.WriteString("\n## Development Environment\n\n")
 	b.WriteString("You are working in an **isolated git worktree**. All development MUST happen here:\n\n")
 	fmt.Fprintf(&b, "- **Working directory**: `%s`\n", wtPath)
-	fmt.Fprintf(&b, "- **Git branch**: `team/%s` (your dedicated branch)\n", name)
+	fmt.Fprintf(&b, "- **Git branch**: `team/%s` (your dedicated branch)\n", workerID)
 	fmt.Fprintf(&b, "- **Main project root**: `%s`\n\n", root)
 	b.WriteString("### Git Rules\n\n")
-	fmt.Fprintf(&b, "- All changes and commits go to the `team/%s` branch — this is already checked out\n", name)
+	fmt.Fprintf(&b, "- All changes and commits go to the `team/%s` branch — this is already checked out\n", workerID)
 	b.WriteString("- **Never** run `git checkout`, `git switch`, or change branches\n")
 	b.WriteString("- **Never** merge or rebase from within this worktree\n")
 	b.WriteString("- Commit regularly with clear messages as you complete work\n\n")
-	b.WriteString("The main controller will merge your branch back to main when ready.\n")
+	b.WriteString("The main controller will merge your branch back to main when ready.\n\n")
+	b.WriteString("### Task Completion Protocol\n\n")
+	b.WriteString("When you finish a task:\n")
+	b.WriteString("1. Run `/openspec archive` to archive the completed change\n")
+	b.WriteString("2. Notify the main controller:\n")
+	b.WriteString("   ```bash\n")
+	b.WriteString("   agent-team reply-main \"<summary of completed work>\"\n")
+	b.WriteString("   ```\n")
 
 	return b.String(), nil
 }
 
 // InjectRolePrompt injects the role prompt into CLAUDE.md and AGENTS.md using tagged sections.
-// This preserves any existing content (e.g. OpenSpec sections) in those files.
-func InjectRolePrompt(wtPath, name, root string) error {
-	content, err := buildRoleSection(wtPath, name, root)
+func InjectRolePrompt(wtPath, workerID, roleName, root string) error {
+	content, err := buildRoleSection(wtPath, workerID, roleName, root)
 	if err != nil {
 		return err
 	}
@@ -175,6 +307,7 @@ func InjectRolePrompt(wtPath, name, root string) error {
 	return nil
 }
 
+// PromptMDContent generates a default prompt.md for legacy v1 roles.
 func PromptMDContent(name string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Role: %s\n\n", name)

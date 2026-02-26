@@ -31,8 +31,8 @@ func OpenSpecInit(dir string) error {
 	return cmd.Run()
 }
 
-// CreateChange creates an OpenSpec change directory with a proposal file.
-func CreateChange(wtPath, changeName, proposal string) (string, error) {
+// CreateChange creates an OpenSpec change directory with proposal and optional design files.
+func CreateChange(wtPath, changeName, proposal, design string) (string, error) {
 	changePath := filepath.Join(wtPath, "openspec", "changes", changeName)
 	if err := os.MkdirAll(changePath, 0755); err != nil {
 		return "", fmt.Errorf("create change directory: %w", err)
@@ -50,6 +50,14 @@ func CreateChange(wtPath, changeName, proposal string) (string, error) {
 	proposalPath := filepath.Join(changePath, "proposal.md")
 	if err := os.WriteFile(proposalPath, []byte(proposal), 0644); err != nil {
 		return "", fmt.Errorf("write proposal.md: %w", err)
+	}
+
+	// Write design.md (if provided)
+	if design != "" {
+		designPath := filepath.Join(changePath, "design.md")
+		if err := os.WriteFile(designPath, []byte(design), 0644); err != nil {
+			return "", fmt.Errorf("write design.md: %w", err)
+		}
 	}
 
 	return changePath, nil

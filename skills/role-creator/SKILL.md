@@ -1,7 +1,8 @@
 ---
 name: role-creator
 description: >
-  Create or update role-specific skill packages under skills/<role-name> with deterministic files.
+  Create or update role-specific skill packages with deterministic files.
+  Supports output to skills/ (open-source publishing) or agents/teams/ (team use).
   Triggers: 创建角色, 新建 role, create role, 更新 role scope, edit role, update role,
   add role skill, 修改角色配置.
   Use when the user asks to create, update, or edit frontend/backend/product (or custom) role
@@ -11,9 +12,13 @@ description: >
 # role-creator
 
 Generate a role skill package in a fixed contract:
-- `skills/<role-name>/SKILL.md`
-- `skills/<role-name>/references/role.yaml`
-- `skills/<role-name>/system.md`
+- `<target>/SKILL.md`
+- `<target>/references/role.yaml`
+- `<target>/system.md`
+
+Target directory options:
+- `skills/<role-name>/` — for open-source publishing (default)
+- `agents/teams/<role-name>/` — for team use with agent-team
 
 ## Required Workflow
 
@@ -26,7 +31,9 @@ Generate a role skill package in a fixed contract:
    - `out-of-scope` (comma-separated output)
 3. If user rejects the auto result, or AI confidence is low, run the full brainstorming process below.
 4. After fields are approved, run skills selection flow.
-5. Execute generator script to write files deterministically.
+5. Ask user for target directory (`skills` or `agents/teams`).
+6. If target is `agents/teams` and the role already exists in global `~/.claude/skills/`, ask if user wants to copy from there instead of generating.
+7. Execute generator script to write files deterministically.
 
 ## Brainstorming Trigger Policy
 
@@ -37,7 +44,7 @@ Generate a role skill package in a fixed contract:
 
 ## Brainstorming Process
 
-1. **Explore context** — scan existing role skills under `skills/*/`, templates, and recent commits for patterns.
+1. **Explore context** — scan existing role skills under `skills/*/` and `agents/teams/*/`, templates, and recent commits for patterns.
 2. **Ask clarifying questions** — one question per message; prefer multiple choice; focus on role purpose and scope boundaries.
 3. **Confirm fields** — present the final `description`, `system_goal`, `in_scope`, `out_of_scope` for user approval before generation.
 
@@ -73,10 +80,26 @@ If `find-skills` is unavailable or returns empty, skip recommendations and ask f
 
 ## Generate Command
 
+For open-source publishing (default):
+
 ```bash
 python3 skills/role-creator/scripts/create_role_skill.py \
   --repo-root . \
   --role-name frontend-dev \
+  --description "Frontend role for UI implementation" \
+  --system-goal "Ship accessible and maintainable UI work" \
+  --in-scope "Build components,Improve accessibility" \
+  --out-of-scope "Database migrations,Backend API ownership" \
+  --skills "ui-ux-pro-max,better-icons"
+```
+
+For team use (agent-team integration):
+
+```bash
+python3 skills/role-creator/scripts/create_role_skill.py \
+  --repo-root . \
+  --role-name frontend-dev \
+  --target-dir agents/teams \
   --description "Frontend role for UI implementation" \
   --system-goal "Ship accessible and maintainable UI work" \
   --in-scope "Build components,Improve accessibility" \
@@ -107,9 +130,9 @@ This ensures roles are self-sufficient and can dynamically extend their capabili
 
 ## Overwrite Behavior
 
-- If `skills/<role-name>/` exists, the script asks for confirmation before overwrite.
+- If the target directory exists, the script asks for confirmation before overwrite.
 - On confirmation, it creates a backup at:
-  - `skills/.backup/<role-name>-<timestamp>/`
+  - `<parent>/.backup/<role-name>-<timestamp>/`
 - Then it overwrites managed files only (`SKILL.md`, `references/role.yaml`, `system.md`).
 
 ## Validation

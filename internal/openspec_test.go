@@ -60,7 +60,7 @@ func TestCreateChange(t *testing.T) {
 	changeName := "2026-02-24-fix-login"
 	proposal := "# Proposal\n\nFix the login flow by adding JWT validation."
 
-	changePath, err := CreateChange(dir, changeName, proposal)
+	changePath, err := CreateChange(dir, changeName, proposal, "")
 	if err != nil {
 		t.Fatalf("CreateChange: %v", err)
 	}
@@ -91,7 +91,7 @@ func TestCreateChangeEmptyProposal(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "openspec", "changes"), 0755)
 
-	changePath, err := CreateChange(dir, "2026-02-24-test", "")
+	changePath, err := CreateChange(dir, "2026-02-24-test", "", "")
 	if err != nil {
 		t.Fatalf("CreateChange: %v", err)
 	}
