@@ -9,3 +9,4 @@ description: >
 
 - Role definition: [references/role.yaml](references/role.yaml)
 - System prompt: [system.md](system.md)
+- Skill fallback rule: If required skills are missing, use `find-skills` to recommend installation, ask global vs project-level first, and default to global when no preference is given.

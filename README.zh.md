@@ -2,27 +2,20 @@
 
 [English](./README.md) | 中文
 
-多智能体开发工作流的 AI 团队角色管理器。借助 WezTerm 或 tmux，在隔离的 Git worktree 中协调多个 AI 编程智能体。
+多智能体开发工作流的 AI 团队角色管理器。采用 **Role + Worker** 双层模型，在隔离 Git worktree 中运行。
 
-每个角色拥有独立的 Git 分支、worktree、终端会话和 OpenSpec 变更管线 —— 全部通过自然语言提示词或 CLI 命令管理。
+- **Role**：角色技能包定义，位于 `agents/teams/<role-name>/`
+- **Worker**：角色运行实例，位于 `.worktrees/<worker-id>/`（例如 `frontend-dev-001`）
 
 ## 目录
 
 - [工作原理](#工作原理)
 - [环境要求](#环境要求)
 - [安装](#安装)
-  - [Agent Skill（推荐）](#agent-skill推荐)
-  - [Homebrew (macOS)](#homebrew-macos)
-  - [从源码编译](#从源码编译)
-  - [从 GitHub Releases 下载](#从-github-releases-下载)
 - [升级](#升级)
+- [快速开始](#快速开始)
+- [自带角色](#自带角色)
 - [作为 Skill 使用](#作为-skill-使用)
-  - [创建角色](#创建角色)
-  - [打开角色会话](#打开角色会话)
-  - [头脑风暴与分配](#头脑风暴与分配)
-  - [回复角色](#回复角色)
-  - [查看状态](#查看状态)
-  - [合并与清理](#合并与清理)
 - [CLI 命令参考](#cli-命令参考)
 - [目录结构](#目录结构)
 - [支持的 Provider](#支持的-provider)
@@ -33,26 +26,30 @@
 
 ```
 主分支
-    │
-    ├── .worktrees/frontend/     ← team/frontend 分支 + Claude 会话
-    ├── .worktrees/backend/      ← team/backend 分支 + Codex 会话
-    └── .worktrees/qa/           ← team/qa 分支 + OpenCode 会话
+  ├── agents/teams/<role-name>/          <- 角色技能包定义
+  ├── agents/workers/<worker-id>/        <- worker 配置
+  └── .worktrees/<worker-id>/            <- 隔离运行目录
 ```
 
-每个角色在独立环境中运行。你与主控智能体进行头脑风暴，通过 OpenSpec 分配变更，各角色独立工作，完成后合并回主分支。
+典型流程：
+
+1. 在 `agents/teams/` 创建或准备角色
+2. 创建 worker：`agent-team worker create <role-name>`
+3. 打开会话：`agent-team worker open <worker-id> [provider]`
+4. 头脑风暴后分配任务：`agent-team worker assign ...`
+5. 合并：`agent-team worker merge <worker-id>`
+6. 清理：`agent-team worker delete <worker-id>`
 
 ## 环境要求
 
 - Git
 - [WezTerm](https://wezfurlong.org/wezterm/) 或 [tmux](https://github.com/tmux/tmux)
 - 至少一个 AI provider CLI：[claude](https://github.com/anthropics/claude-code)、[codex](https://github.com/openai/codex) 或 [opencode](https://opencode.ai)
-- [Node.js](https://nodejs.org/)（用于自动安装 OpenSpec）
+- [Node.js](https://nodejs.org/)（创建 worker 时用于自动安装 OpenSpec）
 
 ## 安装
 
 ### Agent Skill（推荐）
-
-安装为 Agent Skill，让 Claude Code（或其他兼容的 AI 智能体）通过自然语言管理你的团队：
 
 ```bash
 npx skills add JsonLee12138/agent-team
@@ -75,139 +72,135 @@ go install github.com/JsonLee12138/agent-team@latest
 
 ### 从 GitHub Releases 下载
 
-从 [Releases](https://github.com/JsonLee12138/agent-team/releases) 下载对应平台的二进制文件，解压后加入 `PATH` 即可。
+从 [Releases](https://github.com/JsonLee12138/agent-team/releases) 下载二进制，解压后加入 `PATH`。
 
 ## 升级
 
-### Agent Skill
-
 ```bash
+# Skill
 npx skills add JsonLee12138/agent-team
-```
 
-### Homebrew
-
-```bash
+# Homebrew
 brew update && brew upgrade agent-team
+
+# 源码安装
+go install github.com/JsonLee12138/agent-team@latest
 ```
 
-### 从源码编译
+## 快速开始
+
+1. 通过 `role-creator` 在 `agents/teams/` 生成角色
+```bash
+python3 skills/role-creator/scripts/create_role_skill.py \
+  --repo-root . \
+  --role-name frontend-dev \
+  --target-dir agents/teams \
+  --description "Frontend role for UI implementation" \
+  --system-goal "Ship maintainable frontend features"
+```
+
+2. 查看角色列表
+```bash
+agent-team role list
+```
+
+3. 创建 worker
+```bash
+agent-team worker create frontend-dev
+```
+
+4. 打开 worker 会话
+```bash
+agent-team worker open frontend-dev-001 claude
+```
+
+5. 分配任务
+```bash
+agent-team worker assign frontend-dev-001 "Implement responsive navbar"
+```
+
+6. 合并并删除 worker
+```bash
+agent-team worker merge frontend-dev-001
+agent-team worker delete frontend-dev-001
+```
+
+## 自带角色
+
+当前仓库自带 1 个角色：
+
+- `frontend-architect`（路径：`skills/frontend-architect/`）
+
+要在 `agent-team` 中使用它，先复制到 `agents/teams/`：
 
 ```bash
-go install github.com/JsonLee12138/agent-team@latest
+mkdir -p agents/teams
+cp -R skills/frontend-architect agents/teams/
+agent-team role list
 ```
 
 ## 作为 Skill 使用
 
-安装完成后，直接在 AI 智能体会话中用自然语言描述你想做的事，无需记忆命令语法。
+安装 Skill 后，可以直接用自然语言描述操作，例如：
 
-### 创建角色
+- “创建一个前端架构角色。”
+- “给 frontend-architect 创建 worker 并用 codex 打开。”
+- “给 frontend-architect-001 分配一个变更任务。”
+- “查看 worker 状态。”
 
-> 帮我创建一个叫 "frontend" 的团队角色，负责开发 React 组件。
-
-> 创建一个 backend 角色，专门处理 Node.js API 开发。
-
-智能体会自动搭建 worktree，并引导你在 `prompt.md` 中定义角色的专业领域和行为。
-
----
-
-### 打开角色会话
-
-> 用 Claude 打开 frontend 角色的会话。
-
-> 用 Codex 打开所有角色的会话。
-
-> 用 claude-opus-4-5 模型打开 backend 角色。
-
-将在新的终端 tab（或 tmux 窗口）中启动 AI provider，运行在该角色的 worktree 目录下。
-
----
-
-### 头脑风暴与分配
-
-主控智能体在分配工作前会运行头脑风暴流程：
-
-1. 了解角色上下文（`prompt.md`、已有 specs）
-2. 提出澄清性问题
-3. 提出 2–3 种方案及权衡分析
-4. 获取用户确认
-5. 编写提案并通过 `agent-team assign` 分配
-
-> 给 frontend 分配一个任务：实现带移动端汉堡菜单的响应式导航栏。
-
-> 告诉 backend 角色添加一个 JWT 鉴权中间件。
-
-主控智能体先与你进行头脑风暴，然后在角色的 worktree 中创建 OpenSpec 变更并附上确认的提案。角色随后按照 OpenSpec 管线推进：specs → design → tasks → apply → verify。
-
----
-
-### 回复角色
-
-> 回复 frontend：外层布局用 CSS Grid，子元素用 Flexbox。
-
-> 告诉 backend 角色我们用的是 PostgreSQL，不是 MySQL。
-
-消息会以 `[Main Controller Reply]` 为前缀发送到运行中的角色会话。
-
----
-
-### 查看状态
-
-> 查看团队状态。
-
-> 哪些角色正在运行？
-
-显示所有角色、会话运行状态和活跃的 OpenSpec 变更数量。
-
----
-
-### 合并与清理
-
-> 合并 frontend 分支。
-
-> 合并后删除 backend 角色。
-
-将 `team/<name>` 以 `--no-ff` 方式合并到当前分支，之后可选择移除 worktree 和分支。
-
----
+主控智能体应在 assign 前完成头脑风暴流程，再创建 OpenSpec change 并通知 worker。
 
 ## CLI 命令参考
 
-所有命令需在 Git 仓库目录下运行。
+所有命令需在 Git 仓库内运行。
+
+### 角色命令
 
 | 命令 | 说明 |
 |------|------|
-| `agent-team create <name>` | 创建新角色（分支 + worktree + OpenSpec 初始化） |
-| `agent-team open <name> [provider] [--model <m>]` | 在新终端 tab 中打开角色会话 |
-| `agent-team open-all [provider] [--model <m>]` | 打开所有角色的会话 |
-| `agent-team assign <name> "<desc>" [provider] [--proposal <file>]` | 创建 OpenSpec 变更并通知会话 |
-| `agent-team reply <name> "<message>"` | 向运行中的角色会话发送回复 |
-| `agent-team status` | 查看所有角色状态和活跃变更 |
-| `agent-team merge <name>` | 将角色分支合并到当前分支 |
-| `agent-team delete <name>` | 关闭会话并删除 worktree 和分支 |
+| `agent-team role list` | 列出 `agents/teams/` 中可用角色 |
 
-切换到 tmux 后端：在命令前加 `AGENT_TEAM_BACKEND=tmux`。
+### Worker 命令
+
+| 命令 | 说明 |
+|------|------|
+| `agent-team worker create <role-name>` | 创建 worker worktree、分支、配置并初始化 OpenSpec |
+| `agent-team worker open <worker-id> [provider] [--model <model>] [--new-window]` | 打开 worker 会话 |
+| `agent-team worker assign <worker-id> "<description>" [provider] [--proposal <file>] [--design <file>] [--model <model>] [--new-window]` | 创建 OpenSpec change 并通知 worker |
+| `agent-team worker status` | 查看 workers、角色、运行状态、技能数量与活跃变更 |
+| `agent-team worker merge <worker-id>` | 将 `team/<worker-id>` 合并到当前分支 |
+| `agent-team worker delete <worker-id>` | 删除 worker 的 worktree、分支和配置 |
+
+### 通信命令
+
+| 命令 | 说明 |
+|------|------|
+| `agent-team reply <worker-id> "<answer>"` | 向 worker 会话发送 `[Main Controller Reply]` |
+| `agent-team reply-main "<message>"` | worker 向主控发送 `[Worker: <worker-id>]` |
+
+使用 tmux 后端：命令前添加 `AGENT_TEAM_BACKEND=tmux`。
 
 ## 目录结构
 
 ```
 项目根目录/
+├── agents/
+│   ├── teams/
+│   │   └── <role-name>/
+│   │       ├── SKILL.md
+│   │       ├── system.md
+│   │       └── references/role.yaml
+│   └── workers/
+│       └── <worker-id>/config.yaml
 └── .worktrees/
-    └── <name>/
-        ├── CLAUDE.md                              ← 由 prompt.md 自动生成
-        ├── agents/teams/<name>/
-        │   ├── config.yaml                        ← provider、model、pane_id
-        │   └── prompt.md                          ← 角色定义（手动编辑）
+    └── <worker-id>/
+        ├── .claude/skills/
+        ├── .codex/skills/
+        ├── CLAUDE.md
+        ├── AGENTS.md
         └── openspec/
-            ├── config.yaml                        ← OpenSpec 配置
-            ├── specs/                             ← 项目规格说明
+            ├── specs/
             └── changes/
-                └── <change-name>/
-                    ├── .openspec.yaml             ← 变更元数据
-                    ├── proposal.md                ← 头脑风暴产出
-                    ├── specs/                     ← 增量规格说明
-                    ├── design.md                  ← 设计文档
-                    └── tasks.md                   ← 任务拆解
 ```
 
 ## 支持的 Provider
@@ -217,8 +210,6 @@ go install github.com/JsonLee12138/agent-team@latest
 | Claude Code | `claude`（默认） |
 | OpenAI Codex | `codex` |
 | OpenCode | `opencode` |
-
-可在 `config.yaml` 的 `default_provider` 字段中设置每个角色的默认 provider，也可在 `open` / `assign` 命令中作为位置参数传入。
 
 ## 环境变量
 

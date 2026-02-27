@@ -41,6 +41,30 @@ class RoleCreatorScriptTests(unittest.TestCase):
         second = self.module.render_files(config, self.templates_dir)
         self.assertEqual(first, second)
 
+    def test_generated_system_prompt_includes_skill_installation_policy(self):
+        config = self.module.RoleConfig(
+            role_name="frontend-dev",
+            description="Frontend role for UI implementation",
+            system_goal="Ship accessible and maintainable UI work",
+            in_scope=["Implement UI components"],
+            out_of_scope=["Backend API ownership"],
+            skills=["vitest"],
+        )
+        rendered = self.module.render_files(config, self.templates_dir)
+        system_prompt = rendered["system.md"]
+        self.assertIn(
+            "If a required skill is missing at runtime, use `find-skills` to recommend installable skills for this role.",
+            system_prompt,
+        )
+        self.assertIn(
+            "Before any installation, ask the user whether to install globally or project-level.",
+            system_prompt,
+        )
+        self.assertIn(
+            "If the user does not specify, default to global installation.",
+            system_prompt,
+        )
+
     def test_overwrite_creates_backup_before_replacing_managed_files(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir)

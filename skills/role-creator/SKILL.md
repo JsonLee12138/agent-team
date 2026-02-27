@@ -122,9 +122,11 @@ python3 skills/role-creator/scripts/create_role_skill.py \
 Generated roles should follow this behavior at runtime:
 
 1. When a role receives a task that requires a skill not listed in its `references/role.yaml`, it should invoke `find-skills` to search for a matching skill.
-2. If a suitable skill is found, install it and use it to complete the task.
-3. After successful use, suggest adding the skill to the role's `references/role.yaml` for future sessions.
-4. If `find-skills` is unavailable or returns no match, the role should notify the user and proceed with best-effort execution.
+2. If a suitable skill is found, ask the user whether to install globally or project-level before installing.
+3. If the user does not specify, default to global installation.
+4. Install the selected skill and use it to complete the task.
+5. After successful use, suggest adding the skill to the role's `references/role.yaml` for future sessions.
+6. If `find-skills` is unavailable or returns no match, the role should notify the user and proceed with best-effort execution.
 
 This ensures roles are self-sufficient and can dynamically extend their capabilities without manual reconfiguration.
 

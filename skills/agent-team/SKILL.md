@@ -3,10 +3,11 @@ name: agent-team
 description: >
   AI team role and worker manager for multi-agent development workflows.
   Uses Role (skill package) + Worker (instance) model with git worktrees.
-  Use when the user wants to create roles, manage workers, assign tasks,
-  check team status, or merge worker branches.
-  Triggers on /agent-team commands, "create a role", "create a worker",
-  "open worker session", "assign task", "show team status", "merge worker branch".
+  Use when the user wants to create a team, create roles, manage workers,
+  assign tasks, check team status, or merge worker branches.
+  Triggers on /agent-team commands, "create a team", "batch create roles",
+  "create a role", "create a worker", "open worker session",
+  "assign task", "show team status", "merge worker branch".
 ---
 
 # agent-team
@@ -39,6 +40,31 @@ Roles are created and managed by AI using the **role-creator** skill. The CLI do
 1. Use the `/role-creator` skill with `--target-dir agents/teams`
 2. If a role already exists in global `~/.claude/skills/`, prompt user to copy it to `agents/teams/`
 3. Result: `agents/teams/<role-name>/` with SKILL.md, system.md, references/role.yaml
+
+### Creating a Team (Batch Role Creation from Prompt)
+
+Use this workflow when the user describes a team in natural language, for example:
+
+- "Create a frontend developer, a QA engineer, and a frontend architect role."
+- "I need frontend dev + testing + frontend architecture roles."
+
+Flow:
+
+1. Parse the prompt into responsibility units (one role per responsibility).
+2. Normalize each role name to kebab-case, such as:
+   - frontend developer -> `frontend-dev`
+   - QA engineer -> `qa-engineer`
+   - frontend architect -> `frontend-architect`
+3. Present the draft role list and ask for one confirmation before execution.
+4. For each approved role, run the full **Creating a Role** workflow with `/role-creator --target-dir agents/teams`.
+5. Return a per-role summary: `created`, `already exists`, or `failed` (with reason).
+6. Stop after role creation. Do NOT create workers in this flow.
+
+Rules:
+
+- Team creation in this skill is role-only. It MUST NOT auto-run `agent-team worker create`, `worker open`, or `worker assign`.
+- If a role already exists, do not overwrite it by default. Mark it as `already exists`.
+- A single role failure does not cancel the whole batch. Continue and report final results.
 
 ### Listing Roles
 

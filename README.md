@@ -2,27 +2,20 @@
 
 English | [中文](./README.zh.md)
 
-AI team role manager for multi-agent development workflows. Orchestrate multiple AI coding agents in isolated Git worktrees with WezTerm or tmux.
+AI team role and worker manager for multi-agent development workflows. It uses a **Role + Worker** model with isolated Git worktrees and terminal sessions.
 
-Each role gets its own Git branch, worktree, terminal session, and OpenSpec change pipeline — all managed through natural language prompts or CLI commands.
+- **Role**: skill package definition in `agents/teams/<role-name>/`
+- **Worker**: runtime role instance in `.worktrees/<worker-id>/` (for example `frontend-dev-001`)
 
 ## Table of Contents
 
 - [How It Works](#how-it-works)
 - [Requirements](#requirements)
 - [Installation](#installation)
-  - [Agent Skill (recommended)](#agent-skill-recommended)
-  - [Homebrew (macOS)](#homebrew-macos)
-  - [From Source](#from-source)
-  - [From GitHub Releases](#from-github-releases)
 - [Upgrade](#upgrade)
+- [Quick Start](#quick-start)
+- [Built-in Roles](#built-in-roles)
 - [Usage as a Skill](#usage-as-a-skill)
-  - [Create a role](#create-a-role)
-  - [Open a role session](#open-a-role-session)
-  - [Brainstorm and assign](#brainstorm-and-assign)
-  - [Reply to a role](#reply-to-a-role)
-  - [Check status](#check-status)
-  - [Merge and clean up](#merge-and-clean-up)
 - [CLI Reference](#cli-reference)
 - [Directory Structure](#directory-structure)
 - [Supported Providers](#supported-providers)
@@ -33,26 +26,30 @@ Each role gets its own Git branch, worktree, terminal session, and OpenSpec chan
 
 ```
 Main branch
-    │
-    ├── .worktrees/frontend/     ← team/frontend branch + Claude session
-    ├── .worktrees/backend/      ← team/backend branch + Codex session
-    └── .worktrees/qa/           ← team/qa branch + OpenCode session
+  ├── agents/teams/<role-name>/          <- role skill definitions
+  ├── agents/workers/<worker-id>/        <- worker config
+  └── .worktrees/<worker-id>/            <- isolated runtime workspace
 ```
 
-Each role runs in isolation. You brainstorm with the controller, assign changes through OpenSpec, roles work independently, you merge when done.
+Typical flow:
+
+1. Create or prepare a role in `agents/teams/`
+2. Create worker: `agent-team worker create <role-name>`
+3. Open worker session: `agent-team worker open <worker-id> [provider]`
+4. Brainstorm, then assign change: `agent-team worker assign ...`
+5. Merge: `agent-team worker merge <worker-id>`
+6. Cleanup: `agent-team worker delete <worker-id>`
 
 ## Requirements
 
 - Git
 - [WezTerm](https://wezfurlong.org/wezterm/) or [tmux](https://github.com/tmux/tmux)
 - At least one AI provider CLI: [claude](https://github.com/anthropics/claude-code), [codex](https://github.com/openai/codex), or [opencode](https://opencode.ai)
-- [Node.js](https://nodejs.org/) (for OpenSpec auto-install)
+- [Node.js](https://nodejs.org/) (for OpenSpec auto-install during worker creation)
 
 ## Installation
 
 ### Agent Skill (recommended)
-
-Install as an Agent Skill so Claude Code (or any compatible AI agent) can manage your team through natural language:
 
 ```bash
 npx skills add JsonLee12138/agent-team
@@ -75,139 +72,135 @@ go install github.com/JsonLee12138/agent-team@latest
 
 ### From GitHub Releases
 
-Download the binary for your platform from [Releases](https://github.com/JsonLee12138/agent-team/releases), extract it, and add it to your `PATH`.
+Download a binary from [Releases](https://github.com/JsonLee12138/agent-team/releases), extract it, and add it to your `PATH`.
 
 ## Upgrade
 
-### Agent Skill
-
 ```bash
+# Skill
 npx skills add JsonLee12138/agent-team
-```
 
-### Homebrew
-
-```bash
+# Homebrew
 brew update && brew upgrade agent-team
+
+# Source
+go install github.com/JsonLee12138/agent-team@latest
 ```
 
-### From Source
+## Quick Start
+
+1. Create role(s) with `role-creator` into `agents/teams/`
+```bash
+python3 skills/role-creator/scripts/create_role_skill.py \
+  --repo-root . \
+  --role-name frontend-dev \
+  --target-dir agents/teams \
+  --description "Frontend role for UI implementation" \
+  --system-goal "Ship maintainable frontend features"
+```
+
+2. List roles
+```bash
+agent-team role list
+```
+
+3. Create worker
+```bash
+agent-team worker create frontend-dev
+```
+
+4. Open worker session
+```bash
+agent-team worker open frontend-dev-001 claude
+```
+
+5. Assign change
+```bash
+agent-team worker assign frontend-dev-001 "Implement responsive navbar"
+```
+
+6. Merge and delete worker
+```bash
+agent-team worker merge frontend-dev-001
+agent-team worker delete frontend-dev-001
+```
+
+## Built-in Roles
+
+This repository currently includes one built-in role:
+
+- `frontend-architect` (path: `skills/frontend-architect/`)
+
+To use it with `agent-team`, copy it into `agents/teams/` first:
 
 ```bash
-go install github.com/JsonLee12138/agent-team@latest
+mkdir -p agents/teams
+cp -R skills/frontend-architect agents/teams/
+agent-team role list
 ```
 
 ## Usage as a Skill
 
-Once installed, just describe what you want in natural language inside your AI agent session. No need to remember command syntax.
+With agent skill installed, you can describe intent in natural language:
 
-### Create a role
+- "Create a team role for frontend architecture."
+- "Create a worker for frontend-architect and open it with codex."
+- "Assign a change to frontend-architect-001."
+- "Show worker status."
 
-> Create a team role called "frontend" for building React components.
-
-> Create a backend role that handles API development with Node.js.
-
-The agent will scaffold the worktree and prompt you to define the role's expertise in `prompt.md`.
-
----
-
-### Open a role session
-
-> Open the frontend role with Claude.
-
-> Open all role sessions using Codex.
-
-> Open the backend role with model claude-opus-4-5.
-
-A new terminal tab (or tmux window) opens with the AI provider running inside the role's worktree.
-
----
-
-### Brainstorm and assign
-
-The controller AI runs a brainstorming flow before assigning work:
-
-1. Explores the role's context (`prompt.md`, existing specs)
-2. Asks clarifying questions
-3. Proposes 2–3 approaches with trade-offs
-4. Gets user confirmation
-5. Writes a proposal and assigns via `agent-team assign`
-
-> Assign a task to frontend: implement a responsive navbar with a mobile hamburger menu.
-
-> Tell the backend role to add a JWT authentication middleware.
-
-The controller brainstorms with you, then creates an OpenSpec change in the role's worktree with the confirmed proposal. The role proceeds through the OpenSpec pipeline: specs → design → tasks → apply → verify.
-
----
-
-### Reply to a role
-
-> Reply to frontend: use CSS Grid for the layout, Flexbox for individual items.
-
-> Tell the backend role that we're using PostgreSQL, not MySQL.
-
-The message is delivered to the running session prefixed with `[Main Controller Reply]`.
-
----
-
-### Check status
-
-> Show team status.
-
-> Which roles are currently running?
-
-Displays all roles, their session state, and active OpenSpec change count.
-
----
-
-### Merge and clean up
-
-> Merge the frontend branch.
-
-> Delete the backend role after merging.
-
-Merges `team/<name>` into the current branch with `--no-ff`, then optionally removes the worktree and branch.
-
----
+The controller should run brainstorming before assignment, then create an OpenSpec change and notify the worker session.
 
 ## CLI Reference
 
-All commands run from within a Git repository.
+All commands run inside a Git repository.
+
+### Role commands
 
 | Command | Description |
 |---------|-------------|
-| `agent-team create <name>` | Create a new role (branch + worktree + OpenSpec init) |
-| `agent-team open <name> [provider] [--model <m>]` | Open a role session in a new terminal tab |
-| `agent-team open-all [provider] [--model <m>]` | Open sessions for all roles |
-| `agent-team assign <name> "<desc>" [provider] [--proposal <file>]` | Create an OpenSpec change and notify the session |
-| `agent-team reply <name> "<message>"` | Send a reply to a running role session |
-| `agent-team status` | Show all roles, status, and active changes |
-| `agent-team merge <name>` | Merge role branch into current branch |
-| `agent-team delete <name>` | Close session, remove worktree and branch |
+| `agent-team role list` | List available roles in `agents/teams/` |
 
-Use `AGENT_TEAM_BACKEND=tmux` before any command to switch to the tmux backend.
+### Worker commands
+
+| Command | Description |
+|---------|-------------|
+| `agent-team worker create <role-name>` | Create worker worktree, branch, config, and initialize OpenSpec |
+| `agent-team worker open <worker-id> [provider] [--model <model>] [--new-window]` | Open worker session |
+| `agent-team worker assign <worker-id> "<description>" [provider] [--proposal <file>] [--design <file>] [--model <model>] [--new-window]` | Create OpenSpec change and notify worker |
+| `agent-team worker status` | Show workers, roles, running state, skills, and active changes |
+| `agent-team worker merge <worker-id>` | Merge `team/<worker-id>` into current branch |
+| `agent-team worker delete <worker-id>` | Delete worker worktree, branch, and config |
+
+### Communication commands
+
+| Command | Description |
+|---------|-------------|
+| `agent-team reply <worker-id> "<answer>"` | Send `[Main Controller Reply]` message to a worker session |
+| `agent-team reply-main "<message>"` | Worker sends `[Worker: <worker-id>]` message to controller session |
+
+Use `AGENT_TEAM_BACKEND=tmux` before commands to switch backend from WezTerm to tmux.
 
 ## Directory Structure
 
 ```
 project-root/
+├── agents/
+│   ├── teams/
+│   │   └── <role-name>/
+│   │       ├── SKILL.md
+│   │       ├── system.md
+│   │       └── references/role.yaml
+│   └── workers/
+│       └── <worker-id>/config.yaml
 └── .worktrees/
-    └── <name>/
-        ├── CLAUDE.md                              ← auto-generated from prompt.md
-        ├── agents/teams/<name>/
-        │   ├── config.yaml                        ← provider, model, pane_id
-        │   └── prompt.md                          ← role identity (edit this)
+    └── <worker-id>/
+        ├── .claude/skills/
+        ├── .codex/skills/
+        ├── CLAUDE.md
+        ├── AGENTS.md
         └── openspec/
-            ├── config.yaml                        ← OpenSpec configuration
-            ├── specs/                             ← project specifications
+            ├── specs/
             └── changes/
-                └── <change-name>/
-                    ├── .openspec.yaml             ← change metadata
-                    ├── proposal.md                ← brainstorming output
-                    ├── specs/                     ← delta specs
-                    ├── design.md                  ← design artifact
-                    └── tasks.md                   ← task breakdown
 ```
 
 ## Supported Providers
@@ -217,8 +210,6 @@ project-root/
 | Claude Code | `claude` (default) |
 | OpenAI Codex | `codex` |
 | OpenCode | `opencode` |
-
-Override per-role in `config.yaml` (`default_provider`) or pass as a positional argument to `open` / `assign`.
 
 ## Environment Variables
 
