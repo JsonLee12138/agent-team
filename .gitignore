@@ -13,4 +13,4 @@ __pycache__/
 docs/plans/
 .turbo/
 agents/workers
-#openspec/changes
+openspec/changes
