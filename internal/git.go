@@ -35,8 +35,21 @@ func (g *GitClient) CurrentBranch() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// BranchExists checks if a git branch exists.
+func (g *GitClient) BranchExists(branch string) bool {
+	cmd := exec.Command("git", "rev-parse", "--verify", branch)
+	cmd.Dir = g.root
+	return cmd.Run() == nil
+}
+
 func (g *GitClient) WorktreeAdd(path, branch string) error {
-	cmd := exec.Command("git", "worktree", "add", path, "-b", branch)
+	var cmd *exec.Cmd
+	if g.BranchExists(branch) {
+		// Branch already exists (e.g. leftover from incomplete cleanup), reuse it
+		cmd = exec.Command("git", "worktree", "add", path, branch)
+	} else {
+		cmd = exec.Command("git", "worktree", "add", path, "-b", branch)
+	}
 	cmd.Dir = g.root
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("worktree add: %s (%w)", out, err)

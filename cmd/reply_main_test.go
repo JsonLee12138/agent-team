@@ -102,10 +102,10 @@ func TestRunReplyMainV2(t *testing.T) {
 	wtPath := filepath.Join(dir, ".worktrees", "dev-001")
 	os.MkdirAll(wtPath, 0755)
 
-	// Change to worktree directory (reply-main uses os.Getwd())
-	origDir, _ := os.Getwd()
-	os.Chdir(wtPath)
-	defer os.Chdir(origDir)
+	// Override resolveWorktreeRoot to return the test worktree path
+	origResolve := resolveWorktreeRoot
+	resolveWorktreeRoot = func() (string, error) { return wtPath, nil }
+	defer func() { resolveWorktreeRoot = origResolve }()
 
 	err := app.RunReplyMain("What database should I use?")
 	if err != nil {
@@ -135,9 +135,10 @@ func TestRunReplyMainNoController(t *testing.T) {
 	wtPath := filepath.Join(dir, ".worktrees", "solo-001")
 	os.MkdirAll(wtPath, 0755)
 
-	origDir, _ := os.Getwd()
-	os.Chdir(wtPath)
-	defer os.Chdir(origDir)
+	// Override resolveWorktreeRoot to return the test worktree path
+	origResolve := resolveWorktreeRoot
+	resolveWorktreeRoot = func() (string, error) { return wtPath, nil }
+	defer func() { resolveWorktreeRoot = origResolve }()
 
 	err := app.RunReplyMain("hello")
 	if err == nil {

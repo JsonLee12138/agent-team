@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -57,7 +58,12 @@ func CopySkillsToWorktree(wtPath, root, roleName string) error {
 	for _, skillName := range skills {
 		skillPath := findSkillPath(root, skillName)
 		if skillPath != "" {
-			sources = append(sources, skillSource{name: skillName, path: skillPath})
+			// Use the short name as the target directory name
+			// e.g., "antfu/skills@vite" → "vite"
+			destName := parseSkillName(skillName)
+			sources = append(sources, skillSource{name: destName, path: skillPath})
+		} else {
+			fmt.Fprintf(os.Stderr, "Warning: skill '%s' not found in any search path, skipping\n", skillName)
 		}
 	}
 
@@ -79,27 +85,55 @@ func CopySkillsToWorktree(wtPath, root, roleName string) error {
 	return nil
 }
 
+// parseSkillName extracts the short skill name from formats like
+// "antfu/skills@vite" → "vite", or returns the original name if no "@" is present.
+func parseSkillName(skillName string) string {
+	if idx := strings.LastIndex(skillName, "@"); idx >= 0 {
+		return skillName[idx+1:]
+	}
+	return skillName
+}
+
 // findSkillPath searches for a skill in known locations.
+// Supports both plain names ("vite") and scoped names ("antfu/skills@vite").
 func findSkillPath(root, skillName string) string {
-	// Project-local skills/
-	local := filepath.Join(root, "skills", skillName)
-	if _, err := os.Stat(local); err == nil {
-		return local
+	// Build candidate names: full name first, then short name (after @) if different
+	candidates := []string{skillName}
+	shortName := parseSkillName(skillName)
+	if shortName != skillName {
+		candidates = append(candidates, shortName)
 	}
 
-	// Global ~/.claude/skills/
-	home, err := os.UserHomeDir()
-	if err == nil {
-		global := filepath.Join(home, ".claude", "skills", skillName)
-		if _, err := os.Stat(global); err == nil {
-			return global
+	for _, name := range candidates {
+		// Project-local agents/teams/
+		teamDir := filepath.Join(root, "agents", "teams", name)
+		if _, err := os.Stat(teamDir); err == nil {
+			return teamDir
+		}
+
+		// Project-local skills/
+		local := filepath.Join(root, "skills", name)
+		if _, err := os.Stat(local); err == nil {
+			return local
+		}
+
+		// Global ~/.claude/skills/
+		home, err := os.UserHomeDir()
+		if err == nil {
+			global := filepath.Join(home, ".claude", "skills", name)
+			if _, err := os.Stat(global); err == nil {
+				return global
+			}
 		}
 	}
 
 	return ""
 }
 
-// CopyDirPublic recursively copies a directory (exported wrapper).
+// FindSkillPathPublic searches for a skill in known locations (exported wrapper).
+func FindSkillPathPublic(root, skillName string) string {
+	return findSkillPath(root, skillName)
+}
 func CopyDirPublic(src, dst string) error {
 	return copyDir(src, dst)
 }

@@ -268,27 +268,6 @@ func TestInjectRolePromptV2(t *testing.T) {
 	}
 }
 
-func TestInjectRolePromptV1Fallback(t *testing.T) {
-	dir := t.TempDir()
-	wtPath := filepath.Join(dir, ".worktrees", "dev")
-	teamsDir := filepath.Join(wtPath, "agents", "teams", "dev")
-	os.MkdirAll(teamsDir, 0755)
-
-	// No system.md in agents/teams/dev/, but prompt.md in worktree
-	os.WriteFile(filepath.Join(teamsDir, "prompt.md"), []byte("# Role: dev\n\nA developer role.\n"), 0644)
-
-	err := InjectRolePrompt(wtPath, "dev", "dev", dir)
-	if err != nil {
-		t.Fatalf("InjectRolePrompt: %v", err)
-	}
-
-	data, _ := os.ReadFile(filepath.Join(wtPath, "CLAUDE.md"))
-	content := string(data)
-	if !strings.Contains(content, "# Role: dev") {
-		t.Error("CLAUDE.md should contain prompt.md content as fallback")
-	}
-}
-
 func TestInjectRolePromptNoSource(t *testing.T) {
 	dir := t.TempDir()
 	wtPath := filepath.Join(dir, ".worktrees", "dev-001")

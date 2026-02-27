@@ -3,8 +3,9 @@ package cmd
 
 import (
 	"fmt"
-	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/JsonLee12138/agent-team/internal"
 	"github.com/spf13/cobra"
@@ -21,68 +22,41 @@ func newReplyMainCmd() *cobra.Command {
 	}
 }
 
-func (a *App) RunReplyMain(message string) error {
-	cwd, err := os.Getwd()
+// resolveWorktreeRoot uses git to find the actual worktree root directory,
+// which is reliable even when called from a subdirectory.
+// This is a variable so tests can override it.
+var resolveWorktreeRoot = func() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	out, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
+		return "", fmt.Errorf("git rev-parse --show-toplevel: %w", err)
 	}
-
-	// Try to detect worker ID from worktree directory name
-	workerID := filepath.Base(cwd)
-
-	// Try v2: load worker config from agents/workers/<worker-id>/
-	root := a.Git.Root()
-	configPath := internal.WorkerConfigPath(root, workerID)
-	if wcfg, err := internal.LoadWorkerConfig(configPath); err == nil {
-		if wcfg.ControllerPaneID == "" {
-			return fmt.Errorf("no controller pane ID stored for worker '%s' — was the session opened with agent-team worker open?", workerID)
-		}
-		if !a.Session.PaneAlive(wcfg.ControllerPaneID) {
-			return fmt.Errorf("main controller (pane %s) is not running", wcfg.ControllerPaneID)
-		}
-		a.Session.PaneSend(wcfg.ControllerPaneID, fmt.Sprintf("[Worker: %s] %s", workerID, message))
-		fmt.Printf("✓ Sent to main controller from worker '%s'\n", workerID)
-		return nil
-	}
-
-	// v1 fallback: try old role config
-	roleName, cfg, err := findRoleConfig(cwd)
-	if err != nil {
-		return err
-	}
-
-	if cfg.ControllerPaneID == "" {
-		return fmt.Errorf("no controller pane ID stored for role '%s' — was the session opened with agent-team open?", roleName)
-	}
-
-	if !a.Session.PaneAlive(cfg.ControllerPaneID) {
-		return fmt.Errorf("main controller (pane %s) is not running", cfg.ControllerPaneID)
-	}
-
-	a.Session.PaneSend(cfg.ControllerPaneID, fmt.Sprintf("[Role: %s] %s", roleName, message))
-	fmt.Printf("✓ Sent to main controller from '%s'\n", roleName)
-	return nil
+	return strings.TrimSpace(string(out)), nil
 }
 
-// findRoleConfig scans agents/teams/*/config.yaml in the given directory to find the role config (v1 compat).
-func findRoleConfig(dir string) (string, *internal.RoleConfig, error) {
-	teamsDir := filepath.Join(dir, "agents", "teams")
-	entries, err := os.ReadDir(teamsDir)
+func (a *App) RunReplyMain(message string) error {
+	// Use git to find the worktree root, not cwd (which could be a subdirectory)
+	worktreeRoot, err := resolveWorktreeRoot()
 	if err != nil {
-		return "", nil, fmt.Errorf("not in a worker worktree (no agents/teams/ directory found)")
+		return fmt.Errorf("could not determine worktree root: %w", err)
+	}
+	workerID := filepath.Base(worktreeRoot)
+
+	root := a.Git.Root()
+	configPath := internal.WorkerConfigPath(root, workerID)
+	wcfg, err := internal.LoadWorkerConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("worker '%s' not found: %w", workerID, err)
 	}
 
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		configPath := filepath.Join(teamsDir, e.Name(), "config.yaml")
-		cfg, err := internal.LoadRoleConfig(configPath)
-		if err != nil {
-			continue
-		}
-		return e.Name(), cfg, nil
+	if wcfg.ControllerPaneID == "" {
+		return fmt.Errorf("no controller pane ID stored for worker '%s' — was the session opened with agent-team worker open?", workerID)
+	}
+	if !a.Session.PaneAlive(wcfg.ControllerPaneID) {
+		return fmt.Errorf("main controller (pane %s) is not running", wcfg.ControllerPaneID)
 	}
 
-	return "", nil, fmt.Errorf("no role config found in %s", teamsDir)
+	a.Session.PaneSend(wcfg.ControllerPaneID, fmt.Sprintf("[Worker: %s] %s", workerID, message))
+	fmt.Printf("✓ Sent to main controller from worker '%s'\n", workerID)
+	return nil
 }

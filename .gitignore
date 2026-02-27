@@ -10,5 +10,7 @@ output
 # Python cache
 __pycache__/
 *.pyc
-docs/
-docs-bak/
+docs/plans/
+.turbo/
+agents/workers
+#openspec/changes

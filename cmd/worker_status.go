@@ -29,13 +29,34 @@ func (a *App) RunWorkerStatus() error {
 		return nil
 	}
 
-	fmt.Printf("%-24s %-16s %-24s %s\n", "Worker", "Role", "Status", "Changes")
-	fmt.Printf("%-24s %-16s %-24s %s\n", "────────────────────────", "────────────────", "────────────────────────", "──────────────────────────")
+	fmt.Printf("%-24s %-16s %-24s %-12s %s\n", "Worker", "Role", "Status", "Skills", "Changes")
+	fmt.Printf("%-24s %-16s %-24s %-12s %s\n", "────────────────────────", "────────────────", "────────────────────────", "────────────", "──────────────────────────")
 
 	for _, w := range workers {
 		status := "✗ offline"
 		if w.Config != nil && a.Session.PaneAlive(w.Config.PaneID) {
 			status = fmt.Sprintf("✓ running [p:%s]", w.Config.PaneID)
+		}
+
+		// Count skills
+		skillsSummary := "-"
+		skills, err := internal.ReadRoleSkills(root, w.Role)
+		if err == nil {
+			total := len(skills)
+			// Check how many are actually found
+			found := 0
+			for _, s := range skills {
+				if internal.FindSkillPathPublic(root, s) != "" {
+					found++
+				}
+			}
+			if total == 0 {
+				skillsSummary = "0"
+			} else if found == total {
+				skillsSummary = fmt.Sprintf("%d", total)
+			} else {
+				skillsSummary = fmt.Sprintf("%d/%d", found, total)
+			}
 		}
 
 		// Count changes
@@ -54,7 +75,7 @@ func (a *App) RunWorkerStatus() error {
 			}
 		}
 
-		fmt.Printf("%-24s %-16s %-24s %s\n", w.WorkerID, w.Role, status, changesSummary)
+		fmt.Printf("%-24s %-16s %-24s %-12s %s\n", w.WorkerID, w.Role, status, skillsSummary, changesSummary)
 	}
 	return nil
 }

@@ -152,41 +152,12 @@ func WriteWorktreeGitignore(wtPath string) error {
 	return os.WriteFile(filepath.Join(wtPath, ".gitignore"), []byte(content), 0644)
 }
 
-// --- Legacy v1 path functions (kept for backward compat during migration) ---
+// --- Shared utilities ---
 
-func ListRoles(root, wtBase string) []string {
-	base := filepath.Join(root, wtBase)
-	entries, err := os.ReadDir(base)
-	if err != nil {
-		return nil
-	}
-	var roles []string
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		name := e.Name()
-		configPath := filepath.Join(base, name, "agents", "teams", name, "config.yaml")
-		if _, err := os.Stat(configPath); err == nil {
-			roles = append(roles, name)
-		}
-	}
-	return roles
-}
-
-func TeamsDir(root, wtBase, name string) string {
-	return filepath.Join(root, wtBase, name, "agents", "teams", name)
-}
-
+// WtPath returns the path to a worker's worktree directory.
 func WtPath(root, wtBase, name string) string {
 	return filepath.Join(root, wtBase, name)
 }
-
-func ConfigPath(root, wtBase, name string) string {
-	return filepath.Join(TeamsDir(root, wtBase, name), "config.yaml")
-}
-
-// --- Shared utilities ---
 
 func BuildLaunchCmd(provider, model string) string {
 	if provider == "" {
@@ -242,26 +213,43 @@ func InjectSection(filePath, tag, content string) error {
 	return os.WriteFile(filePath, []byte(fileContent), 0644)
 }
 
-// buildRoleSection builds the AGENT_TEAM section content from system.md (v2) or prompt.md (v1 fallback).
+// buildRoleSection builds the AGENT_TEAM section content from the role's system.md.
 func buildRoleSection(wtPath, workerID, roleName, root string) (string, error) {
-	// v2: try reading system.md from role definition in main repo
 	roleSystemPath := RoleSystemMDPath(root, roleName)
 	prompt, err := os.ReadFile(roleSystemPath)
 	if err != nil {
-		// v1 fallback: try prompt.md in worktree
-		teamsDir := filepath.Join(wtPath, "agents", "teams", workerID)
-		promptPath := filepath.Join(teamsDir, "prompt.md")
-		prompt, err = os.ReadFile(promptPath)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return "", nil
-			}
-			return "", err
+		if os.IsNotExist(err) {
+			return "", nil
 		}
+		return "", err
 	}
 
 	var b strings.Builder
 	b.Write(prompt)
+
+	// Inject skill-first workflow and available skills list
+	b.WriteString("\n## Skill-First Workflow\n\n")
+	fmt.Fprintf(&b, "**Role skill (MUST use):** `%s`\n\n", roleName)
+	fmt.Fprintf(&b, "When you receive ANY task, you MUST first invoke the `%s` skill (via `/%s` or the Skill tool). ", roleName, roleName)
+	b.WriteString("This is your primary skill that defines how you approach work. Never skip it.\n\n")
+
+	skills, skillErr := ReadRoleSkills(root, roleName)
+	if skillErr == nil && len(skills) > 0 {
+		b.WriteString("**Dependency skills:**\n\n")
+		for _, skill := range skills {
+			shortName := parseSkillName(skill)
+			fmt.Fprintf(&b, "- `%s`\n", shortName)
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString("**Workflow:**\n\n")
+	b.WriteString("1. **Match skills first** — Check which of your available skills are relevant to the task before doing any direct work.\n")
+	b.WriteString("2. **Invoke matched skills** — For each relevant skill, invoke it (via `/skill-name` or the Skill tool). Let the skill guide execution.\n")
+	b.WriteString("3. **Combine skill outputs** — If a task spans multiple skills, invoke them in logical order and integrate their outputs.\n")
+	b.WriteString("4. **Direct work only as fallback** — Only work directly when no available skill covers the requirement.\n")
+	b.WriteString("5. **Dynamic skill discovery** — If no current skill matches, invoke `find-skills` to search for one. If found, use it and suggest adding it to the role for future sessions.\n")
+
 	b.WriteString("\n## Development Environment\n\n")
 	b.WriteString("You are working in an **isolated git worktree**. All development MUST happen here:\n\n")
 	fmt.Fprintf(&b, "- **Working directory**: `%s`\n", wtPath)
@@ -305,33 +293,4 @@ func InjectRolePrompt(wtPath, workerID, roleName, root string) error {
 	}
 
 	return nil
-}
-
-// PromptMDContent generates a default prompt.md for legacy v1 roles.
-func PromptMDContent(name string) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "# Role: %s\n\n", name)
-	b.WriteString("## Description\n")
-	b.WriteString("Describe this role's responsibilities here.\n\n")
-	b.WriteString("## Expertise\n")
-	b.WriteString("- List key areas of expertise\n\n")
-	b.WriteString("## Behavior\n")
-	b.WriteString("- How this role approaches tasks\n")
-	b.WriteString("- Communication style and boundaries\n\n")
-	b.WriteString("## Workflow\n\n")
-	b.WriteString("When you receive a `[New Change Assigned]` message:\n")
-	b.WriteString("1. Read the proposal at the specified change path\n")
-	b.WriteString("2. Run `/opsx:continue` to create remaining artifacts (specs, design, tasks)\n")
-	b.WriteString("3. Run `/opsx:apply` to implement tasks\n")
-	b.WriteString("4. Run `/opsx:verify` to validate implementation\n")
-	b.WriteString("5. Commit your work regularly\n\n")
-	b.WriteString("## Communication Protocol\n\n")
-	b.WriteString("When you need clarification or have a question for the main controller, run:\n\n")
-	b.WriteString("```bash\n")
-	b.WriteString("agent-team reply-main \"<your question here>\"\n")
-	b.WriteString("```\n\n")
-	b.WriteString("Wait for the main controller to reply. Replies will appear as:\n")
-	b.WriteString("`[Main Controller Reply]`\n\n")
-	b.WriteString("Do NOT proceed on blocked tasks until you receive a reply.\n")
-	return b.String()
 }
