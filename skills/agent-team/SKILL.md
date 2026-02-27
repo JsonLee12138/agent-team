@@ -110,8 +110,21 @@ agent-team worker assign <worker-id> "<description>" [provider] [--proposal <fil
 1. Creates an OpenSpec change at `openspec/changes/<timestamp>-<slug>/`
 2. Copies `--design` file as `design.md` (brainstorming output)
 3. Copies `--proposal` file as `proposal.md` (work requirements)
-4. Auto-opens the worker session if not running
-5. Sends a `[New Change Assigned]` notification
+4. Runs the Assign Readiness Gate before assignment dispatch (ping/pong + retries + window diagnosis)
+5. Auto-opens the worker session if not running
+6. Sends a `[New Change Assigned]` notification
+
+### Assign Readiness Gate (Required)
+
+Before running `agent-team worker assign ...`, the controller MUST execute a readiness handshake.
+
+- MUST send `AGENT_TEAM_PING <worker-id> <attempt>` and wait for matching `AGENT_TEAM_PONG <worker-id> <attempt>`
+- MUST use: first wait `5s`, retry interval `5s`, maximum `3` attempts
+- MUST inspect worker window on timeout before retrying
+- MUST send provider open command when `codex`, `claude`, or `opencode` workspace is not open
+- MUST fail fast after attempt 3 with structured error output and stop assign
+
+For protocol details, diagnostics checklist, retry state flow, and error templates, see [references/readiness.md](references/readiness.md).
 
 ### Check status
 

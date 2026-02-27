@@ -15,7 +15,8 @@ When the user intends to assign new work to a worker, complete these steps in or
 5. **User approves design** — get explicit approval; be ready to revise if needed
 6. **Write design doc** — save to `docs/brainstorming/YYYY-MM-DD-<topic>.md` and commit
 7. **Write proposal** — save the approved design to a temp file
-8. **Execute assign** — run `agent-team worker assign <worker-id> "<desc>" --design docs/brainstorming/<file>.md --proposal <file>`
+8. **Run readiness gate** — execute assign preflight handshake before dispatch. Follow `references/readiness.md` exactly: ping/pong, timeout diagnosis, auto-open provider workspace, retry policy, and fail-fast behavior.
+9. **Execute assign** — run `agent-team worker assign <worker-id> "<desc>" --design docs/brainstorming/<file>.md --proposal <file>`
 
 ## Key Principles
 
@@ -32,3 +33,5 @@ Brainstorming can be skipped ONLY when:
 
 - User explicitly says "just assign" or "直接分配"
 - User provides a complete, detailed design document
+
+Even when brainstorming is skipped, the assign readiness gate is still mandatory before dispatch.
