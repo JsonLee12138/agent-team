@@ -266,6 +266,24 @@ func TestInjectRolePromptV2(t *testing.T) {
 	if !strings.Contains(content, "Task Completion Protocol") {
 		t.Error("CLAUDE.md should contain task completion protocol")
 	}
+	if !strings.Contains(content, "Reply to main controller (used by workers)") {
+		t.Error("CLAUDE.md should require reply-main protocol")
+	}
+	if !strings.Contains(content, "Task completed: <summary>") {
+		t.Error("CLAUDE.md should contain completion reply example")
+	}
+	if !strings.Contains(content, "After the archive attempt (success or failure)") {
+		t.Error("CLAUDE.md should require notification after archive attempt")
+	}
+	if !strings.Contains(content, "archive failed via </openspec archive|/prompts:openspec-archive>: <error>") {
+		t.Error("CLAUDE.md should contain archive failure reporting example")
+	}
+	if !strings.Contains(content, "fallback to `/prompts:openspec-archive`") {
+		t.Error("CLAUDE.md should contain openspec fallback instruction")
+	}
+	if !strings.Contains(content, "Need decision: <problem or options>") {
+		t.Error("CLAUDE.md should contain blocker/options reply example")
+	}
 }
 
 func TestInjectRolePromptNoSource(t *testing.T) {

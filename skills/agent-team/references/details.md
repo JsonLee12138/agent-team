@@ -62,9 +62,28 @@ Changes are managed by OpenSpec. The controller creates a change with design and
 1. `/opsx:continue` — create remaining artifacts (specs, design, tasks)
 2. `/opsx:apply` — implement the tasks
 3. `/opsx:verify` — validate implementation
-4. `/openspec archive` — archive the completed change
+4. Attempt `/openspec archive` for the completed change
+5. If `/openspec archive` is unavailable (for example `command not found`), fallback to `/prompts:openspec-archive`
+6. Send `agent-team reply-main` AFTER the archive attempt with archive status
 
 ## Bidirectional Communication
+
+Workers use `agent-team reply-main` to communicate with main controller.
+
+Task completed (after archive attempt):
+```bash
+agent-team reply-main "Task completed: <summary>; archive: success via </openspec archive|/prompts:openspec-archive>"
+```
+
+Task completed but archive failed (still notify completion):
+```bash
+agent-team reply-main "Task completed: <summary>; archive failed via </openspec archive|/prompts:openspec-archive>: <error>"
+```
+
+Blocked / needs decision on options:
+```bash
+agent-team reply-main "Need decision: <problem or options>"
+```
 
 Worker asks a question to the main controller:
 ```bash

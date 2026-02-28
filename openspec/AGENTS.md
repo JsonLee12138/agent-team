@@ -12,6 +12,17 @@ Instructions for AI coding assistants using OpenSpec for spec-driven development
 - Validate: `openspec validate [change-id] --strict` and fix issues
 - Request approval: Do not start implementation until proposal is approved
 
+## OpenSpec Command Fallback Rule
+
+When an `openspec ...` command fails because the command is unavailable (for example `command not found`), fallback to the matching prompt command:
+
+- `openspec archive ...` -> `/prompts:openspec-archive`
+- `openspec validate ...` -> `/prompts:openspec-validate`
+- `openspec show ...` -> `/prompts:openspec-show`
+- `openspec list ...` -> `/prompts:openspec-list`
+
+Use fallback only for command-availability failures; do not hide real validation/spec errors behind fallback.
+
 ## Three-Stage Workflow
 
 ### Stage 1: Creating Changes

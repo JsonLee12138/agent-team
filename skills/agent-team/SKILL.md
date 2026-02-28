@@ -21,14 +21,34 @@ For directory layout details, see [references/details.md](references/details.md)
 
 ## Install
 
+CLI install (macOS/Homebrew):
+
 ```bash
 brew tap JsonLee12138/agent-team && brew install agent-team
 ```
 
-## Upgrade
+CLI install (source, cross-platform with Go 1.24+):
 
 ```bash
+go install github.com/JsonLee12138/agent-team@latest
+```
+
+## Upgrade
+
+Before running upgrade commands, MUST confirm with the user:
+
+1. **Scope**: update global installed skill vs continue using project-local copy
+2. **Platform**: Homebrew vs source install path
+
+```bash
+# Skill
+npx skills add JsonLee12138/agent-team
+
+# Homebrew
 brew update && brew upgrade agent-team
+
+# Source
+go install github.com/JsonLee12138/agent-team@latest
 ```
 
 ## Role Management (AI Workflow)
@@ -165,6 +185,24 @@ agent-team reply <worker-id> "<answer>"
 agent-team reply-main "<message>"
 ```
 
+Workers MUST use this `agent-team` skill communication path for worker-to-main updates.
+
+Use it in both cases:
+
+1. Task lifecycle updates (send AFTER archive attempt):
+```bash
+agent-team reply-main "Task completed: <summary>; archive: success via </openspec archive|/prompts:openspec-archive>"
+```
+Archive fallback rule: try `/openspec archive` first; if command is unavailable (for example `command not found`), fallback to `/prompts:openspec-archive`.
+If archive fails, still notify completion and include failure details:
+```bash
+agent-team reply-main "Task completed: <summary>; archive failed via </openspec archive|/prompts:openspec-archive>: <error>"
+```
+2. Blockers, questions, or multiple options that need a decision:
+```bash
+agent-team reply-main "Need decision: <problem or options>"
+```
+
 Sends a message prefixed with `[Worker: <worker-id>]` to the controller's session.
 
 ## Brainstorming (Required Before Assign)
@@ -183,9 +221,12 @@ For the full checklist, principles, and anti-patterns, see [references/brainstor
 
 Workers MUST follow these rules when completing a task:
 
-1. **Archive the change**: Run `/openspec archive` to mark the change as completed
-2. **Notify the controller**: Run `agent-team reply-main "<summary>"` to notify the main controller (unless explicitly told not to)
-3. **New work requires new tasks**: After archiving, any new work must go through a new assign cycle
+1. **Attempt archive first**: Run `/openspec archive` for the completed change
+2. **Fallback when command unavailable**: If `/openspec archive` is unavailable (for example `command not found`), use `/prompts:openspec-archive`
+3. **Notify main after archive attempt**: Use `agent-team reply-main "Task completed: <summary>; archive: success via </openspec archive|/prompts:openspec-archive>"` after archive attempt completes
+4. **Archive failure still requires completion notification**: If archive fails, still notify completion with failure details, for example `agent-team reply-main "Task completed: <summary>; archive failed via </openspec archive|/prompts:openspec-archive>: <error>"`
+5. **Escalate blockers/options the same way**: Run `agent-team reply-main "Need decision: <problem or options>"` when blocked or when choices need controller input, then wait for reply
+6. **New work requires new tasks**: After archiving, any new work must go through a new assign cycle
 
 ## Backend Selection
 
