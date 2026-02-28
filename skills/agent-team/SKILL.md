@@ -21,13 +21,13 @@ For directory layout details, see [references/details.md](references/details.md)
 
 ## Install
 
-CLI install (macOS/Homebrew):
+macOS/Homebrew:
 
 ```bash
 brew tap JsonLee12138/agent-team && brew install agent-team
 ```
 
-CLI install (source, cross-platform with Go 1.24+):
+Source (Go 1.24+):
 
 ```bash
 go install github.com/JsonLee12138/agent-team@latest
@@ -35,15 +35,24 @@ go install github.com/JsonLee12138/agent-team@latest
 
 ## Upgrade
 
-Before running upgrade commands, MUST confirm with the user:
+### Skill
 
-1. **Scope**: update global installed skill vs continue using project-local copy
-2. **Platform**: Homebrew vs source install path
+Before running, MUST confirm with the user:
+
+1. **Platform**: which agent platform(s) — see [references/platforms.md](references/platforms.md)
+2. **Scope**: project-level or global
 
 ```bash
-# Skill
-npx skills add JsonLee12138/agent-team
+# Project-level
+npx skills add JsonLee12138/agent-team -a <platform> -y
 
+# Global
+npx skills add JsonLee12138/agent-team -a <platform> -y -g
+```
+
+### CLI
+
+```bash
 # Homebrew
 brew update && brew upgrade agent-team
 
