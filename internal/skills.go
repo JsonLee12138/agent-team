@@ -72,10 +72,12 @@ func CopySkillsToWorktreeFromPath(wtPath, root, roleName, rolePath string) error
 		}
 	}
 
-	// Copy to both .claude/skills/ and .codex/skills/
+	// Copy to all provider skill directories
 	targets := []string{
 		filepath.Join(wtPath, ".claude", "skills"),
 		filepath.Join(wtPath, ".codex", "skills"),
+		filepath.Join(wtPath, ".opencode", "skills"),
+		filepath.Join(wtPath, ".gemini", "skills"),
 	}
 
 	for _, targetBase := range targets {
@@ -288,6 +290,61 @@ func FindSkillPathPublic(root, skillName string) string {
 }
 func CopyDirPublic(src, dst string) error {
 	return copyDir(src, dst)
+}
+
+// BridgeSkillsForProvider creates symlinks from .agents/teams/ and ~/.agents/roles/
+// into the provider's skill scan directory (e.g., .claude/skills/, .opencode/skills/).
+// Only directories containing SKILL.md are bridged. Existing entries are not overwritten.
+func BridgeSkillsForProvider(cwd, provider string) error {
+	targetDir := skillTargetDir(cwd, provider)
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return fmt.Errorf("create target dir: %w", err)
+	}
+
+	// Source directories: project-level + global
+	sources := []string{
+		filepath.Join(ResolveAgentsDir(cwd), "teams"),
+	}
+	if globalDir, err := GlobalRolesDir(); err == nil {
+		sources = append(sources, globalDir)
+	}
+
+	bridged := 0
+	for _, srcDir := range sources {
+		entries, err := os.ReadDir(srcDir)
+		if err != nil {
+			continue
+		}
+
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+
+			src := filepath.Join(srcDir, entry.Name())
+			// Only bridge directories that contain SKILL.md
+			if _, err := os.Stat(filepath.Join(src, "SKILL.md")); os.IsNotExist(err) {
+				continue
+			}
+
+			dest := filepath.Join(targetDir, entry.Name())
+			// Skip if already exists (don't overwrite manual installs or prior copies)
+			if _, err := os.Lstat(dest); err == nil {
+				continue
+			}
+
+			if err := os.Symlink(src, dest); err != nil {
+				fmt.Fprintf(os.Stderr, "[agent-team] bridge-skills: symlink %s → %s: %v\n", src, dest, err)
+				continue
+			}
+			bridged++
+		}
+	}
+
+	if bridged > 0 {
+		fmt.Fprintf(os.Stderr, "[agent-team] bridge-skills: linked %d skill(s) to %s\n", bridged, targetDir)
+	}
+	return nil
 }
 
 // copyDir recursively copies a directory.

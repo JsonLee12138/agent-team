@@ -1,6 +1,6 @@
 {
   "name": "opencode-agent-team",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Agent Team plugin for OpenCode — role injection, quality checks, and task lifecycle hooks",
   "type": "module",
   "main": "./src/plugin.ts",

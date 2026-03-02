@@ -204,6 +204,28 @@ func TestCopySkillsToWorktree(t *testing.T) {
 	if _, err := os.Stat(codexDep); os.IsNotExist(err) {
 		t.Error("dependency skill not mirrored to .codex/skills/")
 	}
+
+	// Check .opencode/skills/ mirror
+	opencodeSkill := filepath.Join(wtPath, ".opencode", "skills", "dev", "SKILL.md")
+	if _, err := os.Stat(opencodeSkill); os.IsNotExist(err) {
+		t.Error("role skill not mirrored to .opencode/skills/")
+	}
+
+	opencodeDep := filepath.Join(wtPath, ".opencode", "skills", "vitest", "SKILL.md")
+	if _, err := os.Stat(opencodeDep); os.IsNotExist(err) {
+		t.Error("dependency skill not mirrored to .opencode/skills/")
+	}
+
+	// Check .gemini/skills/ mirror
+	geminiSkill := filepath.Join(wtPath, ".gemini", "skills", "dev", "SKILL.md")
+	if _, err := os.Stat(geminiSkill); os.IsNotExist(err) {
+		t.Error("role skill not mirrored to .gemini/skills/")
+	}
+
+	geminiDep := filepath.Join(wtPath, ".gemini", "skills", "vitest", "SKILL.md")
+	if _, err := os.Stat(geminiDep); os.IsNotExist(err) {
+		t.Error("dependency skill not mirrored to .gemini/skills/")
+	}
 }
 
 func TestCopySkillsToWorktreeScopedName(t *testing.T) {
@@ -250,6 +272,7 @@ func TestProviderToAgent(t *testing.T) {
 		{"claude", "claude-code"},
 		{"codex", "codex"},
 		{"opencode", "opencode"},
+		{"gemini", "gemini"},
 	}
 	for _, tt := range tests {
 		got, ok := providerToAgent[tt.provider]
@@ -270,6 +293,7 @@ func TestSkillTargetDir(t *testing.T) {
 		{"claude", filepath.Join(".claude", "skills")},
 		{"codex", filepath.Join(".codex", "skills")},
 		{"opencode", filepath.Join(".opencode", "skills")},
+		{"gemini", filepath.Join(".gemini", "skills")},
 		{"unknown", filepath.Join(".claude", "skills")},
 	}
 	for _, tt := range tests {
@@ -360,5 +384,113 @@ func TestInstallSkillsForWorkerCodexProvider(t *testing.T) {
 	codexRole := filepath.Join(wtPath, ".codex", "skills", "dev", "SKILL.md")
 	if _, err := os.Stat(codexRole); os.IsNotExist(err) {
 		t.Error("role skill not installed to .codex/skills/ for codex provider")
+	}
+}
+
+func TestBridgeSkillsForProvider(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create two roles with SKILL.md
+	role1 := filepath.Join(dir, ".agents", "teams", "frontend-dev")
+	os.MkdirAll(role1, 0755)
+	os.WriteFile(filepath.Join(role1, "SKILL.md"), []byte("# frontend-dev\n"), 0644)
+
+	role2 := filepath.Join(dir, ".agents", "teams", "backend-dev")
+	os.MkdirAll(role2, 0755)
+	os.WriteFile(filepath.Join(role2, "SKILL.md"), []byte("# backend-dev\n"), 0644)
+
+	// Create a directory without SKILL.md (should not be bridged)
+	noSkill := filepath.Join(dir, ".agents", "teams", "no-skill-dir")
+	os.MkdirAll(noSkill, 0755)
+	os.WriteFile(filepath.Join(noSkill, "README.md"), []byte("not a skill\n"), 0644)
+
+	err := BridgeSkillsForProvider(dir, "claude")
+	if err != nil {
+		t.Fatalf("BridgeSkillsForProvider: %v", err)
+	}
+
+	// Check symlinks created
+	link1 := filepath.Join(dir, ".claude", "skills", "frontend-dev")
+	info1, err := os.Lstat(link1)
+	if err != nil {
+		t.Fatalf("symlink for frontend-dev not created: %v", err)
+	}
+	if info1.Mode()&os.ModeSymlink == 0 {
+		t.Error("frontend-dev should be a symlink")
+	}
+
+	link2 := filepath.Join(dir, ".claude", "skills", "backend-dev")
+	if _, err := os.Lstat(link2); err != nil {
+		t.Fatalf("symlink for backend-dev not created: %v", err)
+	}
+
+	// Verify the symlink target is correct
+	target, err := os.Readlink(link1)
+	if err != nil {
+		t.Fatalf("readlink: %v", err)
+	}
+	if target != role1 {
+		t.Errorf("symlink target = %q, want %q", target, role1)
+	}
+
+	// Check that no-skill-dir was NOT bridged
+	noSkillLink := filepath.Join(dir, ".claude", "skills", "no-skill-dir")
+	if _, err := os.Lstat(noSkillLink); !os.IsNotExist(err) {
+		t.Error("directory without SKILL.md should not be bridged")
+	}
+
+	// Check SKILL.md is accessible through symlink
+	data, err := os.ReadFile(filepath.Join(link1, "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read through symlink: %v", err)
+	}
+	if string(data) != "# frontend-dev\n" {
+		t.Errorf("SKILL.md content = %q", string(data))
+	}
+}
+
+func TestBridgeSkillsForProviderSkipsExisting(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create a role
+	role := filepath.Join(dir, ".agents", "teams", "my-role")
+	os.MkdirAll(role, 0755)
+	os.WriteFile(filepath.Join(role, "SKILL.md"), []byte("# original\n"), 0644)
+
+	// Pre-create a manual skill at the target (should NOT be overwritten)
+	manualDir := filepath.Join(dir, ".claude", "skills", "my-role")
+	os.MkdirAll(manualDir, 0755)
+	os.WriteFile(filepath.Join(manualDir, "SKILL.md"), []byte("# manual install\n"), 0644)
+
+	err := BridgeSkillsForProvider(dir, "claude")
+	if err != nil {
+		t.Fatalf("BridgeSkillsForProvider: %v", err)
+	}
+
+	// Should still be the manual version, not a symlink
+	data, err := os.ReadFile(filepath.Join(manualDir, "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if string(data) != "# manual install\n" {
+		t.Errorf("existing skill was overwritten: %q", string(data))
+	}
+}
+
+func TestBridgeSkillsForProviderOpenCode(t *testing.T) {
+	dir := t.TempDir()
+
+	role := filepath.Join(dir, ".agents", "teams", "dev")
+	os.MkdirAll(role, 0755)
+	os.WriteFile(filepath.Join(role, "SKILL.md"), []byte("# dev\n"), 0644)
+
+	err := BridgeSkillsForProvider(dir, "opencode")
+	if err != nil {
+		t.Fatalf("BridgeSkillsForProvider: %v", err)
+	}
+
+	link := filepath.Join(dir, ".opencode", "skills", "dev")
+	if _, err := os.Lstat(link); err != nil {
+		t.Fatalf("symlink for opencode not created: %v", err)
 	}
 }

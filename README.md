@@ -69,7 +69,7 @@ claude plugin install agent-team@agent-team
 ### Gemini CLI (via Extension)
 
 ```bash
-gemini extensions install JsonLee12138/agent-team
+gemini extensions install https://github.com/JsonLee12138/agent-team
 ```
 
 This installs the `gemini-extension.json` manifest and hooks. The `GEMINI.md` context file is loaded automatically in worktrees.

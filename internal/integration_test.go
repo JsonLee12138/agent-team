@@ -127,6 +127,16 @@ skills:
 			if _, err := os.Stat(codexPath); os.IsNotExist(err) {
 				t.Errorf(".codex/skills/%s/%s missing after CopySkillsToWorktree", skillName, fileName)
 			}
+
+			opencodePath := filepath.Join(wtPath, ".opencode", "skills", skillName, fileName)
+			if _, err := os.Stat(opencodePath); os.IsNotExist(err) {
+				t.Errorf(".opencode/skills/%s/%s missing after CopySkillsToWorktree", skillName, fileName)
+			}
+
+			geminiPath := filepath.Join(wtPath, ".gemini", "skills", skillName, fileName)
+			if _, err := os.Stat(geminiPath); os.IsNotExist(err) {
+				t.Errorf(".gemini/skills/%s/%s missing after CopySkillsToWorktree", skillName, fileName)
+			}
 		}
 	}
 

@@ -374,7 +374,7 @@ func NextWorkerID(root, wtBase, roleName string) string {
 
 // WriteWorktreeGitignore writes a .gitignore to exclude worker-local files.
 func WriteWorktreeGitignore(wtPath string) error {
-	content := ".gitignore\n.claude/\n.codex/\n.gemini/\n.tasks/\nworker.yaml\n"
+	content := ".gitignore\n.claude/\n.codex/\n.gemini/\n.opencode/\n.tasks/\nworker.yaml\n"
 	return os.WriteFile(filepath.Join(wtPath, ".gitignore"), []byte(content), 0644)
 }
 

@@ -69,7 +69,7 @@ claude plugin install agent-team@agent-team
 ### Gemini CLI（扩展安装）
 
 ```bash
-gemini extensions install JsonLee12138/agent-team
+gemini extensions install https://github.com/JsonLee12138/agent-team
 ```
 
 安装后会注册 `gemini-extension.json` 清单和 hooks，`GEMINI.md` 上下文文件在 worktree 中自动加载。
