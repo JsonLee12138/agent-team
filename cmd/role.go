@@ -14,6 +14,7 @@ func newRoleCmd() *cobra.Command {
 		Short: "Manage roles (skill package definitions)",
 	}
 	cmd.AddCommand(newRoleListCmd())
+	cmd.AddCommand(newRoleCreateCmd())
 	return cmd
 }
 

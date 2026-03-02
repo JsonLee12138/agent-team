@@ -1,0 +1,11 @@
+name: {{.RoleName}}
+description: {{.DescriptionYAML}}
+system_prompt_file: system.md
+scope:
+  in_scope:
+{{.InScopeYAML}}
+  out_of_scope:
+{{.OutOfScopeYAML}}
+constraints:
+  single_role_focus: true
+{{.SkillsField}}

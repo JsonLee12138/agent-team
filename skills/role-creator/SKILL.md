@@ -102,9 +102,7 @@ After the final skills list is confirmed, resolve each plain skill name against 
 For open-source publishing (default):
 
 ```bash
-python3 skills/role-creator/scripts/create_role_skill.py \
-  --repo-root . \
-  --role-name frontend-dev \
+agent-team role create frontend-dev \
   --description "Frontend role for UI implementation" \
   --system-goal "Ship accessible and maintainable UI work" \
   --in-scope "Build components,Improve accessibility" \
@@ -115,9 +113,7 @@ python3 skills/role-creator/scripts/create_role_skill.py \
 For team use (agent-team integration):
 
 ```bash
-python3 skills/role-creator/scripts/create_role_skill.py \
-  --repo-root . \
-  --role-name frontend-dev \
+agent-team role create frontend-dev \
   --target-dir .agents/teams \
   --description "Frontend role for UI implementation" \
   --system-goal "Ship accessible and maintainable UI work" \
@@ -129,12 +125,12 @@ python3 skills/role-creator/scripts/create_role_skill.py \
 Empty skills example:
 
 ```bash
-python3 skills/role-creator/scripts/create_role_skill.py \
-  --repo-root . \
-  --role-name product-manager \
+agent-team role create product-manager \
   --description "Product role for roadmap and PRD work" \
   --system-goal "Define clear product requirements and priorities"
 ```
+
+> Minimum required CLI version: includes `role create` subcommand.
 
 ## Runtime Skill Discovery (Role Usage Guideline)
 
@@ -158,8 +154,11 @@ This ensures roles are self-sufficient and can dynamically extend their capabili
 
 ## Validation
 
-Run after changes:
+After generation, verify the output files exist and contain expected content:
 
-```bash
-python3 -m unittest skills/role-creator/tests/test_create_role_skill.py -v
-```
+1. Check all three managed files exist in `<target>/<role-name>/`:
+   - `SKILL.md` — contains role name, description, and trigger keywords
+   - `references/role.yaml` — contains `description`, `system_goal`, `in_scope`, `out_of_scope`, `skills`
+   - `system.md` — contains system goal and scope instructions
+2. Verify field values in `references/role.yaml` match the approved inputs (description, system goal, scopes, skills list).
+3. If any file is missing or contains unexpected content, report the discrepancy and offer to regenerate.
