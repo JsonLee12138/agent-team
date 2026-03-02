@@ -361,6 +361,75 @@ func TestInstallSkillsForWorkerLocalOnly(t *testing.T) {
 	}
 }
 
+func TestBridgeSkillsForOpenCode(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create skills in skills/ (plugin built-in)
+	skillDir := filepath.Join(dir, "skills", "my-plugin-skill")
+	os.MkdirAll(skillDir, 0755)
+	os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# plugin skill\n"), 0644)
+
+	// Create a role in .agents/teams/
+	roleDir := filepath.Join(dir, ".agents", "teams", "dev-role")
+	os.MkdirAll(roleDir, 0755)
+	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# dev-role\n"), 0644)
+
+	// Directory without SKILL.md should be skipped
+	noSkillDir := filepath.Join(dir, "skills", "no-skill-md")
+	os.MkdirAll(noSkillDir, 0755)
+
+	err := BridgeSkillsForProvider(dir, "opencode")
+	if err != nil {
+		t.Fatalf("BridgeSkillsForProvider: %v", err)
+	}
+
+	// Check symlinks created in .opencode/skills/
+	link1 := filepath.Join(dir, ".opencode", "skills", "my-plugin-skill")
+	if target, err := os.Readlink(link1); err != nil {
+		t.Errorf("expected symlink at %s, got error: %v", link1, err)
+	} else if target != skillDir {
+		t.Errorf("symlink target = %q, want %q", target, skillDir)
+	}
+
+	link2 := filepath.Join(dir, ".opencode", "skills", "dev-role")
+	if target, err := os.Readlink(link2); err != nil {
+		t.Errorf("expected symlink at %s, got error: %v", link2, err)
+	} else if target != roleDir {
+		t.Errorf("symlink target = %q, want %q", target, roleDir)
+	}
+
+	// no-skill-md should NOT be linked
+	noLink := filepath.Join(dir, ".opencode", "skills", "no-skill-md")
+	if _, err := os.Lstat(noLink); !os.IsNotExist(err) {
+		t.Error("directory without SKILL.md should not be bridged")
+	}
+}
+
+func TestBridgeSkillsExistingNotOverwritten(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create a skill
+	skillDir := filepath.Join(dir, "skills", "existing")
+	os.MkdirAll(skillDir, 0755)
+	os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte("# existing\n"), 0644)
+
+	// Pre-create the target as a real directory (not symlink)
+	destDir := filepath.Join(dir, ".opencode", "skills", "existing")
+	os.MkdirAll(destDir, 0755)
+	os.WriteFile(filepath.Join(destDir, "SKILL.md"), []byte("# local version\n"), 0644)
+
+	err := BridgeSkillsForProvider(dir, "opencode")
+	if err != nil {
+		t.Fatalf("BridgeSkillsForProvider: %v", err)
+	}
+
+	// The existing directory should NOT be replaced
+	content, _ := os.ReadFile(filepath.Join(destDir, "SKILL.md"))
+	if string(content) != "# local version\n" {
+		t.Errorf("existing skill was overwritten, content = %q", string(content))
+	}
+}
+
 func TestInstallSkillsForWorkerCodexProvider(t *testing.T) {
 	dir := t.TempDir()
 	wtPath := filepath.Join(dir, "worktree")
@@ -384,113 +453,5 @@ func TestInstallSkillsForWorkerCodexProvider(t *testing.T) {
 	codexRole := filepath.Join(wtPath, ".codex", "skills", "dev", "SKILL.md")
 	if _, err := os.Stat(codexRole); os.IsNotExist(err) {
 		t.Error("role skill not installed to .codex/skills/ for codex provider")
-	}
-}
-
-func TestBridgeSkillsForProvider(t *testing.T) {
-	dir := t.TempDir()
-
-	// Create two roles with SKILL.md
-	role1 := filepath.Join(dir, ".agents", "teams", "frontend-dev")
-	os.MkdirAll(role1, 0755)
-	os.WriteFile(filepath.Join(role1, "SKILL.md"), []byte("# frontend-dev\n"), 0644)
-
-	role2 := filepath.Join(dir, ".agents", "teams", "backend-dev")
-	os.MkdirAll(role2, 0755)
-	os.WriteFile(filepath.Join(role2, "SKILL.md"), []byte("# backend-dev\n"), 0644)
-
-	// Create a directory without SKILL.md (should not be bridged)
-	noSkill := filepath.Join(dir, ".agents", "teams", "no-skill-dir")
-	os.MkdirAll(noSkill, 0755)
-	os.WriteFile(filepath.Join(noSkill, "README.md"), []byte("not a skill\n"), 0644)
-
-	err := BridgeSkillsForProvider(dir, "claude")
-	if err != nil {
-		t.Fatalf("BridgeSkillsForProvider: %v", err)
-	}
-
-	// Check symlinks created
-	link1 := filepath.Join(dir, ".claude", "skills", "frontend-dev")
-	info1, err := os.Lstat(link1)
-	if err != nil {
-		t.Fatalf("symlink for frontend-dev not created: %v", err)
-	}
-	if info1.Mode()&os.ModeSymlink == 0 {
-		t.Error("frontend-dev should be a symlink")
-	}
-
-	link2 := filepath.Join(dir, ".claude", "skills", "backend-dev")
-	if _, err := os.Lstat(link2); err != nil {
-		t.Fatalf("symlink for backend-dev not created: %v", err)
-	}
-
-	// Verify the symlink target is correct
-	target, err := os.Readlink(link1)
-	if err != nil {
-		t.Fatalf("readlink: %v", err)
-	}
-	if target != role1 {
-		t.Errorf("symlink target = %q, want %q", target, role1)
-	}
-
-	// Check that no-skill-dir was NOT bridged
-	noSkillLink := filepath.Join(dir, ".claude", "skills", "no-skill-dir")
-	if _, err := os.Lstat(noSkillLink); !os.IsNotExist(err) {
-		t.Error("directory without SKILL.md should not be bridged")
-	}
-
-	// Check SKILL.md is accessible through symlink
-	data, err := os.ReadFile(filepath.Join(link1, "SKILL.md"))
-	if err != nil {
-		t.Fatalf("read through symlink: %v", err)
-	}
-	if string(data) != "# frontend-dev\n" {
-		t.Errorf("SKILL.md content = %q", string(data))
-	}
-}
-
-func TestBridgeSkillsForProviderSkipsExisting(t *testing.T) {
-	dir := t.TempDir()
-
-	// Create a role
-	role := filepath.Join(dir, ".agents", "teams", "my-role")
-	os.MkdirAll(role, 0755)
-	os.WriteFile(filepath.Join(role, "SKILL.md"), []byte("# original\n"), 0644)
-
-	// Pre-create a manual skill at the target (should NOT be overwritten)
-	manualDir := filepath.Join(dir, ".claude", "skills", "my-role")
-	os.MkdirAll(manualDir, 0755)
-	os.WriteFile(filepath.Join(manualDir, "SKILL.md"), []byte("# manual install\n"), 0644)
-
-	err := BridgeSkillsForProvider(dir, "claude")
-	if err != nil {
-		t.Fatalf("BridgeSkillsForProvider: %v", err)
-	}
-
-	// Should still be the manual version, not a symlink
-	data, err := os.ReadFile(filepath.Join(manualDir, "SKILL.md"))
-	if err != nil {
-		t.Fatalf("read: %v", err)
-	}
-	if string(data) != "# manual install\n" {
-		t.Errorf("existing skill was overwritten: %q", string(data))
-	}
-}
-
-func TestBridgeSkillsForProviderOpenCode(t *testing.T) {
-	dir := t.TempDir()
-
-	role := filepath.Join(dir, ".agents", "teams", "dev")
-	os.MkdirAll(role, 0755)
-	os.WriteFile(filepath.Join(role, "SKILL.md"), []byte("# dev\n"), 0644)
-
-	err := BridgeSkillsForProvider(dir, "opencode")
-	if err != nil {
-		t.Fatalf("BridgeSkillsForProvider: %v", err)
-	}
-
-	link := filepath.Join(dir, ".opencode", "skills", "dev")
-	if _, err := os.Lstat(link); err != nil {
-		t.Fatalf("symlink for opencode not created: %v", err)
 	}
 }

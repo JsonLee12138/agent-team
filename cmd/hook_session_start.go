@@ -42,9 +42,11 @@ func runHookSessionStart(cmd *cobra.Command) error {
 		return nil
 	}
 	if wt == nil {
-		// Not in a managed worktree — bridge skills and output availability info
-		if err := internal.BridgeSkillsForProvider(input.CWD, string(input.Provider)); err != nil {
-			fmt.Fprintf(os.Stderr, "[agent-team] session-start: bridge skills: %v\n", err)
+		// Not in a managed worktree — bridge skills for providers that need it
+		if input.Provider == internal.ProviderOpenCode {
+			if err := internal.BridgeSkillsForProvider(input.CWD, string(input.Provider)); err != nil {
+				fmt.Fprintf(os.Stderr, "[agent-team] session-start: bridge skills: %v\n", err)
+			}
 		}
 		fmt.Fprintf(os.Stderr, "[agent-team] Ready. Use 'agent-team worker create <role>' to start a worker session.\n")
 		return nil
