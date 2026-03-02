@@ -26,6 +26,7 @@ func newRoleCreateCmd() *cobra.Command {
 		targetDir          string
 		overwrite          string
 		repoRoot           string
+		force              bool
 	)
 
 	cmd := &cobra.Command{
@@ -38,6 +39,32 @@ func newRoleCreateCmd() *cobra.Command {
 			validName, err := internal.ValidateRoleName(roleName)
 			if err != nil {
 				return err
+			}
+
+			// Check global roles for duplicates (unless --force)
+			if !force && (targetDir == "skills" || targetDir == ".agents/teams") {
+				matches, searchErr := internal.SearchGlobalRoles(validName)
+				if searchErr == nil && len(matches) > 0 {
+					fmt.Fprintf(cmd.OutOrStdout(), "Found matching global role(s):\n")
+					for _, m := range matches {
+						label := m.MatchType
+						desc := ""
+						if m.Description != "" {
+							desc = " — " + m.Description
+						}
+						fmt.Fprintf(cmd.OutOrStdout(), "  [%s] %s  %s%s\n", label, m.RoleName, m.Path, desc)
+					}
+					fmt.Fprintf(cmd.OutOrStdout(), "Still create a local role? [y/N]: ")
+					reader := bufio.NewReader(cmd.InOrStdin())
+					answer, readErr := reader.ReadString('\n')
+					if readErr != nil {
+						return readErr
+					}
+					answer = strings.TrimSpace(strings.ToLower(answer))
+					if answer != "y" && answer != "yes" {
+						return fmt.Errorf("aborted: use existing global role or pass --force to skip this check")
+					}
+				}
 			}
 
 			finalSkills := internal.ResolveFinalSkills(
@@ -112,6 +139,7 @@ func newRoleCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&targetDir, "target-dir", "skills", "Target directory (skills | .agents/teams | custom path)")
 	cmd.Flags().StringVar(&overwrite, "overwrite", "ask", "Overwrite mode: ask/yes/no")
 	cmd.Flags().StringVar(&repoRoot, "repo-root", ".", "Repository root path")
+	cmd.Flags().BoolVar(&force, "force", false, "Skip global duplicate check")
 
 	_ = cmd.MarkFlagRequired("description")
 	_ = cmd.MarkFlagRequired("system-goal")

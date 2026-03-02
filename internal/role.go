@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"gopkg.in/yaml.v3"
 )
 
 var deprecatedOnce sync.Once
@@ -75,6 +77,218 @@ type WorkerInfo struct {
 	WorkerID string
 	Role     string
 	Config   *WorkerConfig
+}
+
+// RoleMatch describes a resolved role location.
+type RoleMatch struct {
+	RoleName    string // 角色目录名
+	Path        string // 绝对路径
+	Scope       string // "project" | "global"
+	Description string // from role.yaml
+	MatchType   string // "exact" | "keyword"
+}
+
+// GlobalRolesDir returns the global roles directory (~/.agents/roles/).
+func GlobalRolesDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve home directory: %w", err)
+	}
+	return filepath.Join(home, ".agents", "roles"), nil
+}
+
+// fileExists returns true if the path exists.
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// splitRoleKeywords splits a kebab-case name into keywords.
+func splitRoleKeywords(name string) []string {
+	parts := strings.Split(name, "-")
+	var keywords []string
+	for _, p := range parts {
+		if p != "" {
+			keywords = append(keywords, strings.ToLower(p))
+		}
+	}
+	return keywords
+}
+
+// roleYAMLFull is a struct for reading name/description/scope from role.yaml.
+type roleYAMLFull struct {
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+	Scope       struct {
+		InScope []string `yaml:"in_scope"`
+	} `yaml:"scope"`
+}
+
+// readRoleYAMLFull reads role.yaml from the given role path.
+// Returns zero value if file doesn't exist or can't be parsed.
+func readRoleYAMLFull(rolePath string) roleYAMLFull {
+	yamlPath := filepath.Join(rolePath, "references", "role.yaml")
+	data, err := os.ReadFile(yamlPath)
+	if err != nil {
+		return roleYAMLFull{}
+	}
+	var ry roleYAMLFull
+	if err := yaml.Unmarshal(data, &ry); err != nil {
+		return roleYAMLFull{}
+	}
+	return ry
+}
+
+// isRoleDir checks if a directory contains SKILL.md or system.md (i.e., is a valid role).
+func isRoleDir(path string) bool {
+	return fileExists(filepath.Join(path, "SKILL.md")) || fileExists(filepath.Join(path, "system.md"))
+}
+
+// listRolesInDir scans a directory for role subdirectories and returns RoleMatch entries.
+func listRolesInDir(dir, scope string) []RoleMatch {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var matches []RoleMatch
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		rolePath := filepath.Join(dir, e.Name())
+		if !isRoleDir(rolePath) {
+			continue
+		}
+		ry := readRoleYAMLFull(rolePath)
+		matches = append(matches, RoleMatch{
+			RoleName:    e.Name(),
+			Path:        rolePath,
+			Scope:       scope,
+			Description: ry.Description,
+			MatchType:   "exact",
+		})
+	}
+	return matches
+}
+
+// matchesKeywords checks if a role directory or its YAML metadata matches the given keywords.
+func matchesKeywords(dirName string, ry roleYAMLFull, keywords []string) bool {
+	searchText := strings.ToLower(dirName + " " + ry.Description)
+	for _, item := range ry.Scope.InScope {
+		searchText += " " + strings.ToLower(item)
+	}
+	for _, kw := range keywords {
+		if strings.Contains(searchText, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+// ResolveRole looks up a role by name with project-first priority.
+// Search order: .agents/teams/<role> → ~/.agents/roles/<role>
+func ResolveRole(root, roleName string) (*RoleMatch, error) {
+	// 1. Project-level
+	projectDir := RoleDir(root, roleName)
+	if isRoleDir(projectDir) {
+		ry := readRoleYAMLFull(projectDir)
+		return &RoleMatch{
+			RoleName:    roleName,
+			Path:        projectDir,
+			Scope:       "project",
+			Description: ry.Description,
+			MatchType:   "exact",
+		}, nil
+	}
+
+	// 2. Global
+	globalDir, err := GlobalRolesDir()
+	if err != nil {
+		return nil, fmt.Errorf("role '%s' not found in project, and cannot resolve global dir: %w", roleName, err)
+	}
+	globalRolePath := filepath.Join(globalDir, roleName)
+	if isRoleDir(globalRolePath) {
+		ry := readRoleYAMLFull(globalRolePath)
+		return &RoleMatch{
+			RoleName:    roleName,
+			Path:        globalRolePath,
+			Scope:       "global",
+			Description: ry.Description,
+			MatchType:   "exact",
+		}, nil
+	}
+
+	return nil, fmt.Errorf("role '%s' not found in .agents/teams/ or ~/.agents/roles/.\nCreate it first using the role-creator skill", roleName)
+}
+
+// SearchGlobalRoles searches global roles by exact name match and keyword matching.
+// Exact matches are sorted before keyword matches.
+func SearchGlobalRoles(roleName string) ([]RoleMatch, error) {
+	globalDir, err := GlobalRolesDir()
+	if err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(globalDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	keywords := splitRoleKeywords(roleName)
+	var exact, keyword []RoleMatch
+
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		rolePath := filepath.Join(globalDir, e.Name())
+		if !isRoleDir(rolePath) {
+			continue
+		}
+		ry := readRoleYAMLFull(rolePath)
+
+		if e.Name() == roleName {
+			exact = append(exact, RoleMatch{
+				RoleName:    e.Name(),
+				Path:        rolePath,
+				Scope:       "global",
+				Description: ry.Description,
+				MatchType:   "exact",
+			})
+			continue
+		}
+
+		if matchesKeywords(e.Name(), ry, keywords) {
+			keyword = append(keyword, RoleMatch{
+				RoleName:    e.Name(),
+				Path:        rolePath,
+				Scope:       "global",
+				Description: ry.Description,
+				MatchType:   "keyword",
+			})
+		}
+	}
+
+	sort.Slice(keyword, func(i, j int) bool {
+		return keyword[i].RoleName < keyword[j].RoleName
+	})
+
+	return append(exact, keyword...), nil
+}
+
+// ListGlobalRoles lists all roles in ~/.agents/roles/.
+func ListGlobalRoles() ([]RoleMatch, error) {
+	globalDir, err := GlobalRolesDir()
+	if err != nil {
+		return nil, err
+	}
+	roles := listRolesInDir(globalDir, "global")
+	sort.Slice(roles, func(i, j int) bool {
+		return roles[i].RoleName < roles[j].RoleName
+	})
+	return roles, nil
 }
 
 // ListAvailableRoles scans .agents/teams/ for directories containing SKILL.md.
@@ -223,9 +437,9 @@ func InjectSection(filePath, tag, content string) error {
 	return os.WriteFile(filePath, []byte(fileContent), 0644)
 }
 
-// buildRoleSection builds the AGENT_TEAM section content from the role's system.md.
-func buildRoleSection(wtPath, workerID, roleName, root string) (string, error) {
-	roleSystemPath := RoleSystemMDPath(root, roleName)
+// buildRoleSectionFromPath builds the AGENT_TEAM section content from the role at rolePath.
+func buildRoleSectionFromPath(wtPath, workerID, roleName, rolePath, root string) (string, error) {
+	roleSystemPath := filepath.Join(rolePath, "system.md")
 	prompt, err := os.ReadFile(roleSystemPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -243,7 +457,7 @@ func buildRoleSection(wtPath, workerID, roleName, root string) (string, error) {
 	fmt.Fprintf(&b, "When you receive ANY task, you MUST first invoke the `%s` skill (via `/%s` or the Skill tool). ", roleName, roleName)
 	b.WriteString("This is your primary skill that defines how you approach work. Never skip it.\n\n")
 
-	skills, skillErr := ReadRoleSkills(root, roleName)
+	skills, skillErr := ReadRoleSkillsFromPath(rolePath)
 	if skillErr == nil && len(skills) > 0 {
 		b.WriteString("**Dependency skills:**\n\n")
 		for _, skill := range skills {
@@ -294,9 +508,14 @@ func buildRoleSection(wtPath, workerID, roleName, root string) (string, error) {
 	return b.String(), nil
 }
 
-// InjectRolePrompt injects the role prompt into CLAUDE.md and AGENTS.md using tagged sections.
-func InjectRolePrompt(wtPath, workerID, roleName, root string) error {
-	content, err := buildRoleSection(wtPath, workerID, roleName, root)
+// buildRoleSection builds the AGENT_TEAM section content from the role's system.md.
+func buildRoleSection(wtPath, workerID, roleName, root string) (string, error) {
+	return buildRoleSectionFromPath(wtPath, workerID, roleName, RoleDir(root, roleName), root)
+}
+
+// InjectRolePromptWithPath injects the role prompt using an explicit rolePath.
+func InjectRolePromptWithPath(wtPath, workerID, roleName, rolePath, root string) error {
+	content, err := buildRoleSectionFromPath(wtPath, workerID, roleName, rolePath, root)
 	if err != nil {
 		return err
 	}
@@ -315,4 +534,9 @@ func InjectRolePrompt(wtPath, workerID, roleName, root string) error {
 	}
 
 	return nil
+}
+
+// InjectRolePrompt injects the role prompt into CLAUDE.md and AGENTS.md using tagged sections.
+func InjectRolePrompt(wtPath, workerID, roleName, root string) error {
+	return InjectRolePromptWithPath(wtPath, workerID, roleName, RoleDir(root, roleName), root)
 }

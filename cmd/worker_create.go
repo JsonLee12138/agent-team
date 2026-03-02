@@ -2,8 +2,10 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/JsonLee12138/agent-team/internal"
@@ -22,7 +24,7 @@ var defaultOpenSpecSetup = func(wtPath string) error {
 var openSpecSetup = defaultOpenSpecSetup
 
 // skillInstaller can be overridden in tests to skip npx skill installation.
-var skillInstaller = internal.InstallSkillsForWorker
+var skillInstaller = internal.InstallSkillsForWorkerFromPath
 
 func newWorkerCreateCmd() *cobra.Command {
 	var model string
@@ -47,24 +49,26 @@ func newWorkerCreateCmd() *cobra.Command {
 func (a *App) RunWorkerCreate(roleName, provider, model string, newWindow bool) error {
 	root := a.Git.Root()
 
-	// 1. Validate role exists
-	roleDir := internal.RoleDir(root, roleName)
-	if _, err := os.Stat(roleDir); os.IsNotExist(err) {
-		// Check global skills
-		home, homeErr := os.UserHomeDir()
-		if homeErr == nil {
-			globalSkill := fmt.Sprintf("%s/.claude/skills/%s", home, roleName)
-			if _, gErr := os.Stat(globalSkill); gErr == nil {
-				fmt.Printf("Role '%s' found in global skills at %s\n", roleName, globalSkill)
-				fmt.Printf("Copying to %s...\n", roleDir)
-				if err := internal.CopyDirPublic(globalSkill, roleDir); err != nil {
-					return fmt.Errorf("copy global skill: %w", err)
-				}
-			} else {
-				return fmt.Errorf("role '%s' not found in .agents/teams/ or global skills.\nCreate it first using the role-creator skill", roleName)
-			}
-		} else {
-			return fmt.Errorf("role '%s' not found in .agents/teams/.\nCreate it first using the role-creator skill", roleName)
+	// 1. Resolve role (project → global priority)
+	match, err := internal.ResolveRole(root, roleName)
+	if err != nil {
+		return err
+	}
+
+	rolePath := match.Path
+	roleScope := match.Scope
+
+	if match.Scope == "global" {
+		fmt.Printf("Role '%s' found in global roles: %s\n", roleName, match.Path)
+		if match.Description != "" {
+			fmt.Printf("  Description: %s\n", match.Description)
+		}
+		fmt.Print("Use this global role? [Y/n]: ")
+		reader := bufio.NewReader(os.Stdin)
+		answer, _ := reader.ReadString('\n')
+		answer = strings.TrimSpace(strings.ToLower(answer))
+		if answer == "n" || answer == "no" {
+			return fmt.Errorf("aborted: global role '%s' not confirmed", roleName)
 		}
 	}
 
@@ -114,6 +118,10 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, newWindow bool) 
 		PaneID:        "",
 		CreatedAt:     now,
 	}
+	if roleScope == "global" {
+		cfg.RoleScope = roleScope
+		cfg.RolePath = rolePath
+	}
 	configPath := internal.WorkerYAMLPath(wtPath)
 	if err := cfg.Save(configPath); err != nil {
 		return fmt.Errorf("save worker config: %w", err)
@@ -125,7 +133,7 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, newWindow bool) 
 	}
 
 	// 9. Inject role prompt into CLAUDE.md and AGENTS.md
-	if err := internal.InjectRolePrompt(wtPath, workerID, roleName, root); err != nil {
+	if err := internal.InjectRolePromptWithPath(wtPath, workerID, roleName, rolePath, root); err != nil {
 		return fmt.Errorf("inject role prompt: %w", err)
 	}
 
@@ -154,7 +162,7 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, newWindow bool) 
 
 	// 13. Install skills
 	fmt.Printf("  Installing skills for role '%s'...\n", roleName)
-	if err := skillInstaller(wtPath, root, roleName, provider); err != nil {
+	if err := skillInstaller(wtPath, root, roleName, rolePath, provider); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: skill installation had errors: %v\n", err)
 	}
 
@@ -168,6 +176,9 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, newWindow bool) 
 
 	fmt.Printf("✓ Created and opened worker '%s' at %s\n", workerID, wtPath)
 	fmt.Printf("  → Role: %s\n", roleName)
+	if roleScope == "global" {
+		fmt.Printf("  → Role source: global (%s)\n", rolePath)
+	}
 	fmt.Printf("  → Provider: %s\n", provider)
 	fmt.Printf("  → Branch: %s\n", branch)
 	fmt.Printf("  → Pane: %s\n", paneID)

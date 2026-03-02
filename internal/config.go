@@ -13,6 +13,8 @@ import (
 type WorkerConfig struct {
 	WorkerID         string `yaml:"worker_id"`
 	Role             string `yaml:"role"`
+	RoleScope        string `yaml:"role_scope,omitempty"` // "project" | "global"
+	RolePath         string `yaml:"role_path,omitempty"`  // absolute path for global roles
 	Provider         string `yaml:"provider"`
 	DefaultModel     string `yaml:"default_model,omitempty"`
 	MainSessionID    string `yaml:"main_session_id,omitempty"`

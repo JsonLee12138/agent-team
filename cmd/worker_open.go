@@ -58,12 +58,16 @@ func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow bool) er
 
 	// Re-sync skills
 	fmt.Printf("  Syncing skills for role '%s'...\n", cfg.Role)
-	if err := skillInstaller(wtPath, root, cfg.Role, provider); err != nil {
+	rolePath := cfg.RolePath
+	if rolePath == "" {
+		rolePath = internal.RoleDir(root, cfg.Role)
+	}
+	if err := skillInstaller(wtPath, root, cfg.Role, rolePath, provider); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: skill sync had errors: %v\n", err)
 	}
 
 	// Inject role prompt into CLAUDE.md and AGENTS.md
-	if err := internal.InjectRolePrompt(wtPath, workerID, cfg.Role, root); err != nil {
+	if err := internal.InjectRolePromptWithPath(wtPath, workerID, cfg.Role, rolePath, root); err != nil {
 		return fmt.Errorf("inject role prompt: %w", err)
 	}
 

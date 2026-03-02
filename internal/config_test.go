@@ -2,7 +2,9 @@
 package internal
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -62,5 +64,65 @@ func TestWorkerConfigSaveUpdate(t *testing.T) {
 	reloaded, _ := LoadWorkerConfig(path)
 	if reloaded.PaneID != "99" {
 		t.Errorf("PaneID after update = %q, want %q", reloaded.PaneID, "99")
+	}
+}
+
+func TestWorkerConfigRoleScope(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	original := &WorkerConfig{
+		WorkerID:  "dev-001",
+		Role:      "dev",
+		RoleScope: "global",
+		RolePath:  "/home/user/.agents/roles/dev",
+		Provider:  "claude",
+		PaneID:    "42",
+		CreatedAt: "2026-03-02T10:00:00Z",
+	}
+
+	if err := original.Save(path); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	loaded, err := LoadWorkerConfig(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	if loaded.RoleScope != "global" {
+		t.Errorf("RoleScope = %q, want global", loaded.RoleScope)
+	}
+	if loaded.RolePath != "/home/user/.agents/roles/dev" {
+		t.Errorf("RolePath = %q, want /home/user/.agents/roles/dev", loaded.RolePath)
+	}
+}
+
+func TestWorkerConfigRoleScopeOmitEmpty(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+
+	cfg := &WorkerConfig{
+		WorkerID: "dev-001",
+		Role:     "dev",
+		Provider: "claude",
+		PaneID:   "42",
+	}
+
+	if err := cfg.Save(path); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+
+	content := string(data)
+	if strings.Contains(content, "role_scope") {
+		t.Error("YAML should not contain role_scope when empty")
+	}
+	if strings.Contains(content, "role_path") {
+		t.Error("YAML should not contain role_path when empty")
 	}
 }

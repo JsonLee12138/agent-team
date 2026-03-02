@@ -19,9 +19,9 @@ type roleYAML struct {
 	Skills []string `yaml:"skills"`
 }
 
-// ReadRoleSkills reads the skills list from a role's references/role.yaml.
-func ReadRoleSkills(root, roleName string) ([]string, error) {
-	yamlPath := RoleYAMLPath(root, roleName)
+// ReadRoleSkillsFromPath reads the skills list from a role's references/role.yaml at the given path.
+func ReadRoleSkillsFromPath(rolePath string) ([]string, error) {
+	yamlPath := filepath.Join(rolePath, "references", "role.yaml")
 	data, err := os.ReadFile(yamlPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -36,9 +36,14 @@ func ReadRoleSkills(root, roleName string) ([]string, error) {
 	return ry.Skills, nil
 }
 
-// CopySkillsToWorktree copies the role skill and its dependency skills
-// into the worktree's .claude/skills/ and .codex/skills/ directories.
-func CopySkillsToWorktree(wtPath, root, roleName string) error {
+// ReadRoleSkills reads the skills list from a role's references/role.yaml.
+func ReadRoleSkills(root, roleName string) ([]string, error) {
+	return ReadRoleSkillsFromPath(RoleDir(root, roleName))
+}
+
+// CopySkillsToWorktreeFromPath copies the role skill and its dependency skills
+// into the worktree's .claude/skills/ and .codex/skills/ directories, using rolePath directly.
+func CopySkillsToWorktreeFromPath(wtPath, root, roleName, rolePath string) error {
 	// Collect skill directories to copy
 	type skillSource struct {
 		name string
@@ -46,14 +51,13 @@ func CopySkillsToWorktree(wtPath, root, roleName string) error {
 	}
 	var sources []skillSource
 
-	// 1. Copy the role skill itself from agents/teams/<role>/
-	roleDir := RoleDir(root, roleName)
-	if _, err := os.Stat(roleDir); err == nil {
-		sources = append(sources, skillSource{name: roleName, path: roleDir})
+	// 1. Copy the role skill itself from rolePath
+	if _, err := os.Stat(rolePath); err == nil {
+		sources = append(sources, skillSource{name: roleName, path: rolePath})
 	}
 
 	// 2. Read dependency skills from role.yaml
-	skills, err := ReadRoleSkills(root, roleName)
+	skills, err := ReadRoleSkillsFromPath(rolePath)
 	if err != nil {
 		return err
 	}
@@ -61,8 +65,6 @@ func CopySkillsToWorktree(wtPath, root, roleName string) error {
 	for _, skillName := range skills {
 		skillPath := findSkillPath(root, skillName)
 		if skillPath != "" {
-			// Use the short name as the target directory name
-			// e.g., "antfu/skills@vite" → "vite"
 			destName := parseSkillName(skillName)
 			sources = append(sources, skillSource{name: destName, path: skillPath})
 		} else {
@@ -86,6 +88,12 @@ func CopySkillsToWorktree(wtPath, root, roleName string) error {
 	}
 
 	return nil
+}
+
+// CopySkillsToWorktree copies the role skill and its dependency skills
+// into the worktree's .claude/skills/ and .codex/skills/ directories.
+func CopySkillsToWorktree(wtPath, root, roleName string) error {
+	return CopySkillsToWorktreeFromPath(wtPath, root, roleName, RoleDir(root, roleName))
 }
 
 // parseSkillName extracts the short skill name from formats like
@@ -209,24 +217,20 @@ func runNpxSkillsAdd(cwd, skillName, provider string) error {
 	return cmd.Run()
 }
 
-// InstallSkillsForWorker installs role skills into the worktree.
-// - scoped names (containing "/") → npx skills add <source> -a <agent> -y
-// - plain names → local 5-layer search copy → fallback npx skills add → error
-// The role skill itself is always copied locally.
-func InstallSkillsForWorker(wtPath, root, roleName, provider string) error {
+// InstallSkillsForWorkerFromPath installs role skills into the worktree using an explicit rolePath.
+func InstallSkillsForWorkerFromPath(wtPath, root, roleName, rolePath, provider string) error {
 	targetDir := skillTargetDir(wtPath, provider)
 
 	// 1. Copy the role skill itself (always local)
-	roleDir := RoleDir(root, roleName)
-	if _, err := os.Stat(roleDir); err == nil {
+	if _, err := os.Stat(rolePath); err == nil {
 		dst := filepath.Join(targetDir, roleName)
-		if err := copyDir(roleDir, dst); err != nil {
+		if err := copyDir(rolePath, dst); err != nil {
 			return fmt.Errorf("copy role skill %s: %w", roleName, err)
 		}
 	}
 
 	// 2. Read dependency skills from role.yaml
-	skills, err := ReadRoleSkills(root, roleName)
+	skills, err := ReadRoleSkillsFromPath(rolePath)
 	if err != nil {
 		return err
 	}
@@ -265,6 +269,14 @@ func InstallSkillsForWorker(wtPath, root, roleName, provider string) error {
 	}
 
 	return nil
+}
+
+// InstallSkillsForWorker installs role skills into the worktree.
+// - scoped names (containing "/") → npx skills add <source> -a <agent> -y
+// - plain names → local 5-layer search copy → fallback npx skills add → error
+// The role skill itself is always copied locally.
+func InstallSkillsForWorker(wtPath, root, roleName, provider string) error {
+	return InstallSkillsForWorkerFromPath(wtPath, root, roleName, RoleDir(root, roleName), provider)
 }
 
 // FindSkillPathPublic searches for a skill in known locations (exported wrapper).

@@ -359,3 +359,182 @@ func TestRolePathFunctions(t *testing.T) {
 		t.Errorf("RoleDir = %q", got)
 	}
 }
+
+func TestSplitRoleKeywords(t *testing.T) {
+	tests := []struct {
+		input string
+		want  []string
+	}{
+		{"frontend-dev", []string{"frontend", "dev"}},
+		{"backend", []string{"backend"}},
+		{"full-stack-engineer", []string{"full", "stack", "engineer"}},
+		{"a-b-c", []string{"a", "b", "c"}},
+	}
+	for _, tt := range tests {
+		got := splitRoleKeywords(tt.input)
+		if len(got) != len(tt.want) {
+			t.Errorf("splitRoleKeywords(%q) = %v, want %v", tt.input, got, tt.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != tt.want[i] {
+				t.Errorf("splitRoleKeywords(%q)[%d] = %q, want %q", tt.input, i, got[i], tt.want[i])
+			}
+		}
+	}
+}
+
+func TestResolveRole_ProjectFirst(t *testing.T) {
+	root := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	// Create role in both project and global
+	projectRole := filepath.Join(root, ".agents", "teams", "my-role")
+	os.MkdirAll(projectRole, 0755)
+	os.WriteFile(filepath.Join(projectRole, "SKILL.md"), []byte("# skill\n"), 0644)
+
+	globalRole := filepath.Join(home, ".agents", "roles", "my-role")
+	os.MkdirAll(globalRole, 0755)
+	os.WriteFile(filepath.Join(globalRole, "SKILL.md"), []byte("# skill\n"), 0644)
+
+	match, err := ResolveRole(root, "my-role")
+	if err != nil {
+		t.Fatalf("ResolveRole: %v", err)
+	}
+	if match.Scope != "project" {
+		t.Errorf("Scope = %q, want project", match.Scope)
+	}
+	if match.Path != projectRole {
+		t.Errorf("Path = %q, want %q", match.Path, projectRole)
+	}
+}
+
+func TestResolveRole_FallbackGlobal(t *testing.T) {
+	root := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	os.MkdirAll(filepath.Join(root, ".agents"), 0755)
+
+	// Only global role exists
+	globalRole := filepath.Join(home, ".agents", "roles", "my-role")
+	os.MkdirAll(globalRole, 0755)
+	os.WriteFile(filepath.Join(globalRole, "system.md"), []byte("# system\n"), 0644)
+
+	match, err := ResolveRole(root, "my-role")
+	if err != nil {
+		t.Fatalf("ResolveRole: %v", err)
+	}
+	if match.Scope != "global" {
+		t.Errorf("Scope = %q, want global", match.Scope)
+	}
+	if match.Path != globalRole {
+		t.Errorf("Path = %q, want %q", match.Path, globalRole)
+	}
+}
+
+func TestResolveRole_NotFound(t *testing.T) {
+	root := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	os.MkdirAll(filepath.Join(root, ".agents"), 0755)
+
+	_, err := ResolveRole(root, "nonexistent-role")
+	if err == nil {
+		t.Fatal("expected error for nonexistent role")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("error = %q, want 'not found' in message", err.Error())
+	}
+}
+
+func TestSearchGlobalRoles_ExactMatch(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	// Create global role
+	rolePath := filepath.Join(home, ".agents", "roles", "frontend-dev")
+	os.MkdirAll(rolePath, 0755)
+	os.WriteFile(filepath.Join(rolePath, "SKILL.md"), []byte("# skill\n"), 0644)
+
+	matches, err := SearchGlobalRoles("frontend-dev")
+	if err != nil {
+		t.Fatalf("SearchGlobalRoles: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("got %d matches, want 1", len(matches))
+	}
+	if matches[0].MatchType != "exact" {
+		t.Errorf("MatchType = %q, want exact", matches[0].MatchType)
+	}
+	if matches[0].RoleName != "frontend-dev" {
+		t.Errorf("RoleName = %q, want frontend-dev", matches[0].RoleName)
+	}
+}
+
+func TestSearchGlobalRoles_KeywordMatch(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	// Create global role with description containing keyword
+	rolePath := filepath.Join(home, ".agents", "roles", "ui-engineer")
+	refDir := filepath.Join(rolePath, "references")
+	os.MkdirAll(refDir, 0755)
+	os.WriteFile(filepath.Join(rolePath, "SKILL.md"), []byte("# skill\n"), 0644)
+	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte("description: \"Frontend UI development\"\n"), 0644)
+
+	matches, err := SearchGlobalRoles("frontend-dev")
+	if err != nil {
+		t.Fatalf("SearchGlobalRoles: %v", err)
+	}
+	if len(matches) != 1 {
+		t.Fatalf("got %d matches, want 1", len(matches))
+	}
+	if matches[0].MatchType != "keyword" {
+		t.Errorf("MatchType = %q, want keyword", matches[0].MatchType)
+	}
+	if matches[0].Description != "Frontend UI development" {
+		t.Errorf("Description = %q, want 'Frontend UI development'", matches[0].Description)
+	}
+}
+
+func TestListGlobalRoles(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	// Create two global roles
+	for _, name := range []string{"backend-dev", "frontend-dev"} {
+		rolePath := filepath.Join(home, ".agents", "roles", name)
+		os.MkdirAll(rolePath, 0755)
+		os.WriteFile(filepath.Join(rolePath, "SKILL.md"), []byte("# skill\n"), 0644)
+	}
+
+	roles, err := ListGlobalRoles()
+	if err != nil {
+		t.Fatalf("ListGlobalRoles: %v", err)
+	}
+	if len(roles) != 2 {
+		t.Fatalf("got %d roles, want 2", len(roles))
+	}
+	if roles[0].RoleName != "backend-dev" {
+		t.Errorf("roles[0].RoleName = %q, want backend-dev", roles[0].RoleName)
+	}
+	if roles[1].RoleName != "frontend-dev" {
+		t.Errorf("roles[1].RoleName = %q, want frontend-dev", roles[1].RoleName)
+	}
+}
+
+func TestListGlobalRoles_DirNotExists(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	roles, err := ListGlobalRoles()
+	if err != nil {
+		t.Fatalf("ListGlobalRoles: %v", err)
+	}
+	if len(roles) != 0 {
+		t.Errorf("got %d roles, want 0", len(roles))
+	}
+}

@@ -4,12 +4,13 @@
 
 多智能体开发工作流的 AI 团队角色管理器。采用 **Role + Worker** 双层模型，在隔离 Git worktree 中运行。
 
-- **Role**：角色技能包定义，位于 `.agents/teams/<role-name>/`
+- **Role**：角色技能包定义，位于 `.agents/teams/<role-name>/`（项目级）或 `~/.agents/roles/<role-name>/`（全局）
 - **Worker**：角色运行实例，位于 `.worktrees/<worker-id>/`（例如 `frontend-dev-001`）
 
 ## 目录
 
 - [工作原理](#工作原理)
+- [角色解析](#角色解析)
 - [环境要求](#环境要求)
 - [安装](#安装)
 - [升级](#升级)
@@ -27,9 +28,11 @@
 
 ```
 主分支
-  ├── .agents/teams/<role-name>/           <- 角色技能包定义
+  ├── .agents/teams/<role-name>/           <- 项目级角色技能包定义
   └── .worktrees/<worker-id>/              <- 隔离运行目录
         └── worker.yaml                    <- worker 配置
+
+~/.agents/roles/<role-name>/               <- 全局角色技能包定义
 ```
 
 典型流程：
@@ -39,6 +42,17 @@
 3. 头脑风暴后分配任务：`agent-team worker assign ...`
 4. 合并：`agent-team worker merge <worker-id>`
 5. 清理：`agent-team worker delete <worker-id>`
+
+## 角色解析
+
+创建 worker（`worker create`）或引用角色时，工具按**项目优先**的顺序解析角色：
+
+1. **项目级**：`.agents/teams/<role-name>/`
+2. **全局**：`~/.agents/roles/<role-name>/`
+
+全局角色**原地引用**（不复制到项目中）。`worker.yaml` 会记录 `role_scope` 和 `role_path`，后续操作（重新打开、prompt 注入）将继续使用正确的来源。
+
+创建角色（`role create`）时，若全局已有名称或关键词匹配的角色会显示警告。使用 `--force` 可跳过此检查。
 
 ## 环境要求
 
@@ -185,6 +199,7 @@ agent-team role list
 | 命令 | 说明 |
 |------|------|
 | `agent-team role list` | 列出 `.agents/teams/` 中可用角色 |
+| `agent-team role create <role-name> --description "..." --system-goal "..." [--force]` | 创建或更新角色技能包。`--force` 跳过全局重复检查 |
 
 ### 角色仓库命令（role-repo）
 
@@ -206,7 +221,7 @@ agent-team role list
 
 | 命令 | 说明 |
 |------|------|
-| `agent-team worker create <role-name> [provider] [--model <model>] [--new-window]` | 创建 worker 并打开会话、安装技能、启动 AI |
+| `agent-team worker create <role-name> [provider] [--model <model>] [--new-window]` | 创建 worker 并打开会话、安装技能、启动 AI。支持从项目级或全局角色解析 |
 | `agent-team worker open <worker-id> [provider] [--model <model>] [--new-window]` | 重新打开已有 worker 会话 |
 | `agent-team worker assign <worker-id> "<description>" [provider] [--proposal <file>] [--design <file>] [--model <model>] [--new-window]` | 创建 OpenSpec change 并通知 worker |
 | `agent-team worker status` | 查看 workers、角色、运行状态、技能数量与活跃变更 |
@@ -235,13 +250,13 @@ agent-team role list
 项目根目录/
 ├── .agents/
 │   └── teams/
-│       └── <role-name>/
+│       └── <role-name>/                 <- 项目级角色
 │           ├── SKILL.md
 │           ├── system.md
 │           └── references/role.yaml
 └── .worktrees/
     └── <worker-id>/
-        ├── worker.yaml              <- worker 配置
+        ├── worker.yaml              <- worker 配置（全局角色时包含 role_scope/role_path）
         ├── .claude/skills/
         ├── .codex/skills/
         ├── CLAUDE.md
@@ -249,6 +264,13 @@ agent-team role list
         └── openspec/
             ├── specs/
             └── changes/
+
+~/.agents/
+└── roles/
+    └── <role-name>/                     <- 全局角色（原地引用，不复制）
+        ├── SKILL.md
+        ├── system.md
+        └── references/role.yaml
 ```
 
 ## 支持的 Provider

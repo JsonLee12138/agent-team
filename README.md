@@ -4,12 +4,13 @@ English | [中文](./README.zh.md)
 
 AI team role and worker manager for multi-agent development workflows. It uses a **Role + Worker** model with isolated Git worktrees and terminal sessions.
 
-- **Role**: skill package definition in `.agents/teams/<role-name>/`
+- **Role**: skill package definition in `.agents/teams/<role-name>/` (project) or `~/.agents/roles/<role-name>/` (global)
 - **Worker**: runtime role instance in `.worktrees/<worker-id>/` (for example `frontend-dev-001`)
 
 ## Table of Contents
 
 - [How It Works](#how-it-works)
+- [Role Resolution](#role-resolution)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Upgrade](#upgrade)
@@ -27,9 +28,11 @@ AI team role and worker manager for multi-agent development workflows. It uses a
 
 ```
 Main branch
-  ├── .agents/teams/<role-name>/           <- role skill definitions
+  ├── .agents/teams/<role-name>/           <- project role definitions
   └── .worktrees/<worker-id>/              <- isolated runtime workspace
         └── worker.yaml                    <- worker config
+
+~/.agents/roles/<role-name>/               <- global role definitions
 ```
 
 Typical flow:
@@ -39,6 +42,17 @@ Typical flow:
 3. Brainstorm, then assign change: `agent-team worker assign ...`
 4. Merge: `agent-team worker merge <worker-id>`
 5. Cleanup: `agent-team worker delete <worker-id>`
+
+## Role Resolution
+
+When creating a worker (`worker create`) or referencing a role, the tool resolves roles with **project-first priority**:
+
+1. **Project**: `.agents/teams/<role-name>/`
+2. **Global**: `~/.agents/roles/<role-name>/`
+
+Global roles are referenced **in-place** (not copied to the project). The `worker.yaml` records `role_scope` and `role_path` so subsequent operations (reopen, prompt injection) continue to use the correct source.
+
+When creating a role (`role create`), existing global roles with matching names or keywords are shown as a warning. Use `--force` to skip this check.
 
 ## Requirements
 
@@ -185,6 +199,7 @@ All commands run inside a Git repository.
 | Command | Description |
 |---------|-------------|
 | `agent-team role list` | List available roles in `.agents/teams/` |
+| `agent-team role create <role-name> --description "..." --system-goal "..." [--force]` | Create or update a role skill package. `--force` skips global duplicate check |
 
 ### Role Repository commands
 
@@ -206,7 +221,7 @@ Accepted remote role path contracts:
 
 | Command | Description |
 |---------|-------------|
-| `agent-team worker create <role-name> [provider] [--model <model>] [--new-window]` | Create worker, open session, install skills, and launch AI |
+| `agent-team worker create <role-name> [provider] [--model <model>] [--new-window]` | Create worker, open session, install skills, and launch AI. Resolves roles from project or global scope |
 | `agent-team worker open <worker-id> [provider] [--model <model>] [--new-window]` | Reopen an existing worker session |
 | `agent-team worker assign <worker-id> "<description>" [provider] [--proposal <file>] [--design <file>] [--model <model>] [--new-window]` | Create OpenSpec change and notify worker |
 | `agent-team worker status` | Show workers, roles, running state, skills, and active changes |
@@ -235,13 +250,13 @@ Use `AGENT_TEAM_BACKEND=tmux` before commands to switch backend from WezTerm to 
 project-root/
 ├── .agents/
 │   └── teams/
-│       └── <role-name>/
+│       └── <role-name>/                 <- project roles
 │           ├── SKILL.md
 │           ├── system.md
 │           └── references/role.yaml
 └── .worktrees/
     └── <worker-id>/
-        ├── worker.yaml              <- worker config
+        ├── worker.yaml              <- worker config (includes role_scope/role_path for global roles)
         ├── .claude/skills/
         ├── .codex/skills/
         ├── CLAUDE.md
@@ -249,6 +264,13 @@ project-root/
         └── openspec/
             ├── specs/
             └── changes/
+
+~/.agents/
+└── roles/
+    └── <role-name>/                     <- global roles (referenced in-place)
+        ├── SKILL.md
+        ├── system.md
+        └── references/role.yaml
 ```
 
 ## Supported Providers
