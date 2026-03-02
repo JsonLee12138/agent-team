@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "agent-team",
-      "source": ".",
+      "source": "./",
       "description": "AI team role and worker manager for multi-agent development workflows. Includes role creation, worker management, task assignment, and git worktree integration with WezTerm/Tmux support.",
       "version": "1.0.0",
       "author": {
