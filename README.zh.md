@@ -17,6 +17,7 @@
 - [自带角色](#自带角色)
 - [作为 Skill 使用](#作为-skill-使用)
 - [CLI 命令参考](#cli-命令参考)
+- [Role Repo 锁文件](#role-repo-锁文件)
 - [目录结构](#目录结构)
 - [支持的 Provider](#支持的-provider)
 - [环境变量](#环境变量)
@@ -48,7 +49,15 @@
 
 ## 安装
 
-### Agent Skill（推荐）
+**注意：** 安装方式因平台而异。Claude Code 有内置插件系统，其他平台使用 Agent Skill 方式。
+
+### Claude Code（插件安装）
+
+```bash
+claude plugin add JsonLee12138/agent-team
+```
+
+### Agent Skill
 
 ```bash
 npx skills add JsonLee12138/agent-team
@@ -76,6 +85,9 @@ go install github.com/JsonLee12138/agent-team@latest
 ## 升级
 
 ```bash
+# 插件
+claude plugin update agent-team
+
 # Skill
 npx skills add JsonLee12138/agent-team
 
@@ -161,6 +173,22 @@ agent-team role list
 |------|------|
 | `agent-team role list` | 列出 `.agents/teams/` 中可用角色 |
 
+### 角色仓库命令（role-repo）
+
+| 命令 | 说明 |
+|------|------|
+| `agent-team role-repo search <query>` | 基于严格角色路径契约搜索 GitHub 角色 |
+| `agent-team role-repo add <source> [--role <name>...] [--list] [-g] [-y]` | 从 `owner/repo` 或 GitHub URL 发现并安装角色（多角色时默认交互选择） |
+| `agent-team role-repo list [-g]` | 查看所选 scope 下已安装的仓库角色 |
+| `agent-team role-repo remove [roles...] [-g] [-y]` | 删除已安装角色并清理锁文件条目（默认交互选择/确认） |
+| `agent-team role-repo check [-g]` | 用远端目录哈希检查锁文件条目是否可更新 |
+| `agent-team role-repo update [-g] [-y]` | 更新有变更的角色（默认交互选择，`-y` 全量更新） |
+
+接受的远端角色路径契约：
+
+- `skills/<role>/references/role.yaml`
+- `.agents/teams/<role>/references/role.yaml`
+
 ### Worker 命令
 
 | 命令 | 说明 |
@@ -180,6 +208,13 @@ agent-team role list
 | `agent-team reply-main "<message>"` | worker 向主控发送 `[Worker: <worker-id>]` |
 
 使用 tmux 后端：命令前添加 `AGENT_TEAM_BACKEND=tmux`。
+
+## Role Repo 锁文件
+
+- 项目锁文件：`roles-lock.json`
+- 全局锁文件：`~/.agents/.role-lock.json`
+- 项目安装目录：`.agents/teams/<role>/`
+- 全局安装目录：`~/.agents/roles/<role>/`
 
 ## 目录结构
 

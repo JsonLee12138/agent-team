@@ -17,6 +17,7 @@ AI team role and worker manager for multi-agent development workflows. It uses a
 - [Built-in Roles](#built-in-roles)
 - [Usage as a Skill](#usage-as-a-skill)
 - [CLI Reference](#cli-reference)
+- [Role Repo Locks](#role-repo-locks)
 - [Directory Structure](#directory-structure)
 - [Supported Providers](#supported-providers)
 - [Environment Variables](#environment-variables)
@@ -48,7 +49,15 @@ Typical flow:
 
 ## Installation
 
-### Agent Skill (recommended)
+**Note:** Installation differs by platform. Claude Code has a built-in plugin system. Other platforms use the Agent Skill method.
+
+### Claude Code (via Plugin)
+
+```bash
+claude plugin add JsonLee12138/agent-team
+```
+
+### Agent Skill
 
 ```bash
 npx skills add JsonLee12138/agent-team
@@ -76,6 +85,9 @@ Download a binary from [Releases](https://github.com/JsonLee12138/agent-team/rel
 ## Upgrade
 
 ```bash
+# Plugin
+claude plugin update agent-team
+
 # Skill
 npx skills add JsonLee12138/agent-team
 
@@ -161,6 +173,22 @@ All commands run inside a Git repository.
 |---------|-------------|
 | `agent-team role list` | List available roles in `.agents/teams/` |
 
+### Role Repository commands
+
+| Command | Description |
+|---------|-------------|
+| `agent-team role-repo search <query>` | Search GitHub roles using strict role path contracts |
+| `agent-team role-repo add <source> [--role <name>...] [--list] [-g] [-y]` | Discover and install role(s) from `owner/repo` or GitHub URL (interactive selector when multiple roles are found) |
+| `agent-team role-repo list [-g]` | List installed repository-managed roles in selected scope |
+| `agent-team role-repo remove [roles...] [-g] [-y]` | Remove installed roles and clean lock entries (interactive selector/confirm by default) |
+| `agent-team role-repo check [-g]` | Check lock entries against remote folder hashes |
+| `agent-team role-repo update [-g] [-y]` | Update roles with remote changes (interactive selector by default, `-y` updates all) |
+
+Accepted remote role path contracts:
+
+- `skills/<role>/references/role.yaml`
+- `.agents/teams/<role>/references/role.yaml`
+
 ### Worker commands
 
 | Command | Description |
@@ -180,6 +208,13 @@ All commands run inside a Git repository.
 | `agent-team reply-main "<message>"` | Worker sends `[Worker: <worker-id>]` message to controller session |
 
 Use `AGENT_TEAM_BACKEND=tmux` before commands to switch backend from WezTerm to tmux.
+
+## Role Repo Locks
+
+- Project lock: `roles-lock.json`
+- Global lock: `~/.agents/.role-lock.json`
+- Project install target: `.agents/teams/<role>/`
+- Global install target: `~/.agents/roles/<role>/`
 
 ## Directory Structure
 

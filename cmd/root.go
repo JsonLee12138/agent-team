@@ -69,6 +69,7 @@ func GetApp(cmd *cobra.Command) *App {
 func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(newWorkerCmd())
 	rootCmd.AddCommand(newRoleCmd())
+	rootCmd.AddCommand(newRoleRepoCmd())
 	rootCmd.AddCommand(newReplyCmd())
 	rootCmd.AddCommand(newReplyMainCmd())
 	rootCmd.AddCommand(newMigrateCmd())
