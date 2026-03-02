@@ -1,12 +1,15 @@
 {
-  "description": "agent-team hooks: worktree session init, quality checks, brainstorming gate, and task archiving.",
+  "enabled": true,
+  "description": "agent-team hooks: role injection, quality checks, brainstorming gate, task archiving.",
   "hooks": {
     "SessionStart": [
       {
         "hooks": [
           {
+            "name": "role-inject",
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/session-init.sh"
+            "command": "agent-team hook session-start",
+            "timeout": 10000
           }
         ]
       }
@@ -15,8 +18,10 @@
       {
         "hooks": [
           {
+            "name": "stop-guard",
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/stop-guard.sh"
+            "command": "agent-team hook stop",
+            "timeout": 5000
           }
         ]
       }
@@ -26,8 +31,10 @@
         "matcher": "Write|Edit",
         "hooks": [
           {
+            "name": "brainstorming-gate",
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/brainstorming-gate.sh"
+            "command": "agent-team hook pre-tool-use",
+            "timeout": 5000
           }
         ]
       }
@@ -37,8 +44,73 @@
         "matcher": "Write|Edit",
         "hooks": [
           {
+            "name": "post-edit-check",
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/post-edit-check.sh"
+            "command": "agent-team hook post-tool-use",
+            "timeout": 15000
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "name": "task-archive",
+            "type": "command",
+            "command": "agent-team hook task-completed",
+            "timeout": 30000
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "name": "subagent-context",
+            "type": "command",
+            "command": "agent-team hook subagent-start",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "stop-guard-gemini",
+            "type": "command",
+            "command": "agent-team hook stop",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "matcher": "write_file|edit_file",
+        "hooks": [
+          {
+            "name": "brainstorming-gate-gemini",
+            "type": "command",
+            "command": "agent-team hook pre-tool-use",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "AfterTool": [
+      {
+        "matcher": "write_file|edit_file",
+        "hooks": [
+          {
+            "name": "post-edit-check-gemini",
+            "type": "command",
+            "command": "agent-team hook post-tool-use",
+            "timeout": 15000
           }
         ]
       }

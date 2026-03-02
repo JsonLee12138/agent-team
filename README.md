@@ -43,11 +43,11 @@ Typical flow:
 
 - Git
 - [WezTerm](https://wezfurlong.org/wezterm/) or [tmux](https://github.com/tmux/tmux)
-- At least one AI provider CLI: [claude](https://github.com/anthropics/claude-code), [codex](https://github.com/openai/codex), or [opencode](https://opencode.ai)
+- At least one AI provider CLI: [Claude Code](https://github.com/anthropics/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), [Codex](https://github.com/openai/codex), or [OpenCode](https://opencode.ai)
 
 ## Installation
 
-**Note:** Installation differs by platform. Claude Code has a built-in plugin system. Other platforms use the Agent Skill method.
+**Note:** Installation differs by provider. Choose the section for your AI tool.
 
 ### Claude Code (via Plugin Marketplace)
 
@@ -66,7 +66,42 @@ claude plugin marketplace add JsonLee12138/agent-team
 claude plugin install agent-team@agent-team
 ```
 
-### Agent Skill
+### Gemini CLI (via Extension)
+
+```bash
+gemini extensions install JsonLee12138/agent-team
+```
+
+This installs the `gemini-extension.json` manifest and hooks. The `GEMINI.md` context file is loaded automatically in worktrees.
+
+### OpenCode (via npm Plugin)
+
+```bash
+npm install opencode-agent-team
+```
+
+Then add to your `opencode.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["opencode-agent-team"]
+}
+```
+
+Requires `agent-team` binary in PATH (see [Homebrew](#homebrew-macos) or [From Source](#from-source) below).
+
+### Codex
+
+Codex has no plugin or hook system. Install the binary and use the Agent Skill method:
+
+```bash
+npx skills add JsonLee12138/agent-team
+```
+
+Skills are installed into `.codex/skills/` automatically when creating workers with `--provider codex`. Hook behaviors (brainstorming gate, quality checks) are enforced via prompt conventions in the role's `system.md`.
+
+### Agent Skill (all providers)
 
 ```bash
 npx skills add JsonLee12138/agent-team
@@ -94,10 +129,13 @@ Download a binary from [Releases](https://github.com/JsonLee12138/agent-team/rel
 ## Upgrade
 
 ```bash
-# Plugin
+# Claude Code Plugin
 /plugin marketplace update agent-team
 # or
 claude plugin marketplace update agent-team
+
+# Gemini CLI Extension
+gemini extensions update agent-team
 
 # Skill
 npx skills add JsonLee12138/agent-team
@@ -178,11 +216,16 @@ This repository includes several built-in roles in `.agents/teams/`:
 
 ## Supported Providers
 
-| Provider | Value |
-|----------|-------|
-| Claude Code | `claude` (default) |
-| OpenAI Codex | `codex` |
-| OpenCode | `opencode` |
+| Provider | Value | Hook Support | Installation |
+|----------|-------|-------------|--------------|
+| Claude Code | `claude` (default) | Full (plugin hooks) | Plugin marketplace |
+| Gemini CLI | `gemini` | Full (extension hooks) | `gemini extensions install` |
+| OpenCode | `opencode` | Full (npm plugin hooks) | npm plugin |
+| OpenAI Codex | `codex` | Prompt-driven only | Agent Skill |
+
+**Hook support levels:**
+- **Full**: Automatic role injection, brainstorming gate, quality checks, task archiving, idle notification
+- **Prompt-driven**: Hook behaviors enforced via role prompts (no automatic interception)
 
 ## Advanced
 
@@ -257,13 +300,21 @@ project-root/
 │           ├── SKILL.md
 │           ├── system.md
 │           └── references/role.yaml
+├── gemini-extension.json                <- Gemini CLI extension manifest
+├── GEMINI.md                            <- Gemini CLI context file
+├── hooks/
+│   └── hooks.json                       <- Claude + Gemini shared hooks
+├── adapters/
+│   └── opencode/                        <- OpenCode npm plugin
 └── .worktrees/
     └── <worker-id>/
         ├── worker.yaml
         ├── .claude/skills/
         ├── .codex/skills/
+        ├── .gemini/skills/
         ├── CLAUDE.md
         ├── AGENTS.md
+        ├── GEMINI.md
         └── .tasks/
             └── changes/
 

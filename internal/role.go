@@ -37,12 +37,14 @@ var SupportedProviders = map[string]bool{
 	"claude":   true,
 	"codex":    true,
 	"opencode": true,
+	"gemini":   true,
 }
 
 var launchCommands = map[string]string{
 	"claude":   "claude --dangerously-skip-permissions",
 	"codex":    "codex --dangerously-bypass-approvals-and-sandbox",
 	"opencode": "opencode",
+	"gemini":   "gemini",
 }
 
 func FindWtBase(root string) string {
@@ -372,7 +374,7 @@ func NextWorkerID(root, wtBase, roleName string) string {
 
 // WriteWorktreeGitignore writes a .gitignore to exclude worker-local files.
 func WriteWorktreeGitignore(wtPath string) error {
-	content := ".gitignore\n.claude/\n.codex/\n.tasks/\nworker.yaml\n"
+	content := ".gitignore\n.claude/\n.codex/\n.gemini/\n.tasks/\nworker.yaml\n"
 	return os.WriteFile(filepath.Join(wtPath, ".gitignore"), []byte(content), 0644)
 }
 
@@ -530,6 +532,11 @@ func InjectRolePromptWithPath(wtPath, workerID, roleName, rolePath, root string)
 	agentsPath := filepath.Join(wtPath, "AGENTS.md")
 	if err := InjectSection(agentsPath, "AGENT_TEAM", content); err != nil {
 		return fmt.Errorf("inject AGENTS.md: %w", err)
+	}
+
+	geminiPath := filepath.Join(wtPath, "GEMINI.md")
+	if err := InjectSection(geminiPath, "AGENT_TEAM", content); err != nil {
+		return fmt.Errorf("inject GEMINI.md: %w", err)
 	}
 
 	return nil

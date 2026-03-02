@@ -181,6 +181,7 @@ var providerToAgent = map[string]string{
 	"claude":   "claude-code",
 	"codex":    "codex",
 	"opencode": "opencode",
+	"gemini":   "gemini",
 }
 
 // skillTargetDir returns the skill installation target directory for a provider.
@@ -192,6 +193,8 @@ func skillTargetDir(wtPath, provider string) string {
 		return filepath.Join(wtPath, ".codex", "skills")
 	case "opencode":
 		return filepath.Join(wtPath, ".opencode", "skills")
+	case "gemini":
+		return filepath.Join(wtPath, ".gemini", "skills")
 	default:
 		return filepath.Join(wtPath, ".claude", "skills")
 	}

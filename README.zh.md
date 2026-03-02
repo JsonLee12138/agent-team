@@ -43,11 +43,11 @@
 
 - Git
 - [WezTerm](https://wezfurlong.org/wezterm/) 或 [tmux](https://github.com/tmux/tmux)
-- 至少一个 AI provider CLI：[claude](https://github.com/anthropics/claude-code)、[codex](https://github.com/openai/codex) 或 [opencode](https://opencode.ai)
+- 至少一个 AI provider CLI：[Claude Code](https://github.com/anthropics/claude-code)、[Gemini CLI](https://github.com/google-gemini/gemini-cli)、[Codex](https://github.com/openai/codex) 或 [OpenCode](https://opencode.ai)
 
 ## 安装
 
-**注意：** 安装方式因平台而异。Claude Code 有内置插件系统，其他平台使用 Agent Skill 方式。
+**注意：** 安装方式因 provider 而异，请选择你使用的 AI 工具对应的章节。
 
 ### Claude Code（插件市场安装）
 
@@ -66,7 +66,42 @@ claude plugin marketplace add JsonLee12138/agent-team
 claude plugin install agent-team@agent-team
 ```
 
-### Agent Skill
+### Gemini CLI（扩展安装）
+
+```bash
+gemini extensions install JsonLee12138/agent-team
+```
+
+安装后会注册 `gemini-extension.json` 清单和 hooks，`GEMINI.md` 上下文文件在 worktree 中自动加载。
+
+### OpenCode（npm 插件安装）
+
+```bash
+npm install opencode-agent-team
+```
+
+然后在 `opencode.json` 中添加：
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["opencode-agent-team"]
+}
+```
+
+需要 `agent-team` 二进制在 PATH 中（见下方 [Homebrew](#homebrew-macos) 或[从源码编译](#从源码编译)）。
+
+### Codex
+
+Codex 没有插件/hook 系统，安装二进制后使用 Agent Skill 方式：
+
+```bash
+npx skills add JsonLee12138/agent-team
+```
+
+创建 worker 时使用 `--provider codex` 会自动将 skills 安装到 `.codex/skills/`。Hook 行为（brainstorming gate、quality checks）通过角色 `system.md` 中的 prompt 约定来保证。
+
+### Agent Skill（通用）
 
 ```bash
 npx skills add JsonLee12138/agent-team
@@ -94,10 +129,13 @@ go install github.com/JsonLee12138/agent-team@latest
 ## 升级
 
 ```bash
-# 插件
+# Claude Code 插件
 /plugin marketplace update agent-team
 # 或
 claude plugin marketplace update agent-team
+
+# Gemini CLI 扩展
+gemini extensions update agent-team
 
 # Skill
 npx skills add JsonLee12138/agent-team
@@ -178,11 +216,16 @@ AI 会先进行头脑风暴产出设计文档，然后创建任务并通知 work
 
 ## 支持的 Provider
 
-| Provider | 值 |
-|----------|----|
-| Claude Code | `claude`（默认） |
-| OpenAI Codex | `codex` |
-| OpenCode | `opencode` |
+| Provider | 值 | Hook 支持 | 安装方式 |
+|----------|----|----------|---------|
+| Claude Code | `claude`（默认） | 完整（插件 hooks） | 插件市场 |
+| Gemini CLI | `gemini` | 完整（扩展 hooks） | `gemini extensions install` |
+| OpenCode | `opencode` | 完整（npm 插件 hooks） | npm 插件 |
+| OpenAI Codex | `codex` | 仅 Prompt 驱动 | Agent Skill |
+
+**Hook 支持等级说明：**
+- **完整**：自动角色注入、brainstorming gate、质量检查、任务归档、空闲通知
+- **仅 Prompt 驱动**：通过角色 prompt 约定保证 hook 行为（无自动拦截）
 
 ## 高级
 
@@ -257,13 +300,21 @@ AI 会先进行头脑风暴产出设计文档，然后创建任务并通知 work
 │           ├── SKILL.md
 │           ├── system.md
 │           └── references/role.yaml
+├── gemini-extension.json                <- Gemini CLI 扩展清单
+├── GEMINI.md                            <- Gemini CLI 上下文文件
+├── hooks/
+│   └── hooks.json                       <- Claude + Gemini 共用 hooks
+├── adapters/
+│   └── opencode/                        <- OpenCode npm 插件
 └── .worktrees/
     └── <worker-id>/
         ├── worker.yaml
         ├── .claude/skills/
         ├── .codex/skills/
+        ├── .gemini/skills/
         ├── CLAUDE.md
         ├── AGENTS.md
+        ├── GEMINI.md
         └── .tasks/
             └── changes/
 

@@ -1,0 +1,32 @@
+{
+  "name": "opencode-agent-team",
+  "version": "1.0.0",
+  "description": "Agent Team plugin for OpenCode — role injection, quality checks, and task lifecycle hooks",
+  "type": "module",
+  "main": "./src/plugin.ts",
+  "files": [
+    "src/plugin.ts"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "agent-team",
+    "multi-agent",
+    "ai-team"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JsonLee12138/agent-team",
+    "directory": "adapters/opencode"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "^0.4.45"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "license": "MIT"
+}
