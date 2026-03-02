@@ -51,10 +51,21 @@ Typical flow:
 
 **Note:** Installation differs by platform. Claude Code has a built-in plugin system. Other platforms use the Agent Skill method.
 
-### Claude Code (via Plugin)
+### Claude Code (via Plugin Marketplace)
 
 ```bash
-claude plugin add JsonLee12138/agent-team
+# 1. Add marketplace
+/plugin marketplace add JsonLee12138/agent-team
+
+# 2. Install plugin
+/plugin install agent-team@agent-team
+```
+
+Or via CLI:
+
+```bash
+claude plugin marketplace add JsonLee12138/agent-team
+claude plugin install agent-team@agent-team
 ```
 
 ### Agent Skill
@@ -86,7 +97,9 @@ Download a binary from [Releases](https://github.com/JsonLee12138/agent-team/rel
 
 ```bash
 # Plugin
-claude plugin update agent-team
+/plugin marketplace update agent-team
+# or
+claude plugin marketplace update agent-team
 
 # Skill
 npx skills add JsonLee12138/agent-team

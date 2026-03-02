@@ -51,10 +51,21 @@
 
 **注意：** 安装方式因平台而异。Claude Code 有内置插件系统，其他平台使用 Agent Skill 方式。
 
-### Claude Code（插件安装）
+### Claude Code（插件市场安装）
 
 ```bash
-claude plugin add JsonLee12138/agent-team
+# 1. 添加插件市场
+/plugin marketplace add JsonLee12138/agent-team
+
+# 2. 安装插件
+/plugin install agent-team@agent-team
+```
+
+或通过 CLI：
+
+```bash
+claude plugin marketplace add JsonLee12138/agent-team
+claude plugin install agent-team@agent-team
 ```
 
 ### Agent Skill
@@ -86,7 +97,9 @@ go install github.com/JsonLee12138/agent-team@latest
 
 ```bash
 # 插件
-claude plugin update agent-team
+/plugin marketplace update agent-team
+# 或
+claude plugin marketplace update agent-team
 
 # Skill
 npx skills add JsonLee12138/agent-team
