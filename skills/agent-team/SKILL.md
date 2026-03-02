@@ -111,12 +111,7 @@ Shows all available roles in `agents/teams/`.
 agent-team worker create <role-name>
 ```
 
-1. Verifies role exists in `agents/teams/<role-name>/`
-2. If not found, checks global skills and offers to copy
-3. Creates worktree `.worktrees/<worker-id>/` with branch `team/<worker-id>`
-4. Generates `.gitignore` (excludes `.gitignore`, `.claude/`, `.codex/`, `openspec/`)
-5. Creates `agents/workers/<worker-id>/config.yaml`
-6. Initializes OpenSpec
+Creates worktree `.worktrees/<worker-id>/` with branch `team/<worker-id>`, generates config, and initializes `.tasks/` directory.
 
 ### Open a worker session
 
@@ -124,24 +119,22 @@ agent-team worker create <role-name>
 agent-team worker open <worker-id> [claude|codex|opencode] [--model <model>] [--new-window]
 ```
 
-1. Reads role from worker config
-2. Copies role skill and dependency skills to `.claude/skills/` and `.codex/skills/` (mirrored)
-3. Generates CLAUDE.md from role's system.md
-4. Opens terminal tab with chosen AI provider
-5. `--new-window` / `-w`: Open in a new WezTerm window
+Copies role + dependency skills into the worktree, generates CLAUDE.md/AGENTS.md from role's system.md, and opens a terminal tab with the chosen AI provider.
 
 ### Assign a change
 
 ```bash
-agent-team worker assign <worker-id> "<description>" [provider] [--proposal <file>] [--design <file>] [--new-window]
+agent-team worker assign <worker-id> "<description>" [provider] [--proposal <file>] [--design <file>] [--verify-cmd <cmd>] [--new-window]
 ```
 
-1. Creates an OpenSpec change at `openspec/changes/<timestamp>-<slug>/`
-2. Copies `--design` file as `design.md` (brainstorming output)
-3. Copies `--proposal` file as `proposal.md` (work requirements)
-4. Runs the Assign Readiness Gate before assignment dispatch (ping/pong + retries + window diagnosis)
-5. Auto-opens the worker session if not running
-6. Sends a `[New Change Assigned]` notification
+Creates a task change at `.tasks/changes/<timestamp>-<slug>/` with:
+- `--proposal` → `proposal.md` (work requirements)
+- `--design` → `design.md` (architecture decisions)
+- `--verify-cmd` → stored in `change.yaml` for worker verification
+
+The CLI auto-opens the worker session if not running and sends a `[New Change Assigned]` notification.
+
+**Before running this command**, the controller MUST execute the Assign Readiness Gate.
 
 ### Assign Readiness Gate (Required)
 
@@ -194,25 +187,21 @@ agent-team reply <worker-id> "<answer>"
 agent-team reply-main "<message>"
 ```
 
-Workers MUST use this `agent-team` skill communication path for worker-to-main updates.
+Messages appear in the controller's terminal as `[Worker: <worker-id>] <message>`.
 
-Use it in both cases:
+For the full bidirectional communication protocol and message templates, see [references/details.md](references/details.md).
 
-1. Task lifecycle updates (send AFTER archive attempt):
-```bash
-agent-team reply-main "Task completed: <summary>; archive: success via </openspec archive|/prompts:openspec-archive>"
-```
-Archive fallback rule: try `/openspec archive` first; if command is unavailable (for example `command not found`), fallback to `/prompts:openspec-archive`.
-If archive fails, still notify completion and include failure details:
-```bash
-agent-team reply-main "Task completed: <summary>; archive failed via </openspec archive|/prompts:openspec-archive>: <error>"
-```
-2. Blockers, questions, or multiple options that need a decision:
-```bash
-agent-team reply-main "Need decision: <problem or options>"
-```
+## What Workers Do (Controller Reference)
 
-Sends a message prefixed with `[Worker: <worker-id>]` to the controller's session.
+Workers follow a TDD cycle upon receiving a `[New Change Assigned]` notification: read requirements → write acceptance tests → implement (marking tasks done) → run verify → notify main with result.
+
+Workers notify the controller using `reply-main` with one of:
+- `"Task completed: <summary>; verify: passed"`
+- `"Task completed: <summary>; verify: failed — <reason>"`
+- `"Task completed: <summary>; verify: skipped"`
+- `"Need decision: <problem or options>"` (when blocked)
+
+Full worker workflow details: [references/worker-workflow.md](references/worker-workflow.md)
 
 ## Brainstorming (Required Before Assign)
 
@@ -226,20 +215,9 @@ When the user intends to assign new work to a worker, you MUST follow the brains
 
 For the full checklist, principles, and anti-patterns, see [references/brainstorming.md](references/brainstorming.md).
 
-## Task Completion Rules
-
-Workers MUST follow these rules when completing a task:
-
-1. **Attempt archive first**: Run `/openspec archive` for the completed change
-2. **Fallback when command unavailable**: If `/openspec archive` is unavailable (for example `command not found`), use `/prompts:openspec-archive`
-3. **Notify main after archive attempt**: Use `agent-team reply-main "Task completed: <summary>; archive: success via </openspec archive|/prompts:openspec-archive>"` after archive attempt completes
-4. **Archive failure still requires completion notification**: If archive fails, still notify completion with failure details, for example `agent-team reply-main "Task completed: <summary>; archive failed via </openspec archive|/prompts:openspec-archive>: <error>"`
-5. **Escalate blockers/options the same way**: Run `agent-team reply-main "Need decision: <problem or options>"` when blocked or when choices need controller input, then wait for reply
-6. **New work requires new tasks**: After archiving, any new work must go through a new assign cycle
-
 ## Backend Selection
 
-Use tmux instead of WezTerm (default):
+The default terminal backend is **WezTerm**. To use **tmux** instead, set the environment variable:
 
 ```bash
 AGENT_TEAM_BACKEND=tmux agent-team <command>

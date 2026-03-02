@@ -20,7 +20,7 @@ agents/
 
 ```
 .worktrees/<worker-id>/
-  .gitignore                       <- excludes .gitignore, .claude/, .codex/, openspec/
+  .gitignore                       <- excludes .gitignore, .claude/, .codex/, .tasks/
   .claude/
     skills/                        <- dynamically copied on open
       <role-skill>/
@@ -31,16 +31,14 @@ agents/
       <dependency-skill-1>/
   CLAUDE.md                        <- generated from role system.md
   AGENTS.md                        <- generated from role system.md
-  openspec/
-    specs/                         <- project specifications
-    changes/                       <- active changes (managed by OpenSpec)
-      <task-slug>/
-        .openspec.yaml             <- change metadata
-        design.md                  <- brainstorming output (from controller)
+  .tasks/
+    config.yaml                    <- verify defaults (command, timeout), lifecycle
+    changes/                       <- active changes (managed by task system)
+      <timestamp>-<slug>/
+        change.yaml                <- status + task list + verify config
         proposal.md                <- work requirements (from controller)
-        specs/                     <- delta specs (created by worker)
-        tasks.md                   <- task breakdown (created by worker)
-    config.yaml                    <- OpenSpec configuration
+        design.md                  <- architecture decisions (optional)
+        tests.md                   <- acceptance criteria (written by worker, TDD)
 ```
 
 ### Worker config.yaml
@@ -57,27 +55,25 @@ created_at: "2026-02-26T10:00:00Z"
 
 ## Change Workflow
 
-Changes are managed by OpenSpec. The controller creates a change with design and proposal via `agent-team worker assign`. The worker then proceeds through the OpenSpec workflow:
-
-1. `/opsx:continue` — create remaining artifacts (specs, design, tasks)
-2. `/opsx:apply` — implement the tasks
-3. `/opsx:verify` — validate implementation
-4. Attempt `/openspec archive` for the completed change
-5. If `/openspec archive` is unavailable (for example `command not found`), fallback to `/prompts:openspec-archive`
-6. Send `agent-team reply-main` AFTER the archive attempt with archive status
+Changes are managed by the built-in task system. The controller creates a change via `agent-team worker assign` with optional `--proposal`, `--design`, and `--verify-cmd` flags. The worker then follows the TDD cycle defined in [worker-workflow.md](worker-workflow.md).
 
 ## Bidirectional Communication
 
 Workers use `agent-team reply-main` to communicate with main controller.
 
-Task completed (after archive attempt):
+Task completed (after verify):
 ```bash
-agent-team reply-main "Task completed: <summary>; archive: success via </openspec archive|/prompts:openspec-archive>"
+agent-team reply-main "Task completed: <summary>; verify: passed"
 ```
 
-Task completed but archive failed (still notify completion):
+Task completed but verify failed (still notify completion):
 ```bash
-agent-team reply-main "Task completed: <summary>; archive failed via </openspec archive|/prompts:openspec-archive>: <error>"
+agent-team reply-main "Task completed: <summary>; verify: failed — <reason>"
+```
+
+Task completed but verify skipped:
+```bash
+agent-team reply-main "Task completed: <summary>; verify: skipped"
 ```
 
 Blocked / needs decision on options:

@@ -8,7 +8,7 @@ Every assignment goes through this process. A single-file fix, a config change, 
 
 When the user intends to assign new work to a worker, complete these steps in order:
 
-1. **Explore project context** — check the role's `system.md`, existing `openspec/specs/`, project files, docs, and recent commits
+1. **Explore project context** — check the role's `system.md`, existing `.tasks/changes/`, project files, docs, and recent commits
 2. **Ask clarifying questions** — one at a time, one question per message; prefer multiple choice when possible; focus on purpose, constraints, and success criteria
 3. **Propose 2-3 approaches** — with trade-offs; lead with your recommendation and reasoning
 4. **Present design** — scale each section to its complexity (a few sentences if straightforward, up to 200-300 words if nuanced); ask after each section whether it looks right; cover: architecture, components, data flow, error handling, testing as relevant

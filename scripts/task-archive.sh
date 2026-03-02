@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scripts/task-archive.sh — TaskCompleted Hook
-# Archives the active openspec change and notifies main controller.
+# Archives the active task change and notifies main controller.
 set -euo pipefail
 
 INPUT=$(cat)
@@ -17,26 +17,21 @@ WORKER_ID=$(basename "$CWD")
 
 echo "[task-archive] TaskCompleted in worktree $WORKER_ID" >&2
 
-# --- Check openspec availability ---
-if ! command -v openspec &>/dev/null; then
-    echo "[task-archive] openspec not found, skipping archive." >&2
-    agent-team reply-main "Task completed by $WORKER_ID; archive skipped (openspec not found)" 2>/dev/null || true
-    exit 0
-fi
-
-CHANGES_DIR="$CWD/openspec/changes"
+CHANGES_DIR="$CWD/.tasks/changes"
 if [ ! -d "$CHANGES_DIR" ]; then
-    echo "[task-archive] No openspec/changes/ directory, skipping archive." >&2
+    echo "[task-archive] No .tasks/changes/ directory, skipping archive." >&2
     exit 0
 fi
 
-# --- Find active change (non-archived subdirectory) ---
+# --- Find active change (non-archived) ---
 ACTIVE=""
 for d in "$CHANGES_DIR"/*/; do
     [ -d "$d" ] || continue
     name=$(basename "$d")
-    [ "$name" = "archive" ] && continue
-    [ -d "$d/archive" ] && continue
+    yaml_file="$d/change.yaml"
+    [ ! -f "$yaml_file" ] && continue
+    STATUS=$(grep '^status:' "$yaml_file" | awk '{print $2}')
+    [ "$STATUS" = "archived" ] && continue
     ACTIVE="$name"
     break
 done
@@ -49,8 +44,8 @@ fi
 echo "[task-archive] Archiving change: $ACTIVE" >&2
 
 # --- Execute archive ---
-if openspec archive --change "$ACTIVE" --dir "$CWD" 2>&1 | sed 's/^/[task-archive] /' >&2; then
-    agent-team reply-main "Task completed by $WORKER_ID; archive: success (change: $ACTIVE)" 2>/dev/null || true
+if agent-team task archive "$ACTIVE" --dir "$CWD" 2>&1 | sed 's/^/[task-archive] /' >&2; then
+    agent-team reply-main "Task completed by $WORKER_ID; verify: passed (change: $ACTIVE)" 2>/dev/null || true
 else
-    agent-team reply-main "Task completed by $WORKER_ID; archive: failed (change: $ACTIVE)" 2>/dev/null || true
+    agent-team reply-main "Task completed by $WORKER_ID; verify: failed (change: $ACTIVE)" 2>/dev/null || true
 fi

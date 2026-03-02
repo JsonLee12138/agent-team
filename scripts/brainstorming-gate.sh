@@ -14,11 +14,11 @@ GIT_COMMON=$(git -C "$CWD" rev-parse --git-common-dir 2>/dev/null || echo "")
 [[ "$GIT_COMMON" != /* ]] && exit 0
 [[ "$CWD" != *"/.worktrees/"* ]] && exit 0
 
-# 2. openspec/ must exist
-[ ! -d "$CWD/openspec" ] && exit 0
+# 2. .tasks/ must exist
+[ ! -d "$CWD/.tasks" ] && exit 0
 
-# 3. openspec/changes/ must exist
-CHANGES_DIR="$CWD/openspec/changes"
+# 3. .tasks/changes/ must exist
+CHANGES_DIR="$CWD/.tasks/changes"
 [ ! -d "$CHANGES_DIR" ] && exit 0
 
 # 4. Find active (non-archived) change
@@ -26,8 +26,10 @@ ACTIVE=""
 for d in "$CHANGES_DIR"/*/; do
     [ -d "$d" ] || continue
     name=$(basename "$d")
-    [ "$name" = "archive" ] && continue
-    [ -d "$d/archive" ] && continue
+    yaml_file="$d/change.yaml"
+    [ ! -f "$yaml_file" ] && continue
+    STATUS=$(grep '^status:' "$yaml_file" | awk '{print $2}')
+    [ "$STATUS" = "archived" ] && continue
     ACTIVE="$name"
     ACTIVE_DIR="$d"
     break
