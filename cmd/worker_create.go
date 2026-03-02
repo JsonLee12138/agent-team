@@ -12,16 +12,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// defaultOpenSpecSetup is the real OpenSpec initialization function.
-var defaultOpenSpecSetup = func(wtPath string) error {
-	if err := internal.EnsureOpenSpec(); err != nil {
-		return fmt.Errorf("install openspec: %w", err)
-	}
-	return internal.OpenSpecInit(wtPath)
+// defaultTaskSetup is the real task initialization function.
+var defaultTaskSetup = func(wtPath string) error {
+	return internal.InitTasksDir(wtPath)
 }
 
-// openSpecSetup can be overridden in tests to skip OpenSpec initialization.
-var openSpecSetup = defaultOpenSpecSetup
+// taskSetup can be overridden in tests to skip task initialization.
+var taskSetup = defaultTaskSetup
 
 // skillInstaller can be overridden in tests to skip npx skill installation.
 var skillInstaller = internal.InstallSkillsForWorkerFromPath
@@ -127,9 +124,9 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, newWindow bool) 
 		return fmt.Errorf("save worker config: %w", err)
 	}
 
-	// 8. Initialize OpenSpec in worktree
-	if err := openSpecSetup(wtPath); err != nil {
-		return fmt.Errorf("openspec setup: %w", err)
+	// 8. Initialize tasks in worktree
+	if err := taskSetup(wtPath); err != nil {
+		return fmt.Errorf("task setup: %w", err)
 	}
 
 	// 9. Inject role prompt into CLAUDE.md and AGENTS.md

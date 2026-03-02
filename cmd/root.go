@@ -72,6 +72,7 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(newRoleRepoCmd())
 	rootCmd.AddCommand(newReplyCmd())
 	rootCmd.AddCommand(newReplyMainCmd())
+	rootCmd.AddCommand(newTaskCmd())
 	rootCmd.AddCommand(newMigrateCmd())
 	rootCmd.AddCommand(newInjectRolePromptCmd())
 }

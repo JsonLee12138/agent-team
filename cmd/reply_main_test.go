@@ -72,8 +72,8 @@ func initTestApp(t *testing.T) (*App, string) {
 }
 
 func TestRunReplyMainV2(t *testing.T) {
-	openSpecSetup = func(wtPath string) error { return nil }
-	defer func() { openSpecSetup = defaultOpenSpecSetup }()
+	taskSetup = func(wtPath string) error { return nil }
+	defer func() { taskSetup = defaultTaskSetup }()
 
 	app, dir := initTestApp(t)
 	mock := &MockBackend{

@@ -103,7 +103,7 @@ func TestWriteWorktreeGitignore(t *testing.T) {
 		t.Fatalf("read .gitignore: %v", err)
 	}
 	content := string(data)
-	for _, expected := range []string{".gitignore", ".claude/", ".codex/", "openspec/", "worker.yaml"} {
+	for _, expected := range []string{".gitignore", ".claude/", ".codex/", ".tasks/", "worker.yaml"} {
 		if !strings.Contains(content, expected) {
 			t.Errorf(".gitignore should contain %q", expected)
 		}
@@ -285,11 +285,8 @@ func TestInjectRolePromptV2(t *testing.T) {
 	if !strings.Contains(content, "After the archive attempt (success or failure)") {
 		t.Error("CLAUDE.md should require notification after archive attempt")
 	}
-	if !strings.Contains(content, "archive failed via </openspec archive|/prompts:openspec-archive>: <error>") {
-		t.Error("CLAUDE.md should contain archive failure reporting example")
-	}
-	if !strings.Contains(content, "fallback to `/prompts:openspec-archive`") {
-		t.Error("CLAUDE.md should contain openspec fallback instruction")
+	if !strings.Contains(content, "agent-team task archive") {
+		t.Error("CLAUDE.md should contain task archive command")
 	}
 	if !strings.Contains(content, "Need decision: <problem or options>") {
 		t.Error("CLAUDE.md should contain blocker/options reply example")

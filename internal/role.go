@@ -372,7 +372,7 @@ func NextWorkerID(root, wtBase, roleName string) string {
 
 // WriteWorktreeGitignore writes a .gitignore to exclude worker-local files.
 func WriteWorktreeGitignore(wtPath string) error {
-	content := ".gitignore\n.claude/\n.codex/\nopenspec/\nworker.yaml\n"
+	content := ".gitignore\n.claude/\n.codex/\n.tasks/\nworker.yaml\n"
 	return os.WriteFile(filepath.Join(wtPath, ".gitignore"), []byte(content), 0644)
 }
 
@@ -489,21 +489,20 @@ func buildRoleSectionFromPath(wtPath, workerID, roleName, rolePath, root string)
 	b.WriteString("Use the `agent-team` skill's **Reply to main controller (used by workers)** protocol for worker-to-main communication.\n")
 	b.WriteString("For EVERY completed task, you MUST send a completion message to main controller.\n")
 	b.WriteString("When any task is done:\n")
-	b.WriteString("1. Attempt `/openspec archive` for the completed change first\n")
-	b.WriteString("2. If `/openspec archive` command is unavailable (for example: command not found), fallback to `/prompts:openspec-archive`\n")
-	b.WriteString("3. After the archive attempt (success or failure), ALWAYS notify main controller:\n")
+	b.WriteString("1. Run `agent-team task archive <worker-id> <change-name>` to archive the completed change\n")
+	b.WriteString("2. After the archive attempt (success or failure), ALWAYS notify main controller:\n")
 	b.WriteString("   ```bash\n")
-	b.WriteString("   agent-team reply-main \"Task completed: <summary>; archive: success via </openspec archive|/prompts:openspec-archive>\"\n")
+	b.WriteString("   agent-team reply-main \"Task completed: <summary>; change archived: <change-name>\"\n")
 	b.WriteString("   ```\n")
-	b.WriteString("4. If archive fails, you may still report completion, but MUST include the failure details:\n")
+	b.WriteString("3. If archive fails, you may still report completion, but MUST include the failure details:\n")
 	b.WriteString("   ```bash\n")
-	b.WriteString("   agent-team reply-main \"Task completed: <summary>; archive failed via </openspec archive|/prompts:openspec-archive>: <error>\"\n")
+	b.WriteString("   agent-team reply-main \"Task completed: <summary>; archive failed for <change-name>: <error>\"\n")
 	b.WriteString("   ```\n")
-	b.WriteString("5. If you have blockers, questions, or implementation options, report them to main controller:\n")
+	b.WriteString("4. If you have blockers, questions, or implementation options, report them to main controller:\n")
 	b.WriteString("   ```bash\n")
 	b.WriteString("   agent-team reply-main \"Need decision: <problem or options>\"\n")
 	b.WriteString("   ```\n")
-	b.WriteString("6. Do not start the next task until the completion summary has been sent.\n")
+	b.WriteString("5. Do not start the next task until the completion summary has been sent.\n")
 
 	return b.String(), nil
 }

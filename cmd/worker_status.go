@@ -3,8 +3,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/JsonLee12138/agent-team/internal"
 	"github.com/spf13/cobra"
@@ -61,18 +59,10 @@ func (a *App) RunWorkerStatus() error {
 
 		// Count changes
 		wtPath := internal.WtPath(root, a.WtBase, w.WorkerID)
-		changesDir := filepath.Join(wtPath, "openspec", "changes")
+		active := internal.CountActiveChanges(wtPath)
 		changesSummary := "0"
-		if entries, err := os.ReadDir(changesDir); err == nil {
-			active := 0
-			for _, e := range entries {
-				if e.IsDir() && e.Name() != "archive" {
-					active++
-				}
-			}
-			if active > 0 {
-				changesSummary = fmt.Sprintf("%d active", active)
-			}
+		if active > 0 {
+			changesSummary = fmt.Sprintf("%d active", active)
 		}
 
 		fmt.Printf("%-24s %-16s %-24s %-12s %s\n", w.WorkerID, w.Role, status, skillsSummary, changesSummary)

@@ -74,12 +74,12 @@ func (a *App) RunWorkerAssign(workerID, desc, provider, model, proposalPath, des
 		designContent = string(data)
 	}
 
-	// Create OpenSpec change
+	// Create task change
 	ts := time.Now().Format("2006-01-02-15-04-05")
 	slug := internal.Slugify(desc, 50)
 	changeName := fmt.Sprintf("%s-%s", ts, slug)
 
-	changePath, err := internal.CreateChange(wtPath, changeName, proposalContent, designContent)
+	changePath, err := internal.CreateTaskChange(wtPath, changeName, desc, proposalContent, designContent)
 	if err != nil {
 		return err
 	}
@@ -100,9 +100,8 @@ func (a *App) RunWorkerAssign(workerID, desc, provider, model, proposalPath, des
 	}
 
 	// Notify worker
-	changeRel := fmt.Sprintf("openspec/changes/%s/", changeName)
-	msg := fmt.Sprintf("[New Change Assigned] %s\nChange: %s\nProposal ready. Run /opsx:continue to proceed.",
-		desc, changeRel)
+	msg := fmt.Sprintf("[New Change Assigned] %s\nChange: %s\nProposal ready. Run: agent-team task verify %s %s",
+		desc, changeName, cfg.WorkerID, changeName)
 	a.Session.PaneSend(cfg.PaneID, msg)
 
 	fmt.Printf("✓ Assigned to worker '%s': %s\n", workerID, desc)
