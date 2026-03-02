@@ -10,18 +10,14 @@ AI team role and worker manager for multi-agent development workflows. It uses a
 ## Table of Contents
 
 - [How It Works](#how-it-works)
-- [Role Resolution](#role-resolution)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Upgrade](#upgrade)
 - [Quick Start](#quick-start)
 - [Built-in Roles](#built-in-roles)
-- [Usage as a Skill](#usage-as-a-skill)
-- [CLI Reference](#cli-reference)
-- [Role Repo Locks](#role-repo-locks)
-- [Directory Structure](#directory-structure)
+- [Built-in Skills](#built-in-skills)
 - [Supported Providers](#supported-providers)
-- [Environment Variables](#environment-variables)
+- [Advanced](#advanced)
 - [License](#license)
 
 ## How It Works
@@ -37,29 +33,17 @@ Main branch
 
 Typical flow:
 
-1. Create or prepare a role in `.agents/teams/`
-2. Create and open worker: `agent-team worker create <role-name> [provider]`
-3. Brainstorm, then assign change: `agent-team worker assign ...`
-4. Merge: `agent-team worker merge <worker-id>`
-5. Cleanup: `agent-team worker delete <worker-id>`
-
-## Role Resolution
-
-When creating a worker (`worker create`) or referencing a role, the tool resolves roles with **project-first priority**:
-
-1. **Project**: `.agents/teams/<role-name>/`
-2. **Global**: `~/.agents/roles/<role-name>/`
-
-Global roles are referenced **in-place** (not copied to the project). The `worker.yaml` records `role_scope` and `role_path` so subsequent operations (reopen, prompt injection) continue to use the correct source.
-
-When creating a role (`role create`), existing global roles with matching names or keywords are shown as a warning. Use `--force` to skip this check.
+1. **Define roles** — "Create a frontend developer role for my project."
+2. **Spawn worker** — "Create a worker for frontend-dev with claude."
+3. **Brainstorm & assign** — "Assign frontend-dev-001 to implement responsive navbar."
+4. **Merge results** — "Merge frontend-dev-001."
+5. **Cleanup** — "Delete worker frontend-dev-001."
 
 ## Requirements
 
 - Git
 - [WezTerm](https://wezfurlong.org/wezterm/) or [tmux](https://github.com/tmux/tmux)
 - At least one AI provider CLI: [claude](https://github.com/anthropics/claude-code), [codex](https://github.com/openai/codex), or [opencode](https://opencode.ai)
-- [Node.js](https://nodejs.org/) (for OpenSpec auto-install and `npx skills add` during worker creation)
 
 ## Installation
 
@@ -127,50 +111,63 @@ go install github.com/JsonLee12138/agent-team@latest
 
 ## Quick Start
 
-1. Create role(s) with `role-creator` into `.agents/teams/`
-```bash
-python3 skills/role-creator/scripts/create_role_skill.py \
-  --repo-root . \
-  --role-name frontend-dev \
-  --target-dir .agents/teams \
-  --description "Frontend role for UI implementation" \
-  --system-goal "Ship maintainable frontend features"
-```
+After installation, you can manage your team entirely through natural language. The AI understands your intent and runs the right commands behind the scenes.
 
-2. List roles
-```bash
-agent-team role list
-```
+### 1. Create a role
 
-3. Create and open worker (creates worktree, opens session, installs skills, launches AI)
-```bash
-agent-team worker create frontend-dev claude
-```
+> "Create a frontend developer role for UI implementation."
 
-4. Assign change
-```bash
-agent-team worker assign frontend-dev-001 "Implement responsive navbar"
-```
+The AI will guide you through brainstorming the role's scope, goals, and skills, then generate the role package into `.agents/teams/`.
 
-5. Merge and delete worker
-```bash
-agent-team worker merge frontend-dev-001
-agent-team worker delete frontend-dev-001
-```
+You can also create multiple roles at once:
+
+> "Create a team with frontend developer, QA engineer, and product manager roles."
+
+### 2. List roles
+
+> "Show all available roles."
+
+### 3. Create a worker
+
+> "Create a worker for frontend-dev with claude."
+
+This creates an isolated Git worktree, opens a terminal session, installs required skills, and launches the AI provider.
+
+### 4. Assign a task
+
+> "Assign frontend-dev-001 to implement a responsive navbar."
+
+The AI will run brainstorming first to produce a design doc, then create the task and notify the worker session.
+
+### 5. Check status
+
+> "Show team status."
+
+### 6. Merge and cleanup
+
+> "Merge frontend-dev-001."
+>
+> "Delete worker frontend-dev-001."
+
+### Install roles from GitHub
+
+> "Search for roles related to react development."
+>
+> "Install roles from owner/repo."
 
 ## Built-in Roles
 
-This repository currently includes one built-in role:
+This repository includes several built-in roles in `.agents/teams/`:
 
-- `frontend-architect` (path: `skills/frontend-architect/`)
+| Role | Description |
+|------|-------------|
+| `pm` | Product Manager |
+| `frontend-architect` | Frontend Architecture |
+| `vite-react-dev` | Vite + React Development |
+| `uniapp-dev` | UniApp Development |
+| `pencil-designer` | Pencil Design Tool Specialist |
 
-To use it with `agent-team`, copy it into `.agents/teams/` first:
-
-```bash
-mkdir -p .agents/teams
-cp -R skills/frontend-architect .agents/teams/
-agent-team role list
-```
+> "Create a worker for frontend-architect with claude."
 
 ## Built-in Skills
 
@@ -179,72 +176,78 @@ agent-team role list
 | `role-creator` | Create or update role skill packages interactively |
 | `brainstorming` | Turn rough ideas into validated design docs through one-question-at-a-time dialogue before implementation |
 
-## Usage as a Skill
+## Supported Providers
 
-With agent skill installed, you can describe intent in natural language:
+| Provider | Value |
+|----------|-------|
+| Claude Code | `claude` (default) |
+| OpenAI Codex | `codex` |
+| OpenCode | `opencode` |
 
-- "Create a team role for frontend architecture."
-- "Create a worker for frontend-architect with codex."
-- "Assign a change to frontend-architect-001."
-- "Show worker status."
+## Advanced
 
-The controller should run brainstorming before assignment, then create an OpenSpec change and notify the worker session.
+### Role Resolution
 
-## CLI Reference
+When creating a worker or referencing a role, the tool resolves roles with **project-first priority**:
+
+1. **Project**: `.agents/teams/<role-name>/`
+2. **Global**: `~/.agents/roles/<role-name>/`
+
+Global roles are referenced **in-place** (not copied to the project). The `worker.yaml` records `role_scope` and `role_path` so subsequent operations (reopen, prompt injection) continue to use the correct source.
+
+### CLI Reference
 
 All commands run inside a Git repository.
 
-### Role commands
+#### Role commands
 
 | Command | Description |
 |---------|-------------|
 | `agent-team role list` | List available roles in `.agents/teams/` |
 | `agent-team role create <role-name> --description "..." --system-goal "..." [--force]` | Create or update a role skill package. `--force` skips global duplicate check |
 
-### Role Repository commands
+#### Role Repository commands
 
 | Command | Description |
 |---------|-------------|
 | `agent-team role-repo search <query>` | Search GitHub roles using strict role path contracts |
-| `agent-team role-repo add <source> [--role <name>...] [--list] [-g] [-y]` | Discover and install role(s) from `owner/repo` or GitHub URL (interactive selector when multiple roles are found) |
+| `agent-team role-repo add <source> [--role <name>...] [--list] [-g] [-y]` | Discover and install role(s) from `owner/repo` or GitHub URL |
 | `agent-team role-repo list [-g]` | List installed repository-managed roles in selected scope |
-| `agent-team role-repo remove [roles...] [-g] [-y]` | Remove installed roles and clean lock entries (interactive selector/confirm by default) |
+| `agent-team role-repo remove [roles...] [-g] [-y]` | Remove installed roles and clean lock entries |
 | `agent-team role-repo check [-g]` | Check lock entries against remote folder hashes |
-| `agent-team role-repo update [-g] [-y]` | Update roles with remote changes (interactive selector by default, `-y` updates all) |
+| `agent-team role-repo update [-g] [-y]` | Update roles with remote changes |
 
 Accepted remote role path contracts:
 
 - `skills/<role>/references/role.yaml`
 - `.agents/teams/<role>/references/role.yaml`
 
-### Worker commands
+#### Worker commands
 
 | Command | Description |
 |---------|-------------|
-| `agent-team worker create <role-name> [provider] [--model <model>] [--new-window]` | Create worker, open session, install skills, and launch AI. Resolves roles from project or global scope |
+| `agent-team worker create <role-name> [provider] [--model <model>] [--new-window]` | Create worker, open session, install skills, and launch AI |
 | `agent-team worker open <worker-id> [provider] [--model <model>] [--new-window]` | Reopen an existing worker session |
-| `agent-team worker assign <worker-id> "<description>" [provider] [--proposal <file>] [--design <file>] [--model <model>] [--new-window]` | Create OpenSpec change and notify worker |
+| `agent-team worker assign <worker-id> "<description>" [provider] [--proposal <file>] [--design <file>] [--model <model>] [--new-window]` | Create task change and notify worker |
 | `agent-team worker status` | Show workers, roles, running state, skills, and active changes |
 | `agent-team worker merge <worker-id>` | Merge `team/<worker-id>` into current branch |
 | `agent-team worker delete <worker-id>` | Delete worker worktree, branch, and config |
 
-### Communication commands
+#### Communication commands
 
 | Command | Description |
 |---------|-------------|
 | `agent-team reply <worker-id> "<answer>"` | Send `[Main Controller Reply]` message to a worker session |
 | `agent-team reply-main "<message>"` | Worker sends `[Worker: <worker-id>]` message to controller session |
 
-Use `AGENT_TEAM_BACKEND=tmux` before commands to switch backend from WezTerm to tmux.
-
-## Role Repo Locks
+### Role Repo Locks
 
 - Project lock: `roles-lock.json`
 - Global lock: `~/.agents/.role-lock.json`
 - Project install target: `.agents/teams/<role>/`
 - Global install target: `~/.agents/roles/<role>/`
 
-## Directory Structure
+### Directory Structure
 
 ```
 project-root/
@@ -256,13 +259,12 @@ project-root/
 │           └── references/role.yaml
 └── .worktrees/
     └── <worker-id>/
-        ├── worker.yaml              <- worker config (includes role_scope/role_path for global roles)
+        ├── worker.yaml
         ├── .claude/skills/
         ├── .codex/skills/
         ├── CLAUDE.md
         ├── AGENTS.md
-        └── openspec/
-            ├── specs/
+        └── .tasks/
             └── changes/
 
 ~/.agents/
@@ -273,15 +275,7 @@ project-root/
         └── references/role.yaml
 ```
 
-## Supported Providers
-
-| Provider | Value |
-|----------|-------|
-| Claude Code | `claude` (default) |
-| OpenAI Codex | `codex` |
-| OpenCode | `opencode` |
-
-## Environment Variables
+### Environment Variables
 
 | Variable | Description |
 |----------|-------------|

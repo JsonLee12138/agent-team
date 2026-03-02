@@ -10,18 +10,14 @@
 ## 目录
 
 - [工作原理](#工作原理)
-- [角色解析](#角色解析)
 - [环境要求](#环境要求)
 - [安装](#安装)
 - [升级](#升级)
 - [快速开始](#快速开始)
 - [自带角色](#自带角色)
-- [作为 Skill 使用](#作为-skill-使用)
-- [CLI 命令参考](#cli-命令参考)
-- [Role Repo 锁文件](#role-repo-锁文件)
-- [目录结构](#目录结构)
+- [自带 Skills](#自带-skills)
 - [支持的 Provider](#支持的-provider)
-- [环境变量](#环境变量)
+- [高级](#高级)
 - [License](#license)
 
 ## 工作原理
@@ -37,29 +33,17 @@
 
 典型流程：
 
-1. 在 `.agents/teams/` 创建或准备角色
-2. 创建并打开 worker：`agent-team worker create <role-name> [provider]`
-3. 头脑风暴后分配任务：`agent-team worker assign ...`
-4. 合并：`agent-team worker merge <worker-id>`
-5. 清理：`agent-team worker delete <worker-id>`
-
-## 角色解析
-
-创建 worker（`worker create`）或引用角色时，工具按**项目优先**的顺序解析角色：
-
-1. **项目级**：`.agents/teams/<role-name>/`
-2. **全局**：`~/.agents/roles/<role-name>/`
-
-全局角色**原地引用**（不复制到项目中）。`worker.yaml` 会记录 `role_scope` 和 `role_path`，后续操作（重新打开、prompt 注入）将继续使用正确的来源。
-
-创建角色（`role create`）时，若全局已有名称或关键词匹配的角色会显示警告。使用 `--force` 可跳过此检查。
+1. **定义角色** — "给项目创建一个前端开发角色。"
+2. **启动 Worker** — "给 frontend-dev 创建一个 worker，用 claude。"
+3. **头脑风暴 & 分配任务** — "让 frontend-dev-001 实现响应式导航栏。"
+4. **合并成果** — "合并 frontend-dev-001。"
+5. **清理** — "删除 worker frontend-dev-001。"
 
 ## 环境要求
 
 - Git
 - [WezTerm](https://wezfurlong.org/wezterm/) 或 [tmux](https://github.com/tmux/tmux)
 - 至少一个 AI provider CLI：[claude](https://github.com/anthropics/claude-code)、[codex](https://github.com/openai/codex) 或 [opencode](https://opencode.ai)
-- [Node.js](https://nodejs.org/)（创建 worker 时用于自动安装 OpenSpec 和 `npx skills add`）
 
 ## 安装
 
@@ -127,50 +111,63 @@ go install github.com/JsonLee12138/agent-team@latest
 
 ## 快速开始
 
-1. 通过 `role-creator` 在 `.agents/teams/` 生成角色
-```bash
-python3 skills/role-creator/scripts/create_role_skill.py \
-  --repo-root . \
-  --role-name frontend-dev \
-  --target-dir .agents/teams \
-  --description "Frontend role for UI implementation" \
-  --system-goal "Ship maintainable frontend features"
-```
+安装完成后，你可以完全通过自然语言来管理团队。AI 会理解你的意图并自动执行对应的命令。
 
-2. 查看角色列表
-```bash
-agent-team role list
-```
+### 1. 创建角色
 
-3. 创建并打开 worker（创建 worktree、打开会话、安装技能、启动 AI）
-```bash
-agent-team worker create frontend-dev claude
-```
+> "创建一个前端开发角色，负责 UI 实现。"
 
-4. 分配任务
-```bash
-agent-team worker assign frontend-dev-001 "Implement responsive navbar"
-```
+AI 会引导你通过头脑风暴确定角色的范围、目标和所需技能，然后生成角色技能包到 `.agents/teams/`。
 
-5. 合并并删除 worker
-```bash
-agent-team worker merge frontend-dev-001
-agent-team worker delete frontend-dev-001
-```
+也可以一次创建多个角色：
+
+> "创建一个团队，包含前端开发、QA 工程师和产品经理角色。"
+
+### 2. 查看角色
+
+> "展示所有可用角色。"
+
+### 3. 创建 Worker
+
+> "给 frontend-dev 创建一个 worker，用 claude。"
+
+这会创建一个隔离的 Git worktree，打开终端会话，安装所需技能，并启动 AI provider。
+
+### 4. 分配任务
+
+> "让 frontend-dev-001 实现响应式导航栏。"
+
+AI 会先进行头脑风暴产出设计文档，然后创建任务并通知 worker 会话。
+
+### 5. 查看状态
+
+> "查看团队状态。"
+
+### 6. 合并与清理
+
+> "合并 frontend-dev-001。"
+>
+> "删除 worker frontend-dev-001。"
+
+### 从 GitHub 安装角色
+
+> "搜索与 react 开发相关的角色。"
+>
+> "从 owner/repo 安装角色。"
 
 ## 自带角色
 
-当前仓库自带 1 个角色：
+本仓库在 `.agents/teams/` 中包含以下自带角色：
 
-- `frontend-architect`（路径：`skills/frontend-architect/`）
+| 角色 | 说明 |
+|------|------|
+| `pm` | 产品经理 |
+| `frontend-architect` | 前端架构 |
+| `vite-react-dev` | Vite + React 开发 |
+| `uniapp-dev` | UniApp 开发 |
+| `pencil-designer` | Pencil 设计工具专家 |
 
-要在 `agent-team` 中使用它，先复制到 `.agents/teams/`：
-
-```bash
-mkdir -p .agents/teams
-cp -R skills/frontend-architect .agents/teams/
-agent-team role list
-```
+> "给 frontend-architect 创建一个 worker，用 claude。"
 
 ## 自带 Skills
 
@@ -179,72 +176,78 @@ agent-team role list
 | `role-creator` | 交互式创建或更新角色技能包 |
 | `brainstorming` | 通过逐问对话，将粗略想法转化为经过验证的设计文档，先设计再实现 |
 
-## 作为 Skill 使用
+## 支持的 Provider
 
-安装 Skill 后，可以直接用自然语言描述操作，例如：
+| Provider | 值 |
+|----------|----|
+| Claude Code | `claude`（默认） |
+| OpenAI Codex | `codex` |
+| OpenCode | `opencode` |
 
-- "创建一个前端架构角色。"
-- "给 frontend-architect 创建 worker 并用 codex 打开。"
-- "给 frontend-architect-001 分配一个变更任务。"
-- "查看 worker 状态。"
+## 高级
 
-主控智能体应在 assign 前完成头脑风暴流程，再创建 OpenSpec change 并通知 worker。
+### 角色解析
 
-## CLI 命令参考
+创建 worker 或引用角色时，工具按**项目优先**的顺序解析角色：
+
+1. **项目级**：`.agents/teams/<role-name>/`
+2. **全局**：`~/.agents/roles/<role-name>/`
+
+全局角色**原地引用**（不复制到项目中）。`worker.yaml` 会记录 `role_scope` 和 `role_path`，后续操作（重新打开、prompt 注入）将继续使用正确的来源。
+
+### CLI 命令参考
 
 所有命令需在 Git 仓库内运行。
 
-### 角色命令
+#### 角色命令
 
 | 命令 | 说明 |
 |------|------|
 | `agent-team role list` | 列出 `.agents/teams/` 中可用角色 |
 | `agent-team role create <role-name> --description "..." --system-goal "..." [--force]` | 创建或更新角色技能包。`--force` 跳过全局重复检查 |
 
-### 角色仓库命令（role-repo）
+#### 角色仓库命令（role-repo）
 
 | 命令 | 说明 |
 |------|------|
 | `agent-team role-repo search <query>` | 基于严格角色路径契约搜索 GitHub 角色 |
-| `agent-team role-repo add <source> [--role <name>...] [--list] [-g] [-y]` | 从 `owner/repo` 或 GitHub URL 发现并安装角色（多角色时默认交互选择） |
+| `agent-team role-repo add <source> [--role <name>...] [--list] [-g] [-y]` | 从 `owner/repo` 或 GitHub URL 发现并安装角色 |
 | `agent-team role-repo list [-g]` | 查看所选 scope 下已安装的仓库角色 |
-| `agent-team role-repo remove [roles...] [-g] [-y]` | 删除已安装角色并清理锁文件条目（默认交互选择/确认） |
+| `agent-team role-repo remove [roles...] [-g] [-y]` | 删除已安装角色并清理锁文件条目 |
 | `agent-team role-repo check [-g]` | 用远端目录哈希检查锁文件条目是否可更新 |
-| `agent-team role-repo update [-g] [-y]` | 更新有变更的角色（默认交互选择，`-y` 全量更新） |
+| `agent-team role-repo update [-g] [-y]` | 更新有变更的角色 |
 
 接受的远端角色路径契约：
 
 - `skills/<role>/references/role.yaml`
 - `.agents/teams/<role>/references/role.yaml`
 
-### Worker 命令
+#### Worker 命令
 
 | 命令 | 说明 |
 |------|------|
-| `agent-team worker create <role-name> [provider] [--model <model>] [--new-window]` | 创建 worker 并打开会话、安装技能、启动 AI。支持从项目级或全局角色解析 |
+| `agent-team worker create <role-name> [provider] [--model <model>] [--new-window]` | 创建 worker 并打开会话、安装技能、启动 AI |
 | `agent-team worker open <worker-id> [provider] [--model <model>] [--new-window]` | 重新打开已有 worker 会话 |
-| `agent-team worker assign <worker-id> "<description>" [provider] [--proposal <file>] [--design <file>] [--model <model>] [--new-window]` | 创建 OpenSpec change 并通知 worker |
+| `agent-team worker assign <worker-id> "<description>" [provider] [--proposal <file>] [--design <file>] [--model <model>] [--new-window]` | 创建任务变更并通知 worker |
 | `agent-team worker status` | 查看 workers、角色、运行状态、技能数量与活跃变更 |
 | `agent-team worker merge <worker-id>` | 将 `team/<worker-id>` 合并到当前分支 |
 | `agent-team worker delete <worker-id>` | 删除 worker 的 worktree、分支和配置 |
 
-### 通信命令
+#### 通信命令
 
 | 命令 | 说明 |
 |------|------|
 | `agent-team reply <worker-id> "<answer>"` | 向 worker 会话发送 `[Main Controller Reply]` |
 | `agent-team reply-main "<message>"` | worker 向主控发送 `[Worker: <worker-id>]` |
 
-使用 tmux 后端：命令前添加 `AGENT_TEAM_BACKEND=tmux`。
-
-## Role Repo 锁文件
+### Role Repo 锁文件
 
 - 项目锁文件：`roles-lock.json`
 - 全局锁文件：`~/.agents/.role-lock.json`
 - 项目安装目录：`.agents/teams/<role>/`
 - 全局安装目录：`~/.agents/roles/<role>/`
 
-## 目录结构
+### 目录结构
 
 ```
 项目根目录/
@@ -256,13 +259,12 @@ agent-team role list
 │           └── references/role.yaml
 └── .worktrees/
     └── <worker-id>/
-        ├── worker.yaml              <- worker 配置（全局角色时包含 role_scope/role_path）
+        ├── worker.yaml
         ├── .claude/skills/
         ├── .codex/skills/
         ├── CLAUDE.md
         ├── AGENTS.md
-        └── openspec/
-            ├── specs/
+        └── .tasks/
             └── changes/
 
 ~/.agents/
@@ -273,15 +275,7 @@ agent-team role list
         └── references/role.yaml
 ```
 
-## 支持的 Provider
-
-| Provider | 值 |
-|----------|----|
-| Claude Code | `claude`（默认） |
-| OpenAI Codex | `codex` |
-| OpenCode | `opencode` |
-
-## 环境变量
+### 环境变量
 
 | 变量 | 说明 |
 |------|------|
