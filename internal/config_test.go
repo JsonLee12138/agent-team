@@ -11,12 +11,12 @@ func TestWorkerConfigRoundTrip(t *testing.T) {
 	path := filepath.Join(dir, "workers", "dev-001", "config.yaml")
 
 	original := &WorkerConfig{
-		WorkerID:        "dev-001",
-		Role:            "dev",
-		DefaultProvider: "claude",
-		DefaultModel:    "claude-sonnet-4-6",
-		PaneID:          "42",
-		CreatedAt:       "2026-02-24T10:00:00Z",
+		WorkerID:     "dev-001",
+		Role:         "dev",
+		Provider:     "claude",
+		DefaultModel: "claude-sonnet-4-6",
+		PaneID:       "42",
+		CreatedAt:    "2026-02-24T10:00:00Z",
 	}
 
 	if err := original.Save(path); err != nil {
@@ -34,8 +34,8 @@ func TestWorkerConfigRoundTrip(t *testing.T) {
 	if loaded.Role != original.Role {
 		t.Errorf("Role = %q, want %q", loaded.Role, original.Role)
 	}
-	if loaded.DefaultProvider != original.DefaultProvider {
-		t.Errorf("DefaultProvider = %q, want %q", loaded.DefaultProvider, original.DefaultProvider)
+	if loaded.Provider != original.Provider {
+		t.Errorf("Provider = %q, want %q", loaded.Provider, original.Provider)
 	}
 	if loaded.PaneID != original.PaneID {
 		t.Errorf("PaneID = %q, want %q", loaded.PaneID, original.PaneID)

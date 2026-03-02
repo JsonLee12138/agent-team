@@ -2,7 +2,7 @@
 name: role-creator
 description: >
   Create or update role-specific skill packages with deterministic files.
-  Supports output to skills/ (open-source publishing) or agents/teams/ (team use).
+  Supports output to skills/ (open-source publishing) or .agents/teams/ (team use).
   Triggers: 创建角色, 新建 role, create role, 更新 role scope, edit role, update role,
   add role skill, 修改角色配置.
   Use when the user asks to create, update, or edit frontend/backend/product (or custom) role
@@ -18,7 +18,7 @@ Generate a role skill package in a fixed contract:
 
 Target directory options:
 - `skills/<role-name>/` — for open-source publishing (default)
-- `agents/teams/<role-name>/` — for team use with agent-team
+- `.agents/teams/<role-name>/` — for team use with agent-team
 
 ## Required Workflow
 
@@ -31,8 +31,8 @@ Target directory options:
    - `out-of-scope` (comma-separated output)
 3. If user rejects the auto result, or AI confidence is low, run the full brainstorming process below.
 4. After fields are approved, run skills selection flow.
-5. Ask user for target directory (`skills` or `agents/teams`).
-6. If target is `agents/teams` and the role already exists in global `~/.claude/skills/`, ask if user wants to copy from there instead of generating.
+5. Ask user for target directory (`skills` or `.agents/teams`).
+6. If target is `.agents/teams` and the role already exists in global `~/.claude/skills/`, ask if user wants to copy from there instead of generating.
 7. Execute generator script to write files deterministically.
 
 ## Brainstorming Trigger Policy
@@ -44,7 +44,7 @@ Target directory options:
 
 ## Brainstorming Process
 
-1. **Explore context** — scan existing role skills under `skills/*/` and `agents/teams/*/`, templates, and recent commits for patterns.
+1. **Explore context** — scan existing role skills under `skills/*/` and `.agents/teams/*/`, templates, and recent commits for patterns.
 2. **Ask clarifying questions** — one question per message; prefer multiple choice; focus on role purpose and scope boundaries.
 3. **Confirm fields** — present the final `description`, `system_goal`, `in_scope`, `out_of_scope` for user approval before generation.
 
@@ -78,6 +78,25 @@ Target directory options:
 
 If `find-skills` is unavailable or returns empty, skip recommendations and ask for manual additions only.
 
+### Local Skill Resolution
+
+After the final skills list is confirmed, resolve each plain skill name against local directories:
+
+1. For each skill in the final list that is a **plain name** (no `/`), scan local paths:
+   - `skills/*/`, `.agents/teams/*/`, `.claude/skills/*/`, `~/.claude/skills/*/`
+2. If a local copy is found, ask the user whether to replace it with a full scoped path:
+
+   ```text
+   Skill 'vitest' found locally at skills/vitest/.
+   Use find-skills to look up its full remote path (e.g. antfu/skills@vitest)?  [y/N]
+   ```
+
+   - **y** → run `find-skills` for that skill name, present matches, let user pick the scoped path to replace the plain name.
+   - **N (default)** → keep the plain name as-is.
+
+3. Skills that already have a scoped path (containing `/`) are kept unchanged.
+4. Update the final list with any replacements before passing to the generator script.
+
 ## Generate Command
 
 For open-source publishing (default):
@@ -99,7 +118,7 @@ For team use (agent-team integration):
 python3 skills/role-creator/scripts/create_role_skill.py \
   --repo-root . \
   --role-name frontend-dev \
-  --target-dir agents/teams \
+  --target-dir .agents/teams \
   --description "Frontend role for UI implementation" \
   --system-goal "Ship accessible and maintainable UI work" \
   --in-scope "Build components,Improve accessibility" \

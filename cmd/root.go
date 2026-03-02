@@ -27,8 +27,9 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		// Skip init for help/version/completion
-		if cmd.Name() == "help" || cmd.Name() == "version" || cmd.Name() == "completion" {
+		// Skip init for help/version/completion/migrate/_inject-role-prompt
+		switch cmd.Name() {
+		case "help", "version", "completion", "_inject-role-prompt":
 			return nil
 		}
 
@@ -70,4 +71,6 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(newRoleCmd())
 	rootCmd.AddCommand(newReplyCmd())
 	rootCmd.AddCommand(newReplyMainCmd())
+	rootCmd.AddCommand(newMigrateCmd())
+	rootCmd.AddCommand(newInjectRolePromptCmd())
 }

@@ -82,25 +82,22 @@ func TestRunReplyMainV2(t *testing.T) {
 	}
 	app.Session = mock
 
-	// Create role and worker
-	roleDir := filepath.Join(dir, "agents", "teams", "dev")
+	// Create role
+	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
 	os.MkdirAll(roleDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# dev\n"), 0644)
 
-	// Create worker config
-	workerDir := filepath.Join(dir, "agents", "workers", "dev-001")
-	os.MkdirAll(workerDir, 0755)
+	// Create worktree directory with worker.yaml
+	wtPath := filepath.Join(dir, ".worktrees", "dev-001")
+	os.MkdirAll(wtPath, 0755)
 	wcfg := &internal.WorkerConfig{
 		WorkerID:         "dev-001",
 		Role:             "dev",
+		Provider:         "claude",
 		PaneID:           "50",
 		ControllerPaneID: "99",
 	}
-	wcfg.Save(filepath.Join(workerDir, "config.yaml"))
-
-	// Create worktree directory
-	wtPath := filepath.Join(dir, ".worktrees", "dev-001")
-	os.MkdirAll(wtPath, 0755)
+	wcfg.Save(internal.WorkerYAMLPath(wtPath))
 
 	// Override resolveWorktreeRoot to return the test worktree path
 	origResolve := resolveWorktreeRoot
@@ -126,14 +123,11 @@ func TestRunReplyMainV2(t *testing.T) {
 func TestRunReplyMainNoController(t *testing.T) {
 	app, dir := initTestApp(t)
 
-	// Create worker config without controller pane ID
-	workerDir := filepath.Join(dir, "agents", "workers", "solo-001")
-	os.MkdirAll(workerDir, 0755)
-	wcfg := &internal.WorkerConfig{WorkerID: "solo-001", Role: "solo"}
-	wcfg.Save(filepath.Join(workerDir, "config.yaml"))
-
+	// Create worktree directory with worker.yaml (no controller pane)
 	wtPath := filepath.Join(dir, ".worktrees", "solo-001")
 	os.MkdirAll(wtPath, 0755)
+	wcfg := &internal.WorkerConfig{WorkerID: "solo-001", Role: "solo", Provider: "claude"}
+	wcfg.Save(internal.WorkerYAMLPath(wtPath))
 
 	// Override resolveWorktreeRoot to return the test worktree path
 	origResolve := resolveWorktreeRoot

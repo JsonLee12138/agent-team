@@ -288,9 +288,9 @@ class RoleCreatorScriptTests(unittest.TestCase):
                 config=config,
                 templates_dir=self.templates_dir,
                 overwrite_mode="ask",
-                target_dir_name="agents/teams",
+                target_dir_name=".agents/teams",
             )
-            target = repo_root / "agents" / "teams" / "backend-dev"
+            target = repo_root / ".agents" / "teams" / "backend-dev"
             self.assertEqual(result.target_dir, target)
             self.assertTrue((target / "SKILL.md").exists())
             self.assertTrue((target / "references" / "role.yaml").exists())

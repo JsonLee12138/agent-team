@@ -2,11 +2,14 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -104,30 +107,164 @@ func findSkillPath(root, skillName string) string {
 		candidates = append(candidates, shortName)
 	}
 
+	searchDirs := buildSearchDirs(root)
+
 	for _, name := range candidates {
-		// Project-local agents/teams/
-		teamDir := filepath.Join(root, "agents", "teams", name)
-		if _, err := os.Stat(teamDir); err == nil {
-			return teamDir
-		}
-
-		// Project-local skills/
-		local := filepath.Join(root, "skills", name)
-		if _, err := os.Stat(local); err == nil {
-			return local
-		}
-
-		// Global ~/.claude/skills/
-		home, err := os.UserHomeDir()
-		if err == nil {
-			global := filepath.Join(home, ".claude", "skills", name)
-			if _, err := os.Stat(global); err == nil {
-				return global
+		for _, dir := range searchDirs {
+			p := filepath.Join(dir, name)
+			if _, err := os.Stat(p); err == nil {
+				return p
 			}
 		}
 	}
 
+	// 远程下载回退（仅 scoped 格式）
+	if shortName != skillName {
+		targetDir := filepath.Join(root, ".claude", "skills")
+		if downloaded := tryRemoteDownload(skillName, targetDir, shortName); downloaded != "" {
+			return downloaded
+		}
+	}
+
 	return ""
+}
+
+// pluginSkillsDir 返回 Plugin 内置技能目录（从环境变量读取）
+func pluginSkillsDir() string {
+	if root := os.Getenv("CLAUDE_PLUGIN_ROOT"); root != "" {
+		return filepath.Join(root, "skills")
+	}
+	return ""
+}
+
+// buildSearchDirs 构建 5 层技能搜索目录
+func buildSearchDirs(root string) []string {
+	var dirs []string
+	if d := pluginSkillsDir(); d != "" {
+		dirs = append(dirs, d) // 层 1: Plugin 内置
+	}
+	dirs = append(dirs, filepath.Join(ResolveAgentsDir(root), "teams")) // 层 2: .agents/teams
+	dirs = append(dirs, filepath.Join(root, "skills"))                  // 层 3: project/skills
+	dirs = append(dirs, filepath.Join(root, ".claude", "skills"))       // 层 4: .claude/skills
+	if home, err := os.UserHomeDir(); err == nil {
+		dirs = append(dirs, filepath.Join(home, ".claude", "skills")) // 层 5: ~/.claude/skills
+	}
+	return dirs
+}
+
+// tryRemoteDownload 尝试通过 npx skills install 下载远程技能（非阻塞，失败只 warn）
+func tryRemoteDownload(skillName, targetDir, shortName string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "npx", "skills", "install", skillName, "--target", targetDir)
+	if err := cmd.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: remote skill download failed '%s': %v\n", skillName, err)
+		return ""
+	}
+	downloaded := filepath.Join(targetDir, shortName)
+	if _, err := os.Stat(downloaded); err == nil {
+		return downloaded
+	}
+	return ""
+}
+
+// providerToAgent maps provider names to npx skills add -a parameter values.
+var providerToAgent = map[string]string{
+	"claude":   "claude-code",
+	"codex":    "codex",
+	"opencode": "opencode",
+}
+
+// skillTargetDir returns the skill installation target directory for a provider.
+func skillTargetDir(wtPath, provider string) string {
+	switch provider {
+	case "claude":
+		return filepath.Join(wtPath, ".claude", "skills")
+	case "codex":
+		return filepath.Join(wtPath, ".codex", "skills")
+	case "opencode":
+		return filepath.Join(wtPath, ".opencode", "skills")
+	default:
+		return filepath.Join(wtPath, ".claude", "skills")
+	}
+}
+
+// isScopedSkill returns true if the skill name contains "/" (scoped format like "antfu/skills@vite").
+func isScopedSkill(skillName string) bool {
+	return strings.Contains(skillName, "/")
+}
+
+// runNpxSkillsAdd runs "npx skills add <source> -a <agent> -y" in the given directory.
+func runNpxSkillsAdd(cwd, skillName, provider string) error {
+	agent, ok := providerToAgent[provider]
+	if !ok {
+		agent = "claude-code"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "npx", "skills", "add", skillName, "-a", agent, "-y")
+	cmd.Dir = cwd
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+// InstallSkillsForWorker installs role skills into the worktree.
+// - scoped names (containing "/") → npx skills add <source> -a <agent> -y
+// - plain names → local 5-layer search copy → fallback npx skills add → error
+// The role skill itself is always copied locally.
+func InstallSkillsForWorker(wtPath, root, roleName, provider string) error {
+	targetDir := skillTargetDir(wtPath, provider)
+
+	// 1. Copy the role skill itself (always local)
+	roleDir := RoleDir(root, roleName)
+	if _, err := os.Stat(roleDir); err == nil {
+		dst := filepath.Join(targetDir, roleName)
+		if err := copyDir(roleDir, dst); err != nil {
+			return fmt.Errorf("copy role skill %s: %w", roleName, err)
+		}
+	}
+
+	// 2. Read dependency skills from role.yaml
+	skills, err := ReadRoleSkills(root, roleName)
+	if err != nil {
+		return err
+	}
+
+	for _, skillName := range skills {
+		shortName := parseSkillName(skillName)
+		dst := filepath.Join(targetDir, shortName)
+
+		// Skip if already installed in target directory
+		if _, err := os.Stat(dst); err == nil {
+			fmt.Printf("  Skill '%s' already installed, skipping\n", shortName)
+			continue
+		}
+
+		if isScopedSkill(skillName) {
+			// Scoped: directly use npx skills add
+			fmt.Printf("  Installing skill '%s' via npx...\n", skillName)
+			if err := runNpxSkillsAdd(wtPath, skillName, provider); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: npx skills add '%s' failed: %v\n", skillName, err)
+			}
+		} else {
+			// Plain: try local search first
+			skillPath := findSkillPath(root, skillName)
+			if skillPath != "" {
+				if err := copyDir(skillPath, dst); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: copy skill '%s' failed: %v\n", skillName, err)
+				}
+			} else {
+				// Fallback to npx skills add
+				fmt.Printf("  Skill '%s' not found locally, trying npx...\n", skillName)
+				if err := runNpxSkillsAdd(wtPath, skillName, provider); err != nil {
+					fmt.Fprintf(os.Stderr, "Error: skill '%s' not found locally and npx install failed: %v\n", skillName, err)
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 // FindSkillPathPublic searches for a skill in known locations (exported wrapper).

@@ -4,7 +4,7 @@ English | [中文](./README.zh.md)
 
 AI team role and worker manager for multi-agent development workflows. It uses a **Role + Worker** model with isolated Git worktrees and terminal sessions.
 
-- **Role**: skill package definition in `agents/teams/<role-name>/`
+- **Role**: skill package definition in `.agents/teams/<role-name>/`
 - **Worker**: runtime role instance in `.worktrees/<worker-id>/` (for example `frontend-dev-001`)
 
 ## Table of Contents
@@ -26,26 +26,25 @@ AI team role and worker manager for multi-agent development workflows. It uses a
 
 ```
 Main branch
-  ├── agents/teams/<role-name>/          <- role skill definitions
-  ├── agents/workers/<worker-id>/        <- worker config
-  └── .worktrees/<worker-id>/            <- isolated runtime workspace
+  ├── .agents/teams/<role-name>/           <- role skill definitions
+  └── .worktrees/<worker-id>/              <- isolated runtime workspace
+        └── worker.yaml                    <- worker config
 ```
 
 Typical flow:
 
-1. Create or prepare a role in `agents/teams/`
-2. Create worker: `agent-team worker create <role-name>`
-3. Open worker session: `agent-team worker open <worker-id> [provider]`
-4. Brainstorm, then assign change: `agent-team worker assign ...`
-5. Merge: `agent-team worker merge <worker-id>`
-6. Cleanup: `agent-team worker delete <worker-id>`
+1. Create or prepare a role in `.agents/teams/`
+2. Create and open worker: `agent-team worker create <role-name> [provider]`
+3. Brainstorm, then assign change: `agent-team worker assign ...`
+4. Merge: `agent-team worker merge <worker-id>`
+5. Cleanup: `agent-team worker delete <worker-id>`
 
 ## Requirements
 
 - Git
 - [WezTerm](https://wezfurlong.org/wezterm/) or [tmux](https://github.com/tmux/tmux)
 - At least one AI provider CLI: [claude](https://github.com/anthropics/claude-code), [codex](https://github.com/openai/codex), or [opencode](https://opencode.ai)
-- [Node.js](https://nodejs.org/) (for OpenSpec auto-install during worker creation)
+- [Node.js](https://nodejs.org/) (for OpenSpec auto-install and `npx skills add` during worker creation)
 
 ## Installation
 
@@ -89,12 +88,12 @@ go install github.com/JsonLee12138/agent-team@latest
 
 ## Quick Start
 
-1. Create role(s) with `role-creator` into `agents/teams/`
+1. Create role(s) with `role-creator` into `.agents/teams/`
 ```bash
 python3 skills/role-creator/scripts/create_role_skill.py \
   --repo-root . \
   --role-name frontend-dev \
-  --target-dir agents/teams \
+  --target-dir .agents/teams \
   --description "Frontend role for UI implementation" \
   --system-goal "Ship maintainable frontend features"
 ```
@@ -104,22 +103,17 @@ python3 skills/role-creator/scripts/create_role_skill.py \
 agent-team role list
 ```
 
-3. Create worker
+3. Create and open worker (creates worktree, opens session, installs skills, launches AI)
 ```bash
-agent-team worker create frontend-dev
+agent-team worker create frontend-dev claude
 ```
 
-4. Open worker session
-```bash
-agent-team worker open frontend-dev-001 claude
-```
-
-5. Assign change
+4. Assign change
 ```bash
 agent-team worker assign frontend-dev-001 "Implement responsive navbar"
 ```
 
-6. Merge and delete worker
+5. Merge and delete worker
 ```bash
 agent-team worker merge frontend-dev-001
 agent-team worker delete frontend-dev-001
@@ -131,20 +125,27 @@ This repository currently includes one built-in role:
 
 - `frontend-architect` (path: `skills/frontend-architect/`)
 
-To use it with `agent-team`, copy it into `agents/teams/` first:
+To use it with `agent-team`, copy it into `.agents/teams/` first:
 
 ```bash
-mkdir -p agents/teams
-cp -R skills/frontend-architect agents/teams/
+mkdir -p .agents/teams
+cp -R skills/frontend-architect .agents/teams/
 agent-team role list
 ```
+
+## Built-in Skills
+
+| Skill | Description |
+|-------|-------------|
+| `role-creator` | Create or update role skill packages interactively |
+| `brainstorming` | Turn rough ideas into validated design docs through one-question-at-a-time dialogue before implementation |
 
 ## Usage as a Skill
 
 With agent skill installed, you can describe intent in natural language:
 
 - "Create a team role for frontend architecture."
-- "Create a worker for frontend-architect and open it with codex."
+- "Create a worker for frontend-architect with codex."
 - "Assign a change to frontend-architect-001."
 - "Show worker status."
 
@@ -158,14 +159,14 @@ All commands run inside a Git repository.
 
 | Command | Description |
 |---------|-------------|
-| `agent-team role list` | List available roles in `agents/teams/` |
+| `agent-team role list` | List available roles in `.agents/teams/` |
 
 ### Worker commands
 
 | Command | Description |
 |---------|-------------|
-| `agent-team worker create <role-name>` | Create worker worktree, branch, config, and initialize OpenSpec |
-| `agent-team worker open <worker-id> [provider] [--model <model>] [--new-window]` | Open worker session |
+| `agent-team worker create <role-name> [provider] [--model <model>] [--new-window]` | Create worker, open session, install skills, and launch AI |
+| `agent-team worker open <worker-id> [provider] [--model <model>] [--new-window]` | Reopen an existing worker session |
 | `agent-team worker assign <worker-id> "<description>" [provider] [--proposal <file>] [--design <file>] [--model <model>] [--new-window]` | Create OpenSpec change and notify worker |
 | `agent-team worker status` | Show workers, roles, running state, skills, and active changes |
 | `agent-team worker merge <worker-id>` | Merge `team/<worker-id>` into current branch |
@@ -184,16 +185,15 @@ Use `AGENT_TEAM_BACKEND=tmux` before commands to switch backend from WezTerm to 
 
 ```
 project-root/
-├── agents/
-│   ├── teams/
-│   │   └── <role-name>/
-│   │       ├── SKILL.md
-│   │       ├── system.md
-│   │       └── references/role.yaml
-│   └── workers/
-│       └── <worker-id>/config.yaml
+├── .agents/
+│   └── teams/
+│       └── <role-name>/
+│           ├── SKILL.md
+│           ├── system.md
+│           └── references/role.yaml
 └── .worktrees/
     └── <worker-id>/
+        ├── worker.yaml              <- worker config
         ├── .claude/skills/
         ├── .codex/skills/
         ├── CLAUDE.md

@@ -4,7 +4,7 @@
 
 多智能体开发工作流的 AI 团队角色管理器。采用 **Role + Worker** 双层模型，在隔离 Git worktree 中运行。
 
-- **Role**：角色技能包定义，位于 `agents/teams/<role-name>/`
+- **Role**：角色技能包定义，位于 `.agents/teams/<role-name>/`
 - **Worker**：角色运行实例，位于 `.worktrees/<worker-id>/`（例如 `frontend-dev-001`）
 
 ## 目录
@@ -26,26 +26,25 @@
 
 ```
 主分支
-  ├── agents/teams/<role-name>/          <- 角色技能包定义
-  ├── agents/workers/<worker-id>/        <- worker 配置
-  └── .worktrees/<worker-id>/            <- 隔离运行目录
+  ├── .agents/teams/<role-name>/           <- 角色技能包定义
+  └── .worktrees/<worker-id>/              <- 隔离运行目录
+        └── worker.yaml                    <- worker 配置
 ```
 
 典型流程：
 
-1. 在 `agents/teams/` 创建或准备角色
-2. 创建 worker：`agent-team worker create <role-name>`
-3. 打开会话：`agent-team worker open <worker-id> [provider]`
-4. 头脑风暴后分配任务：`agent-team worker assign ...`
-5. 合并：`agent-team worker merge <worker-id>`
-6. 清理：`agent-team worker delete <worker-id>`
+1. 在 `.agents/teams/` 创建或准备角色
+2. 创建并打开 worker：`agent-team worker create <role-name> [provider]`
+3. 头脑风暴后分配任务：`agent-team worker assign ...`
+4. 合并：`agent-team worker merge <worker-id>`
+5. 清理：`agent-team worker delete <worker-id>`
 
 ## 环境要求
 
 - Git
 - [WezTerm](https://wezfurlong.org/wezterm/) 或 [tmux](https://github.com/tmux/tmux)
 - 至少一个 AI provider CLI：[claude](https://github.com/anthropics/claude-code)、[codex](https://github.com/openai/codex) 或 [opencode](https://opencode.ai)
-- [Node.js](https://nodejs.org/)（创建 worker 时用于自动安装 OpenSpec）
+- [Node.js](https://nodejs.org/)（创建 worker 时用于自动安装 OpenSpec 和 `npx skills add`）
 
 ## 安装
 
@@ -89,12 +88,12 @@ go install github.com/JsonLee12138/agent-team@latest
 
 ## 快速开始
 
-1. 通过 `role-creator` 在 `agents/teams/` 生成角色
+1. 通过 `role-creator` 在 `.agents/teams/` 生成角色
 ```bash
 python3 skills/role-creator/scripts/create_role_skill.py \
   --repo-root . \
   --role-name frontend-dev \
-  --target-dir agents/teams \
+  --target-dir .agents/teams \
   --description "Frontend role for UI implementation" \
   --system-goal "Ship maintainable frontend features"
 ```
@@ -104,22 +103,17 @@ python3 skills/role-creator/scripts/create_role_skill.py \
 agent-team role list
 ```
 
-3. 创建 worker
+3. 创建并打开 worker（创建 worktree、打开会话、安装技能、启动 AI）
 ```bash
-agent-team worker create frontend-dev
+agent-team worker create frontend-dev claude
 ```
 
-4. 打开 worker 会话
-```bash
-agent-team worker open frontend-dev-001 claude
-```
-
-5. 分配任务
+4. 分配任务
 ```bash
 agent-team worker assign frontend-dev-001 "Implement responsive navbar"
 ```
 
-6. 合并并删除 worker
+5. 合并并删除 worker
 ```bash
 agent-team worker merge frontend-dev-001
 agent-team worker delete frontend-dev-001
@@ -131,22 +125,29 @@ agent-team worker delete frontend-dev-001
 
 - `frontend-architect`（路径：`skills/frontend-architect/`）
 
-要在 `agent-team` 中使用它，先复制到 `agents/teams/`：
+要在 `agent-team` 中使用它，先复制到 `.agents/teams/`：
 
 ```bash
-mkdir -p agents/teams
-cp -R skills/frontend-architect agents/teams/
+mkdir -p .agents/teams
+cp -R skills/frontend-architect .agents/teams/
 agent-team role list
 ```
+
+## 自带 Skills
+
+| Skill | 说明 |
+|-------|------|
+| `role-creator` | 交互式创建或更新角色技能包 |
+| `brainstorming` | 通过逐问对话，将粗略想法转化为经过验证的设计文档，先设计再实现 |
 
 ## 作为 Skill 使用
 
 安装 Skill 后，可以直接用自然语言描述操作，例如：
 
-- “创建一个前端架构角色。”
-- “给 frontend-architect 创建 worker 并用 codex 打开。”
-- “给 frontend-architect-001 分配一个变更任务。”
-- “查看 worker 状态。”
+- "创建一个前端架构角色。"
+- "给 frontend-architect 创建 worker 并用 codex 打开。"
+- "给 frontend-architect-001 分配一个变更任务。"
+- "查看 worker 状态。"
 
 主控智能体应在 assign 前完成头脑风暴流程，再创建 OpenSpec change 并通知 worker。
 
@@ -158,14 +159,14 @@ agent-team role list
 
 | 命令 | 说明 |
 |------|------|
-| `agent-team role list` | 列出 `agents/teams/` 中可用角色 |
+| `agent-team role list` | 列出 `.agents/teams/` 中可用角色 |
 
 ### Worker 命令
 
 | 命令 | 说明 |
 |------|------|
-| `agent-team worker create <role-name>` | 创建 worker worktree、分支、配置并初始化 OpenSpec |
-| `agent-team worker open <worker-id> [provider] [--model <model>] [--new-window]` | 打开 worker 会话 |
+| `agent-team worker create <role-name> [provider] [--model <model>] [--new-window]` | 创建 worker 并打开会话、安装技能、启动 AI |
+| `agent-team worker open <worker-id> [provider] [--model <model>] [--new-window]` | 重新打开已有 worker 会话 |
 | `agent-team worker assign <worker-id> "<description>" [provider] [--proposal <file>] [--design <file>] [--model <model>] [--new-window]` | 创建 OpenSpec change 并通知 worker |
 | `agent-team worker status` | 查看 workers、角色、运行状态、技能数量与活跃变更 |
 | `agent-team worker merge <worker-id>` | 将 `team/<worker-id>` 合并到当前分支 |
@@ -184,16 +185,15 @@ agent-team role list
 
 ```
 项目根目录/
-├── agents/
-│   ├── teams/
-│   │   └── <role-name>/
-│   │       ├── SKILL.md
-│   │       ├── system.md
-│   │       └── references/role.yaml
-│   └── workers/
-│       └── <worker-id>/config.yaml
+├── .agents/
+│   └── teams/
+│       └── <role-name>/
+│           ├── SKILL.md
+│           ├── system.md
+│           └── references/role.yaml
 └── .worktrees/
     └── <worker-id>/
+        ├── worker.yaml              <- worker 配置
         ├── .claude/skills/
         ├── .codex/skills/
         ├── CLAUDE.md

@@ -23,7 +23,7 @@ func newWorkerStatusCmd() *cobra.Command {
 
 func (a *App) RunWorkerStatus() error {
 	root := a.Git.Root()
-	workers := internal.ListWorkers(root)
+	workers := internal.ListWorkers(root, a.WtBase)
 	if len(workers) == 0 {
 		fmt.Println("No workers found. Create one with: agent-team worker create <role-name>")
 		return nil

@@ -1,0 +1,8 @@
+{
+  "agent_team": {
+    "brainstorming_gate": true,
+    "post_edit_check": true,
+    "remote_skill_download": true,
+    "deprecated_path_warning": true
+  }
+}

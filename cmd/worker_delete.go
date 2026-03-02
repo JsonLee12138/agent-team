@@ -23,8 +23,7 @@ func newWorkerDeleteCmd() *cobra.Command {
 func (a *App) RunWorkerDelete(workerID string) error {
 	root := a.Git.Root()
 	wtPath := internal.WtPath(root, a.WtBase, workerID)
-	configPath := internal.WorkerConfigPath(root, workerID)
-	workerDir := internal.WorkerDir(root, workerID)
+	configPath := internal.WorkerYAMLPath(wtPath)
 
 	if _, err := os.Stat(wtPath); os.IsNotExist(err) {
 		return fmt.Errorf("worker '%s' not found", workerID)
@@ -47,9 +46,6 @@ func (a *App) RunWorkerDelete(workerID string) error {
 
 	// Delete branch
 	a.Git.DeleteBranch("team/" + workerID)
-
-	// Remove worker config directory
-	os.RemoveAll(workerDir)
 
 	fmt.Printf("✓ Deleted worker '%s'\n", workerID)
 	return nil

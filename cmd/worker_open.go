@@ -15,7 +15,7 @@ func newWorkerOpenCmd() *cobra.Command {
 	var newWindow bool
 	cmd := &cobra.Command{
 		Use:   "open <worker-id> [provider]",
-		Short: "Open a worker session in a new terminal tab or window",
+		Short: "Reopen an existing worker session in a new terminal tab or window",
 		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			provider := ""
@@ -32,8 +32,8 @@ func newWorkerOpenCmd() *cobra.Command {
 
 func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow bool) error {
 	root := a.Git.Root()
-	configPath := internal.WorkerConfigPath(root, workerID)
 	wtPath := internal.WtPath(root, a.WtBase, workerID)
+	configPath := internal.WorkerYAMLPath(wtPath)
 
 	cfg, err := internal.LoadWorkerConfig(configPath)
 	if err != nil {
@@ -45,7 +45,7 @@ func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow bool) er
 	}
 
 	if provider == "" {
-		provider = cfg.DefaultProvider
+		provider = cfg.Provider
 		if provider == "" {
 			provider = "claude"
 		}
@@ -56,10 +56,10 @@ func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow bool) er
 		return nil
 	}
 
-	// Copy skills to worktree
-	fmt.Printf("  Copying skills for role '%s'...\n", cfg.Role)
-	if err := internal.CopySkillsToWorktree(wtPath, root, cfg.Role); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: failed to copy skills: %v\n", err)
+	// Re-sync skills
+	fmt.Printf("  Syncing skills for role '%s'...\n", cfg.Role)
+	if err := skillInstaller(wtPath, root, cfg.Role, provider); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: skill sync had errors: %v\n", err)
 	}
 
 	// Inject role prompt into CLAUDE.md and AGENTS.md

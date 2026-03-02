@@ -3,7 +3,7 @@ VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev
 GO := $(shell command -v go1.24.2 2>/dev/null || GOROOT=$$HOME/.gvm/gos/go1.24.2 echo $$HOME/.gvm/gos/go1.24.2/bin/go 2>/dev/null || echo go)
 GORUN := GOROOT=$(HOME)/.gvm/gos/go1.24.2 $(HOME)/.gvm/gos/go1.24.2/bin/go
 
-.PHONY: build test lint clean install uninstall
+.PHONY: build test lint clean install uninstall plugin-pack plugin-test migrate
 
 build:
 	$(GORUN) build -ldflags "-X github.com/JsonLee12138/agent-team/cmd.Version=$(VERSION)" -o $(BINARY) .
@@ -38,3 +38,18 @@ uninstall:
 	else \
 		echo "✓ Uninstalled agent-team from /usr/local/bin"; \
 	fi
+
+# Pack plugin artifacts into a distributable archive
+plugin-pack: build
+	@tar czf agent-team-plugin.tar.gz \
+		.claude-plugin/ hooks/ scripts/ skills/ settings.json README.md $(BINARY)
+	@echo "✓ Packaged agent-team-plugin.tar.gz"
+
+# Test plugin loading with Claude Code
+plugin-test: build
+	claude --plugin-dir . --debug
+
+# Run the migrate subcommand (move agents/ → .agents/)
+migrate: build
+	@./$(BINARY) migrate
+

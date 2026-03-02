@@ -1,0 +1,4 @@
+interface:
+  display_name: "Brainstorming"
+  short_description: "Role-based brainstorming to approved docs"
+  default_prompt: "Use brainstorming before implementation: ask one question at a time, present 2-3 approaches, get approval, then write a brainstorming doc after asking whether to use docs/brainstorming/ or a custom directory."

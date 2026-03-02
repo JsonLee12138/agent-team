@@ -1,0 +1,10 @@
+{
+  "name": "agent-team",
+  "description": "AI team role and worker manager for multi-agent development workflows.",
+  "version": "1.0.0",
+  "author": { "name": "JsonLee", "url": "https://github.com/JsonLee12138" },
+  "homepage": "https://github.com/JsonLee12138/agent-team",
+  "repository": "https://github.com/JsonLee12138/agent-team",
+  "license": "MIT",
+  "keywords": ["team", "multi-agent", "worktree", "role", "worker", "wezterm", "tmux", "agent-team"]
+}

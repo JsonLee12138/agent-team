@@ -9,7 +9,27 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
+
+var deprecatedOnce sync.Once
+
+// ResolveAgentsDir 优先返回 .agents/，回退到 agents/（加 deprecation 警告）
+func ResolveAgentsDir(root string) string {
+	newPath := filepath.Join(root, ".agents")
+	if _, err := os.Stat(newPath); err == nil {
+		return newPath
+	}
+	oldPath := filepath.Join(root, "agents")
+	if _, err := os.Stat(oldPath); err == nil {
+		deprecatedOnce.Do(func() {
+			fmt.Fprintln(os.Stderr,
+				"[DEPRECATED] Using agents/ directory. Run 'agent-team migrate' to update to .agents/")
+		})
+		return oldPath
+	}
+	return newPath // 两者都不存在时返回新路径（将由命令创建）
+}
 
 var SupportedProviders = map[string]bool{
 	"claude":   true,
@@ -35,9 +55,9 @@ func FindWtBase(root string) string {
 
 // --- v2 path functions ---
 
-// RoleDir returns the path to a role definition: agents/teams/<role-name>/
+// RoleDir returns the path to a role definition: .agents/teams/<role-name>/
 func RoleDir(root, roleName string) string {
-	return filepath.Join(root, "agents", "teams", roleName)
+	return filepath.Join(ResolveAgentsDir(root), "teams", roleName)
 }
 
 // RoleYAMLPath returns the path to a role's role.yaml.
@@ -50,16 +70,6 @@ func RoleSystemMDPath(root, roleName string) string {
 	return filepath.Join(RoleDir(root, roleName), "system.md")
 }
 
-// WorkerDir returns the path to a worker config directory: agents/workers/<worker-id>/
-func WorkerDir(root, workerID string) string {
-	return filepath.Join(root, "agents", "workers", workerID)
-}
-
-// WorkerConfigPath returns the path to a worker's config.yaml.
-func WorkerConfigPath(root, workerID string) string {
-	return filepath.Join(WorkerDir(root, workerID), "config.yaml")
-}
-
 // WorkerInfo holds summary info for a worker.
 type WorkerInfo struct {
 	WorkerID string
@@ -67,9 +77,9 @@ type WorkerInfo struct {
 	Config   *WorkerConfig
 }
 
-// ListAvailableRoles scans agents/teams/ for directories containing SKILL.md.
+// ListAvailableRoles scans .agents/teams/ for directories containing SKILL.md.
 func ListAvailableRoles(root string) []string {
-	teamsDir := filepath.Join(root, "agents", "teams")
+	teamsDir := filepath.Join(ResolveAgentsDir(root), "teams")
 	entries, err := os.ReadDir(teamsDir)
 	if err != nil {
 		return nil
@@ -88,10 +98,10 @@ func ListAvailableRoles(root string) []string {
 	return roles
 }
 
-// ListWorkers scans agents/workers/ for directories containing config.yaml.
-func ListWorkers(root string) []WorkerInfo {
-	workersDir := filepath.Join(root, "agents", "workers")
-	entries, err := os.ReadDir(workersDir)
+// ListWorkers scans worktrees for directories containing worker.yaml.
+func ListWorkers(root, wtBase string) []WorkerInfo {
+	wtDir := filepath.Join(root, wtBase)
+	entries, err := os.ReadDir(wtDir)
 	if err != nil {
 		return nil
 	}
@@ -100,7 +110,7 @@ func ListWorkers(root string) []WorkerInfo {
 		if !e.IsDir() {
 			continue
 		}
-		configPath := filepath.Join(workersDir, e.Name(), "config.yaml")
+		configPath := WorkerYAMLPath(filepath.Join(wtDir, e.Name()))
 		cfg, err := LoadWorkerConfig(configPath)
 		if err != nil {
 			continue
@@ -118,9 +128,9 @@ func ListWorkers(root string) []WorkerInfo {
 var workerIDPattern = regexp.MustCompile(`^(.+)-(\d{3})$`)
 
 // NextWorkerID computes the next worker ID for a given role (e.g., frontend-dev-001).
-func NextWorkerID(root, roleName string) string {
-	workersDir := filepath.Join(root, "agents", "workers")
-	entries, err := os.ReadDir(workersDir)
+func NextWorkerID(root, wtBase, roleName string) string {
+	wtDir := filepath.Join(root, wtBase)
+	entries, err := os.ReadDir(wtDir)
 	if err != nil {
 		return fmt.Sprintf("%s-001", roleName)
 	}
@@ -148,7 +158,7 @@ func NextWorkerID(root, roleName string) string {
 
 // WriteWorktreeGitignore writes a .gitignore to exclude worker-local files.
 func WriteWorktreeGitignore(wtPath string) error {
-	content := ".gitignore\n.claude/\n.codex/\nopenspec/\n"
+	content := ".gitignore\n.claude/\n.codex/\nopenspec/\nworker.yaml\n"
 	return os.WriteFile(filepath.Join(wtPath, ".gitignore"), []byte(content), 0644)
 }
 

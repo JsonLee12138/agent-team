@@ -42,8 +42,7 @@ func (a *App) RunReplyMain(message string) error {
 	}
 	workerID := filepath.Base(worktreeRoot)
 
-	root := a.Git.Root()
-	configPath := internal.WorkerConfigPath(root, workerID)
+	configPath := internal.WorkerYAMLPath(worktreeRoot)
 	wcfg, err := internal.LoadWorkerConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("worker '%s' not found: %w", workerID, err)

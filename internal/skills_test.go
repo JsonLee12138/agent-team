@@ -39,7 +39,7 @@ func TestReadRoleSkills(t *testing.T) {
 	})
 
 	t.Run("reads skills list", func(t *testing.T) {
-		roleDir := filepath.Join(dir, "agents", "teams", "dev", "references")
+		roleDir := filepath.Join(dir, ".agents", "teams", "dev", "references")
 		os.MkdirAll(roleDir, 0755)
 		content := "name: dev\nskills:\n  - vite\n  - antfu/skills@vitest\n"
 		os.WriteFile(filepath.Join(roleDir, "role.yaml"), []byte(content), 0644)
@@ -57,7 +57,7 @@ func TestReadRoleSkills(t *testing.T) {
 	})
 
 	t.Run("empty skills returns empty", func(t *testing.T) {
-		roleDir := filepath.Join(dir, "agents", "teams", "empty-role", "references")
+		roleDir := filepath.Join(dir, ".agents", "teams", "empty-role", "references")
 		os.MkdirAll(roleDir, 0755)
 		content := "name: empty-role\nskills: []\n"
 		os.WriteFile(filepath.Join(roleDir, "role.yaml"), []byte(content), 0644)
@@ -82,8 +82,8 @@ func TestFindSkillPath(t *testing.T) {
 		}
 	})
 
-	t.Run("finds in agents/teams/", func(t *testing.T) {
-		teamDir := filepath.Join(dir, "agents", "teams", "my-role")
+	t.Run("finds in .agents/teams/", func(t *testing.T) {
+		teamDir := filepath.Join(dir, ".agents", "teams", "my-role")
 		os.MkdirAll(teamDir, 0755)
 
 		got := findSkillPath(dir, "my-role")
@@ -102,6 +102,16 @@ func TestFindSkillPath(t *testing.T) {
 		}
 	})
 
+	t.Run("finds in .claude/skills/", func(t *testing.T) {
+		skillDir := filepath.Join(dir, ".claude", "skills", "local-cached-skill")
+		os.MkdirAll(skillDir, 0755)
+
+		got := findSkillPath(dir, "local-cached-skill")
+		if got != skillDir {
+			t.Errorf("findSkillPath(.claude/skills) = %q, want %q", got, skillDir)
+		}
+	})
+
 	t.Run("scoped name resolves short name", func(t *testing.T) {
 		skillDir := filepath.Join(dir, "skills", "vite")
 		os.MkdirAll(skillDir, 0755)
@@ -112,17 +122,38 @@ func TestFindSkillPath(t *testing.T) {
 		}
 	})
 
-	t.Run("agents/teams takes priority over skills/", func(t *testing.T) {
-		teamDir := filepath.Join(dir, "agents", "teams", "dual")
+	t.Run(".agents/teams takes priority over skills/", func(t *testing.T) {
+		teamDir := filepath.Join(dir, ".agents", "teams", "dual")
 		os.MkdirAll(teamDir, 0755)
 		skillDir := filepath.Join(dir, "skills", "dual")
 		os.MkdirAll(skillDir, 0755)
 
 		got := findSkillPath(dir, "dual")
 		if got != teamDir {
-			t.Errorf("findSkillPath should prefer agents/teams/, got %q", got)
+			t.Errorf("findSkillPath should prefer .agents/teams/, got %q", got)
 		}
 	})
+}
+
+func TestFindSkillPathPluginRoot(t *testing.T) {
+	dir := t.TempDir()
+	pluginRoot := t.TempDir()
+
+	// Create skill in Plugin root
+	pluginSkillDir := filepath.Join(pluginRoot, "skills", "plugin-builtin")
+	os.MkdirAll(pluginSkillDir, 0755)
+	os.WriteFile(filepath.Join(pluginSkillDir, "SKILL.md"), []byte("# plugin-builtin\n"), 0644)
+
+	// Also create same skill in project to verify Plugin takes priority
+	projSkillDir := filepath.Join(dir, "skills", "plugin-builtin")
+	os.MkdirAll(projSkillDir, 0755)
+
+	t.Setenv("CLAUDE_PLUGIN_ROOT", pluginRoot)
+
+	got := findSkillPath(dir, "plugin-builtin")
+	if got != pluginSkillDir {
+		t.Errorf("Plugin root skill should take priority, got %q, want %q", got, pluginSkillDir)
+	}
 }
 
 func TestCopySkillsToWorktree(t *testing.T) {
@@ -131,7 +162,7 @@ func TestCopySkillsToWorktree(t *testing.T) {
 	os.MkdirAll(wtPath, 0755)
 
 	// Create role skill
-	roleDir := filepath.Join(dir, "agents", "teams", "dev")
+	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
 	refDir := filepath.Join(roleDir, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# dev\n"), 0644)
@@ -181,7 +212,7 @@ func TestCopySkillsToWorktreeScopedName(t *testing.T) {
 	os.MkdirAll(wtPath, 0755)
 
 	// Create role with scoped skill dependency
-	roleDir := filepath.Join(dir, "agents", "teams", "arch")
+	roleDir := filepath.Join(dir, ".agents", "teams", "arch")
 	refDir := filepath.Join(roleDir, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# arch\n"), 0644)
@@ -209,5 +240,125 @@ func TestCopySkillsToWorktreeScopedName(t *testing.T) {
 	badPath := filepath.Join(wtPath, ".claude", "skills", "antfu", "skills@vite")
 	if _, err := os.Stat(badPath); err == nil {
 		t.Error("scoped skill should NOT be copied using full scoped path")
+	}
+}
+
+func TestProviderToAgent(t *testing.T) {
+	tests := []struct {
+		provider, want string
+	}{
+		{"claude", "claude-code"},
+		{"codex", "codex"},
+		{"opencode", "opencode"},
+	}
+	for _, tt := range tests {
+		got, ok := providerToAgent[tt.provider]
+		if !ok {
+			t.Errorf("providerToAgent[%q] not found", tt.provider)
+			continue
+		}
+		if got != tt.want {
+			t.Errorf("providerToAgent[%q] = %q, want %q", tt.provider, got, tt.want)
+		}
+	}
+}
+
+func TestSkillTargetDir(t *testing.T) {
+	tests := []struct {
+		provider, wantSuffix string
+	}{
+		{"claude", filepath.Join(".claude", "skills")},
+		{"codex", filepath.Join(".codex", "skills")},
+		{"opencode", filepath.Join(".opencode", "skills")},
+		{"unknown", filepath.Join(".claude", "skills")},
+	}
+	for _, tt := range tests {
+		got := skillTargetDir("/wt", tt.provider)
+		want := filepath.Join("/wt", tt.wantSuffix)
+		if got != want {
+			t.Errorf("skillTargetDir(%q) = %q, want %q", tt.provider, got, want)
+		}
+	}
+}
+
+func TestIsScopedSkill(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"vite", false},
+		{"antfu/skills@vite", true},
+		{"jsonlee12138/prompts@eslint", true},
+		{"plain-name", false},
+	}
+	for _, tt := range tests {
+		got := isScopedSkill(tt.input)
+		if got != tt.want {
+			t.Errorf("isScopedSkill(%q) = %v, want %v", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestInstallSkillsForWorkerLocalOnly(t *testing.T) {
+	dir := t.TempDir()
+	wtPath := filepath.Join(dir, "worktree")
+	os.MkdirAll(wtPath, 0755)
+
+	// Create role skill
+	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	refDir := filepath.Join(roleDir, "references")
+	os.MkdirAll(refDir, 0755)
+	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# dev\n"), 0644)
+
+	// Create dependency skill in skills/
+	depDir := filepath.Join(dir, "skills", "vitest")
+	os.MkdirAll(depDir, 0755)
+	os.WriteFile(filepath.Join(depDir, "SKILL.md"), []byte("# vitest\n"), 0644)
+
+	// Write role.yaml with plain skills only (no scoped, so no npx calls)
+	roleYAML := "name: dev\nskills:\n  - vitest\n"
+	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte(roleYAML), 0644)
+
+	err := InstallSkillsForWorker(wtPath, dir, "dev", "claude")
+	if err != nil {
+		t.Fatalf("InstallSkillsForWorker: %v", err)
+	}
+
+	// Check role skill copied to .claude/skills/
+	claudeRole := filepath.Join(wtPath, ".claude", "skills", "dev", "SKILL.md")
+	if _, err := os.Stat(claudeRole); os.IsNotExist(err) {
+		t.Error("role skill not installed to .claude/skills/")
+	}
+
+	// Check dependency skill copied
+	claudeDep := filepath.Join(wtPath, ".claude", "skills", "vitest", "SKILL.md")
+	if _, err := os.Stat(claudeDep); os.IsNotExist(err) {
+		t.Error("dependency skill not installed to .claude/skills/")
+	}
+}
+
+func TestInstallSkillsForWorkerCodexProvider(t *testing.T) {
+	dir := t.TempDir()
+	wtPath := filepath.Join(dir, "worktree")
+	os.MkdirAll(wtPath, 0755)
+
+	// Create role skill
+	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	refDir := filepath.Join(roleDir, "references")
+	os.MkdirAll(refDir, 0755)
+	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# dev\n"), 0644)
+
+	roleYAML := "name: dev\nskills: []\n"
+	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte(roleYAML), 0644)
+
+	err := InstallSkillsForWorker(wtPath, dir, "dev", "codex")
+	if err != nil {
+		t.Fatalf("InstallSkillsForWorker: %v", err)
+	}
+
+	// Check role skill copied to .codex/skills/
+	codexRole := filepath.Join(wtPath, ".codex", "skills", "dev", "SKILL.md")
+	if _, err := os.Stat(codexRole); os.IsNotExist(err) {
+		t.Error("role skill not installed to .codex/skills/ for codex provider")
 	}
 }

@@ -231,8 +231,8 @@ def create_or_update_role(
 ) -> GenerationResult:
     validate_role_name(config.role_name)
 
-    if target_dir_name == "agents/teams":
-        base_dir = repo_root / "agents" / "teams"
+    if target_dir_name == ".agents/teams":
+        base_dir = repo_root / ".agents" / "teams"
     else:
         base_dir = repo_root / target_dir_name
     target_dir = base_dir / config.role_name
@@ -276,7 +276,7 @@ def collect_scope(values: list[str], fallback: str) -> list[str]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Create or update a role skill package under skills/<role-name>/."
+        description="Create or update a role skill package under skills/<role-name>/ or .agents/teams/<role-name>/."
     )
     parser.add_argument("--repo-root", default=".", help="Repository root path")
     parser.add_argument("--role-name", required=True, help="Role directory name in kebab-case")
@@ -326,7 +326,7 @@ def build_parser() -> argparse.ArgumentParser:
         default="skills",
         help="Target directory for the role skill package. "
         "Use 'skills' for open-source publishing (default), "
-        "'agents/teams' for team use, or a custom path.",
+        "'.agents/teams' for team use, or a custom path.",
     )
     return parser
 

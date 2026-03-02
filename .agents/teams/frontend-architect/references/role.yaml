@@ -20,11 +20,11 @@ scope:
 constraints:
   single_role_focus: true
 skills:
-  - "design-patterns-principles"
-  - "vite-tanstack"
+  - "jsonlee12138/prompts@design-patterns-principles"
+  - "jsonlee12138/prompts@vite-tanstack"
   - "antfu/skills@vite"
   - "antfu/skills@vitest"
   - "jsonlee12138/prompts@eslint-config"
-  - "jsdoc-typescript-docs"
+  - "patricio0312rev/skills@jsdoc-typescript-docs"
   - "antfu/skills@turborepo"
   - "jsonlee12138/prompts@unocss-shadcn"

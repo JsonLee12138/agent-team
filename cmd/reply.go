@@ -21,7 +21,8 @@ func newReplyCmd() *cobra.Command {
 
 func (a *App) RunReply(workerID, answer string) error {
 	root := a.Git.Root()
-	configPath := internal.WorkerConfigPath(root, workerID)
+	wtPath := internal.WtPath(root, a.WtBase, workerID)
+	configPath := internal.WorkerYAMLPath(wtPath)
 	cfg, err := internal.LoadWorkerConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("worker '%s' not found: %w", workerID, err)

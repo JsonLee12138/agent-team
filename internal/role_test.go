@@ -33,7 +33,7 @@ func TestListAvailableRoles(t *testing.T) {
 	}
 
 	// create a role with SKILL.md
-	roleDir := filepath.Join(dir, "agents", "teams", "backend")
+	roleDir := filepath.Join(dir, ".agents", "teams", "backend")
 	os.MkdirAll(roleDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# backend\n"), 0644)
 
@@ -45,20 +45,21 @@ func TestListAvailableRoles(t *testing.T) {
 
 func TestListWorkers(t *testing.T) {
 	dir := t.TempDir()
+	wtBase := ".worktrees"
 
 	// empty → no workers
-	workers := ListWorkers(dir)
+	workers := ListWorkers(dir, wtBase)
 	if len(workers) != 0 {
 		t.Errorf("ListWorkers(empty) = %v, want empty", workers)
 	}
 
-	// create a worker
-	workerDir := filepath.Join(dir, "agents", "workers", "backend-001")
-	os.MkdirAll(workerDir, 0755)
-	cfg := &WorkerConfig{WorkerID: "backend-001", Role: "backend"}
-	cfg.Save(filepath.Join(workerDir, "config.yaml"))
+	// create a worktree dir with worker.yaml
+	wtDir := filepath.Join(dir, wtBase, "backend-001")
+	os.MkdirAll(wtDir, 0755)
+	cfg := &WorkerConfig{WorkerID: "backend-001", Role: "backend", Provider: "claude"}
+	cfg.Save(WorkerYAMLPath(wtDir))
 
-	workers = ListWorkers(dir)
+	workers = ListWorkers(dir, wtBase)
 	if len(workers) != 1 || workers[0].WorkerID != "backend-001" {
 		t.Errorf("ListWorkers = %v, want [backend-001]", workers)
 	}
@@ -69,23 +70,24 @@ func TestListWorkers(t *testing.T) {
 
 func TestNextWorkerID(t *testing.T) {
 	dir := t.TempDir()
+	wtBase := ".worktrees"
 
-	// no workers → 001
-	got := NextWorkerID(dir, "frontend-dev")
+	// no worktrees → 001
+	got := NextWorkerID(dir, wtBase, "frontend-dev")
 	if got != "frontend-dev-001" {
 		t.Errorf("NextWorkerID(empty) = %q, want frontend-dev-001", got)
 	}
 
-	// create worker 001
-	os.MkdirAll(filepath.Join(dir, "agents", "workers", "frontend-dev-001"), 0755)
-	got = NextWorkerID(dir, "frontend-dev")
+	// create worktree 001
+	os.MkdirAll(filepath.Join(dir, wtBase, "frontend-dev-001"), 0755)
+	got = NextWorkerID(dir, wtBase, "frontend-dev")
 	if got != "frontend-dev-002" {
 		t.Errorf("NextWorkerID(001 exists) = %q, want frontend-dev-002", got)
 	}
 
-	// create worker 005 (gap)
-	os.MkdirAll(filepath.Join(dir, "agents", "workers", "frontend-dev-005"), 0755)
-	got = NextWorkerID(dir, "frontend-dev")
+	// create worktree 005 (gap)
+	os.MkdirAll(filepath.Join(dir, wtBase, "frontend-dev-005"), 0755)
+	got = NextWorkerID(dir, wtBase, "frontend-dev")
 	if got != "frontend-dev-006" {
 		t.Errorf("NextWorkerID(005 exists) = %q, want frontend-dev-006", got)
 	}
@@ -101,10 +103,18 @@ func TestWriteWorktreeGitignore(t *testing.T) {
 		t.Fatalf("read .gitignore: %v", err)
 	}
 	content := string(data)
-	for _, expected := range []string{".gitignore", ".claude/", ".codex/", "openspec/"} {
+	for _, expected := range []string{".gitignore", ".claude/", ".codex/", "openspec/", "worker.yaml"} {
 		if !strings.Contains(content, expected) {
 			t.Errorf(".gitignore should contain %q", expected)
 		}
+	}
+}
+
+func TestWorkerYAMLPath(t *testing.T) {
+	got := WorkerYAMLPath("/tmp/wt/dev-001")
+	want := "/tmp/wt/dev-001/worker.yaml"
+	if got != want {
+		t.Errorf("WorkerYAMLPath = %q, want %q", got, want)
 	}
 }
 
@@ -238,8 +248,8 @@ func TestInjectRolePromptV2(t *testing.T) {
 	wtPath := filepath.Join(dir, ".worktrees", "dev-001")
 	os.MkdirAll(wtPath, 0755)
 
-	// Create role system.md in agents/teams/dev/
-	roleDir := filepath.Join(dir, "agents", "teams", "dev")
+	// Create role system.md in .agents/teams/dev/
+	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
 	os.MkdirAll(roleDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# System Prompt: dev\n\nA developer role.\n"), 0644)
 
@@ -302,16 +312,50 @@ func TestInjectRolePromptNoSource(t *testing.T) {
 	}
 }
 
-func TestRolePathFunctions(t *testing.T) {
-	root := "/project"
+func TestResolveAgentsDir(t *testing.T) {
+	t.Run("returns .agents/ when exists", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
+		got := ResolveAgentsDir(dir)
+		if got != filepath.Join(dir, ".agents") {
+			t.Errorf("ResolveAgentsDir = %q, want .agents/", got)
+		}
+	})
 
-	if got := RoleDir(root, "frontend-dev"); got != "/project/agents/teams/frontend-dev" {
+	t.Run("falls back to agents/ when .agents/ missing", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, "agents"), 0755)
+		got := ResolveAgentsDir(dir)
+		if got != filepath.Join(dir, "agents") {
+			t.Errorf("ResolveAgentsDir = %q, want agents/", got)
+		}
+	})
+
+	t.Run("prefers .agents/ over agents/ when both exist", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
+		os.MkdirAll(filepath.Join(dir, "agents"), 0755)
+		got := ResolveAgentsDir(dir)
+		if got != filepath.Join(dir, ".agents") {
+			t.Errorf("ResolveAgentsDir = %q, want .agents/ (priority)", got)
+		}
+	})
+
+	t.Run("returns .agents/ when neither exists", func(t *testing.T) {
+		dir := t.TempDir()
+		got := ResolveAgentsDir(dir)
+		if got != filepath.Join(dir, ".agents") {
+			t.Errorf("ResolveAgentsDir = %q, want .agents/ (default)", got)
+		}
+	})
+}
+
+func TestRolePathFunctions(t *testing.T) {
+	// Use a temp dir with .agents/ so ResolveAgentsDir returns .agents/
+	root := t.TempDir()
+	os.MkdirAll(filepath.Join(root, ".agents"), 0755)
+
+	if got := RoleDir(root, "frontend-dev"); got != filepath.Join(root, ".agents", "teams", "frontend-dev") {
 		t.Errorf("RoleDir = %q", got)
-	}
-	if got := WorkerDir(root, "frontend-dev-001"); got != "/project/agents/workers/frontend-dev-001" {
-		t.Errorf("WorkerDir = %q", got)
-	}
-	if got := WorkerConfigPath(root, "frontend-dev-001"); got != "/project/agents/workers/frontend-dev-001/config.yaml" {
-		t.Errorf("WorkerConfigPath = %q", got)
 	}
 }

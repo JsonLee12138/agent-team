@@ -1,0 +1,33 @@
+// cmd/inject_role_prompt.go
+package cmd
+
+import (
+	"fmt"
+
+	"github.com/JsonLee12138/agent-team/internal"
+	"github.com/spf13/cobra"
+)
+
+// newInjectRolePromptCmd 返回隐藏子命令，供 session-init.sh Hook 调用。
+func newInjectRolePromptCmd() *cobra.Command {
+	var worktree, workerID, role, root string
+
+	cmd := &cobra.Command{
+		Use:    "_inject-role-prompt",
+		Hidden: true,
+		Short:  "Inject role prompt into worktree CLAUDE.md (internal, used by hooks)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if worktree == "" || workerID == "" || role == "" || root == "" {
+				return fmt.Errorf("--worktree, --worker-id, --role, and --root are all required")
+			}
+			return internal.InjectRolePrompt(worktree, workerID, role, root)
+		},
+	}
+
+	cmd.Flags().StringVar(&worktree, "worktree", "", "Path to the git worktree directory")
+	cmd.Flags().StringVar(&workerID, "worker-id", "", "Worker ID (e.g. frontend-dev-001)")
+	cmd.Flags().StringVar(&role, "role", "", "Role name (e.g. frontend-dev)")
+	cmd.Flags().StringVar(&root, "root", "", "Main project root directory")
+
+	return cmd
+}
