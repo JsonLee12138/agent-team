@@ -25,6 +25,10 @@ jobs:
           node-version: "22"
           registry-url: https://registry.npmjs.org/
 
+      - name: Upgrade npm for OIDC support
+        run: npm install -g npm@latest
+        working-directory: .
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
