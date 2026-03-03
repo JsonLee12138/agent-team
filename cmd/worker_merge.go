@@ -29,6 +29,19 @@ func (a *App) RunWorkerMerge(workerID string) error {
 		return fmt.Errorf("worker '%s' not found", workerID)
 	}
 
+	// Close running worker session before merge
+	configPath := internal.WorkerYAMLPath(wtPath)
+	cfg, cfgErr := internal.LoadWorkerConfig(configPath)
+	if cfgErr == nil && a.Session.PaneAlive(cfg.PaneID) {
+		fmt.Printf("Closing worker session (pane %s)...\n", cfg.PaneID)
+		if killErr := a.Session.KillPane(cfg.PaneID); killErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to close pane %s: %v\n", cfg.PaneID, killErr)
+		} else {
+			cfg.PaneID = ""
+			cfg.Save(configPath)
+		}
+	}
+
 	mainBranch, _ := a.Git.CurrentBranch()
 
 	fmt.Printf("Merging branch '%s' into '%s'...\n", branch, mainBranch)
