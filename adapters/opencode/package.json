@@ -26,6 +26,7 @@
     "@opencode-ai/plugin": "^0.4.45"
   },
   "devDependencies": {
+    "@types/bun": "^1.2.0",
     "typescript": "^5.7.0"
   },
   "license": "MIT"

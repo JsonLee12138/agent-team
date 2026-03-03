@@ -7,8 +7,8 @@ import type { Plugin } from "@opencode-ai/plugin"
  * Install: add "opencode-agent-team" to opencode.json plugin array.
  * Requires: `agent-team` binary in PATH.
  */
-const plugin: Plugin = async ({ $, worktree }) => {
-  const cwd = worktree || process.cwd()
+const plugin: Plugin = async ({ $ }) => {
+  const cwd = process.cwd()
 
   // Verify agent-team binary is available on load
   try {
@@ -19,44 +19,26 @@ const plugin: Plugin = async ({ $, worktree }) => {
   }
 
   return {
-    "session.created": async () => {
+    "tool.execute.before": async (input, output) => {
       try {
-        const input = JSON.stringify({ cwd })
-        await $`echo ${input} | agent-team hook session-start --provider opencode`
-      } catch {
-        // non-fatal
-      }
-    },
-
-    "session.idle": async () => {
-      try {
-        const input = JSON.stringify({ cwd })
-        await $`echo ${input} | agent-team hook teammate-idle --provider opencode`
-      } catch {
-        // non-fatal
-      }
-    },
-
-    "tool.execute.before": async (toolInput) => {
-      try {
-        const input = JSON.stringify({
+        const payload = JSON.stringify({
           cwd,
-          tool_name: toolInput.tool,
-          tool_input: toolInput.args,
+          tool_name: input.tool,
+          tool_input: output.args,
         })
-        await $`echo ${input} | agent-team hook pre-tool-use --provider opencode`
+        await $`echo ${payload} | agent-team hook pre-tool-use --provider opencode`
       } catch {
         // non-fatal
       }
     },
 
-    "tool.execute.after": async (toolInput) => {
+    "tool.execute.after": async (input) => {
       try {
-        const input = JSON.stringify({
+        const payload = JSON.stringify({
           cwd,
-          tool_name: toolInput.tool,
+          tool_name: input.tool,
         })
-        await $`echo ${input} | agent-team hook post-tool-use --provider opencode`
+        await $`echo ${payload} | agent-team hook post-tool-use --provider opencode`
       } catch {
         // non-fatal
       }
