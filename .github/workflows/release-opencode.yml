@@ -34,8 +34,10 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
           echo "Publishing version: $VERSION"
 
-      - name: Setup npm registry
-        run: npm config set registry https://registry.npmjs.org/
+      - name: Setup Node for npm publish
+        uses: actions/setup-node@v6
+        with:
+          registry-url: https://registry.npmjs.org/
 
       - name: Publish to npm
         run: npm publish --provenance --access public
