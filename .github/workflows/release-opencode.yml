@@ -19,6 +19,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          registry-url: https://registry.npmjs.org/
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
@@ -34,10 +40,5 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
           echo "Publishing version: $VERSION"
 
-      - name: Setup Node for npm publish
-        uses: actions/setup-node@v6
-        with:
-          registry-url: https://registry.npmjs.org/
-
       - name: Publish to npm
-        run: npm publish --provenance --access public
+        run: npm publish --access public
