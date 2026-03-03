@@ -14,7 +14,7 @@ func newRoleRepoCmd() *cobra.Command {
 		Use:   "role-repo",
 		Short: "Manage repository-backed role installations",
 	}
-	cmd.AddCommand(newRoleRepoSearchCmd())
+	cmd.AddCommand(newRoleRepoFindCmd())
 	cmd.AddCommand(newRoleRepoAddCmd())
 	cmd.AddCommand(newRoleRepoListCmd())
 	cmd.AddCommand(newRoleRepoRemoveCmd())

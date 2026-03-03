@@ -14,51 +14,34 @@ description: >
 
 Manages AI team workflows using a **Role + Worker** dual-layer model with git worktrees and terminal multiplexer tabs.
 
-- **Role** = a skill package definition (SKILL.md + system.md + role.yaml) stored in `agents/teams/<role-name>/`
+- **Role** = a skill package definition (SKILL.md + system.md + role.yaml) stored in `.agents/teams/<role-name>/` (project) or `~/.agents/roles/<role-name>/` (global)
 - **Worker** = a role instance running in an isolated worktree, identified by `<role-name>-<3-digit-number>`
 
 For directory layout details, see [references/details.md](references/details.md).
 
-## Install
+> **IMPORTANT — No Sandbox Mode**
+> All `agent-team` commands MUST be run **without sandbox** (i.e. with `dangerouslyDisableSandbox: true` or equivalent).
+> agent-team manages git worktrees, creates/deletes directories outside the project root, spawns terminal sessions, and writes to `~/.agents/`. These operations will fail silently or error out inside a sandboxed shell.
 
-macOS/Homebrew:
+## Install & Upgrade
 
-```bash
-brew tap JsonLee12138/agent-team && brew install agent-team
-```
+For per-provider installation and upgrade instructions (Claude Code Plugin, Gemini Extension, OpenCode npm Plugin, Codex Skill, Homebrew, Source), see [references/install-upgrade.md](references/install-upgrade.md).
 
-Source (Go 1.24+):
+**Self-install check**: If `agent-team` binary is not found, follow the install guide to get it set up.
 
-```bash
-go install github.com/JsonLee12138/agent-team@latest
-```
-
-## Upgrade
-
-### Skill
-
-Before running, MUST confirm with the user:
-
-1. **Platform**: which agent platform(s) — see [references/platforms.md](references/platforms.md)
-2. **Scope**: project-level or global
+## Project Initialization
 
 ```bash
-# Project-level
-npx skills add JsonLee12138/agent-team -a <platform> -y
-
-# Global
-npx skills add JsonLee12138/agent-team -a <platform> -y -g
+agent-team init [--global-only] [--skip-detect]
 ```
 
-### CLI
+Runs first-time setup:
 
-```bash
-# Homebrew
-brew update && brew upgrade agent-team
+1. **Detects installed providers** — checks for `claude`, `gemini`, `opencode`, `codex` binaries on PATH
+2. **Creates project structure** — `.agents/teams/` with `.gitkeep` (skipped with `--global-only`)
+3. **Installs bundled roles** — copies plugin-bundled roles to `~/.agents/roles/`, hash-compares to skip/update as needed
 
-# Source
-go install github.com/JsonLee12138/agent-team@latest
-```
+Use after initial installation or when updating the plugin to sync new bundled roles.
 
 ## Role Management (AI Workflow)
 
@@ -66,9 +49,9 @@ Roles are created and managed by AI using the **role-creator** skill. The CLI do
 
 ### Creating a Role
 
-1. Use the `/role-creator` skill with `--target-dir agents/teams`
-2. If a role already exists in global `~/.claude/skills/`, prompt user to copy it to `agents/teams/`
-3. Result: `agents/teams/<role-name>/` with SKILL.md, system.md, references/role.yaml
+1. Use the `/role-creator` skill with `--target-dir .agents/teams`
+2. If a role already exists in global `~/.agents/roles/`, prompt user to copy it to `.agents/teams/`
+3. Result: `.agents/teams/<role-name>/` with SKILL.md, system.md, references/role.yaml
 
 ### Creating a Team (Batch Role Creation from Prompt)
 
@@ -85,7 +68,7 @@ Flow:
    - QA engineer -> `qa-engineer`
    - frontend architect -> `frontend-architect`
 3. Present the draft role list and ask for one confirmation before execution.
-4. For each approved role, run the full **Creating a Role** workflow with `/role-creator --target-dir agents/teams`.
+4. For each approved role, run the full **Creating a Role** workflow with `/role-creator --target-dir .agents/teams`.
 5. Return a per-role summary: `created`, `already exists`, or `failed` (with reason).
 6. Stop after role creation. Do NOT create workers in this flow.
 
@@ -101,7 +84,42 @@ Rules:
 agent-team role list
 ```
 
-Shows all available roles in `agents/teams/`.
+Shows all available roles in `.agents/teams/`.
+
+### Finding Remote Roles
+
+```bash
+# Direct search (shows up to 6 results)
+agent-team role-repo find <query>
+
+# Interactive mode (no arguments in terminal)
+agent-team role-repo find
+```
+
+Searches GitHub for role repositories. In interactive mode, prompts for a query and offers to install the selected role.
+
+### Installing Remote Roles
+
+```bash
+agent-team role-repo add <owner/repo> [--role <name>] [-g] [-y]
+```
+
+In interactive mode (no `--global` flag), prompts for scope (Project or Global) and confirmation before installing.
+
+### Listing Installed Roles
+
+```bash
+# Show both project and global roles
+agent-team role-repo list
+
+# Show only global roles
+agent-team role-repo list -g
+
+# JSON output
+agent-team role-repo list --json
+```
+
+Displays installed roles with source, update date, and scope breakdown.
 
 ## Worker Management (CLI Commands)
 

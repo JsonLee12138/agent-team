@@ -5,15 +5,12 @@
 ### Main Repository
 
 ```
-agents/
+.agents/
   teams/
     <role-name>/                   <- role skill definition (managed by role-creator)
       SKILL.md
       system.md
       references/role.yaml
-  workers/
-    <worker-id>/                   <- worker config
-      config.yaml                  <- worker_id, role, provider, pane_id, etc.
 ```
 
 ### Worker Worktree
@@ -103,10 +100,14 @@ When `agent-team worker open` runs, it:
 
 1. Reads the role's `references/role.yaml` to get the skills list
 2. Finds each skill in:
-   - `agents/teams/<skill-name>/` (project roles)
+   - Plugin built-in `$CLAUDE_PLUGIN_ROOT/skills/` (highest priority)
+   - `.agents/teams/<skill-name>/` (project roles)
    - `skills/<skill-name>/` (project skills)
+   - `.claude/skills/<skill-name>/` (local cached)
    - `~/.claude/skills/<skill-name>/` (global skills)
 3. Copies the role skill directory and all dependency skills to:
    - `.claude/skills/<skill-name>/`
    - `.codex/skills/<skill-name>/`
-4. Both directories are kept in sync (identical content)
+   - `.opencode/skills/<skill-name>/`
+   - `.gemini/skills/<skill-name>/`
+4. All four directories are kept in sync (identical content)

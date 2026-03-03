@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/JsonLee12138/agent-team/internal"
@@ -23,7 +24,8 @@ func newRoleRepoAddCmd() *cobra.Command {
 		Short: "Install roles from a repository source",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return GetApp(cmd).RunRoleRepoAdd(cmd.InOrStdin(), cmd.OutOrStdout(), args[0], roleNames, global, listOnly, yes)
+			scopeExplicit := cmd.Flags().Changed("global")
+			return GetApp(cmd).RunRoleRepoAdd(cmd.InOrStdin(), cmd.OutOrStdout(), args[0], roleNames, global, scopeExplicit, listOnly, yes)
 		},
 	}
 	cmd.Flags().BoolVarP(&global, "global", "g", false, "Install to global scope (~/.agents/roles)")
@@ -33,8 +35,22 @@ func newRoleRepoAddCmd() *cobra.Command {
 	return cmd
 }
 
-func (a *App) RunRoleRepoAdd(in io.Reader, out io.Writer, sourceArg string, roleNames []string, global bool, listOnly bool, overwrite bool) error {
+func (a *App) RunRoleRepoAdd(in io.Reader, out io.Writer, sourceArg string, roleNames []string, global bool, scopeExplicit bool, listOnly bool, overwrite bool) error {
 	root := a.Git.Root()
+
+	// Scope selection: if --global not explicitly set and interactive, prompt
+	if !scopeExplicit && !listOnly && isInteractiveInput(in) {
+		choice, err := promptSingleChoice(in, out,
+			"Install scope:",
+			[]string{"Project (.agents/teams/)", "Global (~/.agents/roles/)"},
+			"Project (.agents/teams/)",
+		)
+		if err != nil {
+			return err
+		}
+		global = strings.HasPrefix(choice, "Global")
+	}
+
 	scope := roleRepoScopeFromFlag(global)
 	installRoot, err := internal.ResolveRoleRepoInstallRoot(root, scope)
 	if err != nil {
@@ -87,6 +103,32 @@ func (a *App) RunRoleRepoAdd(in io.Reader, out io.Writer, sourceArg string, role
 			fmt.Fprintf(out, "%s\t%s\n", role.Candidate.Name, role.Candidate.RolePath)
 		}
 		return nil
+	}
+
+	// Confirmation step: show summary and prompt before install
+	if !overwrite && isInteractiveInput(in) {
+		scopeLabel := "Project"
+		if global {
+			scopeLabel = "Global"
+		}
+		fmt.Fprintf(out, "\nInstall summary:\n")
+		fmt.Fprintf(out, "  Source: %s\n", source.FullName())
+		fmt.Fprintf(out, "  Scope:  %s (%s)\n", scopeLabel, installRoot)
+		fmt.Fprintf(out, "  Roles:  ")
+		names := make([]string, len(selected))
+		for i, r := range selected {
+			names[i] = r.Candidate.Name
+		}
+		fmt.Fprintf(out, "%s\n\n", strings.Join(names, ", "))
+
+		confirmed, err := promptConfirm(in, out, "Proceed with installation?")
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			fmt.Fprintln(out, "Installation cancelled.")
+			return nil
+		}
 	}
 
 	now := time.Now().UTC()

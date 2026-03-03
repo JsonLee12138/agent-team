@@ -292,62 +292,6 @@ func CopyDirPublic(src, dst string) error {
 	return copyDir(src, dst)
 }
 
-// BridgeSkillsForProvider creates symlinks from .agents/teams/, ~/.agents/roles/,
-// and the plugin skills/ directory into the provider's skill scan directory.
-// Only directories containing SKILL.md are bridged. Existing entries are not overwritten.
-// This is needed for providers like OpenCode whose scan paths don't include
-// .agents/teams/ or the plugin's skills/ directory.
-func BridgeSkillsForProvider(cwd, provider string) error {
-	targetDir := skillTargetDir(cwd, provider)
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
-		return fmt.Errorf("create target dir: %w", err)
-	}
-
-	// Source directories: plugin skills + project roles + global roles
-	sources := []string{
-		filepath.Join(cwd, "skills"),
-		filepath.Join(ResolveAgentsDir(cwd), "teams"),
-	}
-	if globalDir, err := GlobalRolesDir(); err == nil {
-		sources = append(sources, globalDir)
-	}
-
-	bridged := 0
-	for _, srcDir := range sources {
-		entries, err := os.ReadDir(srcDir)
-		if err != nil {
-			continue
-		}
-
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				continue
-			}
-
-			src := filepath.Join(srcDir, entry.Name())
-			if _, err := os.Stat(filepath.Join(src, "SKILL.md")); os.IsNotExist(err) {
-				continue
-			}
-
-			dest := filepath.Join(targetDir, entry.Name())
-			if _, err := os.Lstat(dest); err == nil {
-				continue
-			}
-
-			if err := os.Symlink(src, dest); err != nil {
-				fmt.Fprintf(os.Stderr, "[agent-team] bridge-skills: symlink %s → %s: %v\n", src, dest, err)
-				continue
-			}
-			bridged++
-		}
-	}
-
-	if bridged > 0 {
-		fmt.Fprintf(os.Stderr, "[agent-team] bridge-skills: linked %d skill(s) to %s\n", bridged, targetDir)
-	}
-	return nil
-}
-
 // copyDir recursively copies a directory.
 func copyDir(src, dst string) error {
 	// Remove destination if it exists to ensure a clean copy

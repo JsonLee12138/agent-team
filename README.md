@@ -49,6 +49,37 @@ Typical flow:
 
 **Note:** Installation differs by provider. Choose the section for your AI tool.
 
+### AI Self-Install (Recommended)
+
+Let your AI agent install and set up agent-team itself. Two steps:
+
+**Step 1: Install the skill** — gives the AI the knowledge it needs.
+
+```bash
+# Claude Code
+npx skills add JsonLee12138/agent-team -a claude -y
+
+# Gemini CLI
+npx skills add JsonLee12138/agent-team -a gemini -y
+
+# OpenCode
+npx skills add JsonLee12138/agent-team -a opencode -y
+
+# Codex
+npx skills add JsonLee12138/agent-team -a codex -y
+
+# All supported platforms at once
+npx skills add JsonLee12138/agent-team -a '*' -y
+```
+
+**Step 2: Ask the AI to install and initialize.**
+
+> "Install agent-team and initialize the project."
+
+The AI will read the skill instructions, install the binary, and run `agent-team init` to complete setup — no manual steps needed.
+
+---
+
 ### Claude Code (via Plugin Marketplace)
 
 ```bash

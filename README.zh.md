@@ -49,6 +49,37 @@
 
 **注意：** 安装方式因 provider 而异，请选择你使用的 AI 工具对应的章节。
 
+### AI 自助安装（推荐）
+
+让 AI 自行完成 agent-team 的安装和配置，只需两步：
+
+**第 1 步：安装 skill** — 让 AI 获得安装所需的知识。
+
+```bash
+# Claude Code
+npx skills add JsonLee12138/agent-team -a claude -y
+
+# Gemini CLI
+npx skills add JsonLee12138/agent-team -a gemini -y
+
+# OpenCode
+npx skills add JsonLee12138/agent-team -a opencode -y
+
+# Codex
+npx skills add JsonLee12138/agent-team -a codex -y
+
+# 一次性安装到所有平台
+npx skills add JsonLee12138/agent-team -a '*' -y
+```
+
+**第 2 步：让 AI 安装并初始化。**
+
+> "安装 agent-team 并初始化项目。"
+
+AI 会读取 skill 中的说明，自动安装二进制文件并执行 `agent-team init` 完成配置 — 无需手动操作。
+
+---
+
 ### Claude Code（插件市场安装）
 
 ```bash
