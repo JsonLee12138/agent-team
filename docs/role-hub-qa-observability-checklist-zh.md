@@ -1,9 +1,9 @@
 # role-hub QA/可观测性基线检查单（M7）
 
-> 版本：v1.0 | 更新日期：2026-03-04
+> 版本：v1.1 | 更新日期：2026-03-04
 > 角色：QA/可观测性工程师（worker-6）
 > 依赖：M1~M6 构建产物
-> 主控决策：直接上线（无灰度）、安装量公开、Ingest 为公开接口+防滥用
+> 主控决策：直接上线（无灰度）、安装量公开、Ingest 为公开接口+防滥用、不做旧 payload 兼容
 
 ---
 
@@ -47,6 +47,13 @@
 | T-ING-08 | 公开接口防滥用：速率限制 | 超限返回 429 Too Many Requests | P0 | 按 IP/sender 限流生效 |
 | T-ING-09 | 公开接口防滥用：载荷大小限制 | 超限返回 413 Payload Too Large | P1 | 拒绝异常大请求 |
 | T-ING-10 | 并发大量请求（负载测试） | 成功率 >95%，无数据丢失 | P0 | 压测报告确认 |
+| T-ING-11 | 旧协议 payload：请求体含 `roles[]` 字段 | 400 Bad Request，error_code=`UNSUPPORTED_PAYLOAD_VERSION` | P0 | 返回结构化错误含升级提示 |
+| T-ING-12 | 旧协议 payload：`roles[]` + 合法 HMAC | 仍返回 400（不因签名合法而接受旧格式） | P0 | 安全校验先于协议校验不影响拒绝结果 |
+| T-ING-13 | 新协议 payload：请求体使用 `candidates[]` 字段 | 202 Accepted，正常处理 | P0 | 新协议字段被正确解析 |
+| T-ING-14 | 混合 payload：同时含 `roles[]` 和 `candidates[]` | 400 Bad Request，error_code=`UNSUPPORTED_PAYLOAD_VERSION` | P0 | 存在旧字段即拒绝，不做部分兼容 |
+| T-ING-15 | 新协议契约校验：`candidates[]` 各必填字段完整 | 202 Accepted | P0 | 按新契约校验规则通过 |
+| T-ING-16 | 新协议契约校验：`candidates[]` 缺少必填字段 | 400 Bad Request，error_code=`VALIDATION_ERROR` | P0 | 返回具体缺失字段名 |
+| T-ING-17 | 新协议契约校验：`candidates[]` 字段值超出约束 | 400 Bad Request，error_code=`VALIDATION_ERROR` | P0 | 返回具体违规字段与约束说明 |
 
 ### 1.3 Normalize Worker（M4）
 
@@ -87,6 +94,7 @@
 | T-E2E-04 | GitHub 限流下全链路表现 | M4→M5 | Normalize 退避重试；Query 返回已有数据 | P0 |
 | T-E2E-05 | Ingest API 被滥用攻击 | M2 | 速率限制生效，正常流量不受影响 | P0 |
 | T-E2E-06 | request_id 全链路追踪 | M1→M2→M4→M5 | 同一 request_id 贯穿所有日志 | P0 |
+| T-E2E-07 | 旧版 CLI 发送 `roles[]` payload | M1→M2 | Ingest 返回 400+UNSUPPORTED_PAYLOAD_VERSION，CLI 静默处理不崩溃 | P0 |
 
 ---
 
@@ -101,6 +109,9 @@
 | `ingest_latency_p95` | 请求处理耗时 P95 | < 500ms | `ingest_events.latency_ms` |
 | `ingest_latency_p99` | 请求处理耗时 P99 | < 1000ms | `ingest_events.latency_ms` |
 | `ingest_error_distribution` | 按 error_code 分组统计 | 无主导错误码 | `ingest_events.error_code` |
+| `ingest_4xx_by_error_code` | 4xx 响应按 error_code 分组计数/分钟 | 监控趋势 | `ingest_events.error_code` + HTTP status |
+| `ingest_unsupported_payload_ratio` | `UNSUPPORTED_PAYLOAD_VERSION` 占总 4xx 比例 | 上线初期可能偏高，持续下降为健康 | `ingest_events.error_code` |
+| `ingest_validation_error_ratio` | `VALIDATION_ERROR` 占总请求比例 | < 5% | `ingest_events.error_code` |
 | `ingest_ratelimit_rejections` | 429 响应数/分钟 | 监控趋势 | API 网关日志 |
 | `ingest_request_volume` | 每分钟请求量 | 基线参考 | API 网关日志 |
 
@@ -164,6 +175,7 @@
 | NormalizeHighRetryRate | `normalize_retry_rate > 20%` | 连续 30 分钟 | Slack #alerts | 检查 GitHub API 可用性 |
 | QueryLatencyDegraded | `query_list_latency_p95 > 500ms` | 连续 10 分钟 | Slack #alerts | 检查查询计划、索引命中 |
 | DataFreshnessDegraded | `data_freshness_p95 > 60 min` | 连续 30 分钟 | Slack #alerts | 检查 Normalize Worker 处理效率 |
+| UnsupportedPayloadHigh | `ingest_unsupported_payload_ratio > 30%` 且 `UNSUPPORTED_PAYLOAD_VERSION` 绝对量 > 50/h | 连续 1 小时 | Slack #alerts | 排查是否有大量旧版 CLI 未升级 |
 
 ### 3.3 Info（记录观察，无需立即行动）
 
@@ -172,6 +184,7 @@
 | IngestVolumeAnomaly | 请求量偏离基线 ±50% | Slack #monitoring | 流量模式变化 |
 | NewSenderDetected | 出现新的 sender 标识 | 日志 | 新 CLI 版本或新用户接入 |
 | StatusDistributionShift | invalid/unreachable 占比 >30% | Slack #monitoring | 数据质量风险 |
+| UnsupportedPayloadDetected | 出现 `UNSUPPORTED_PAYLOAD_VERSION` 错误 | Slack #monitoring | 旧版 CLI 仍在使用，跟踪升级进度 |
 
 ---
 
@@ -221,10 +234,10 @@
 ### 5.1 功能回归
 
 - [ ] T-CLI-01~06：CLI 异步上报全场景通过
-- [ ] T-ING-01~10：Ingest API 全场景通过
+- [ ] T-ING-01~17：Ingest API 全场景通过（含旧 payload 拒绝与新协议契约校验）
 - [ ] T-NRM-01~09：Normalize Worker 全场景通过
 - [ ] T-QRY-01~10：Query API 全场景通过
-- [ ] T-E2E-01~06：全链路 E2E 场景通过
+- [ ] T-E2E-01~07：全链路 E2E 场景通过（含旧版 CLI 兼容性）
 
 ### 5.2 性能回归
 
@@ -239,6 +252,8 @@
 - [ ] 时间窗口校验拒绝过期请求
 - [ ] 速率限制对异常流量生效
 - [ ] 载荷大小限制生效
+- [ ] 旧协议 `roles[]` payload 返回 400+`UNSUPPORTED_PAYLOAD_VERSION`
+- [ ] 新协议 `candidates[]` 契约校验规则正确
 - [ ] 无 SQL 注入风险（参数化查询）
 - [ ] 无敏感信息泄露（日志脱敏）
 
@@ -316,6 +331,7 @@
 - [ ] 数据新鲜度 P95 < 30 分钟
 - [ ] 安装量计数功能正常
 - [ ] 无公开接口滥用迹象
+- [ ] `UNSUPPORTED_PAYLOAD_VERSION` 比例趋势下降（旧版 CLI 逐步升级）
 
 #### 第一周（稳定性确认）
 - [ ] 连续 7 天无 Critical 告警
@@ -353,6 +369,8 @@
 │ [Ingest 成功率时序图 - 24h]                              │
 ├────────────────────────────┬────────────────────────────┤
 │ [请求量时序图 - 24h]       │ [错误分布饼图]              │
+├────────────────────────────┼────────────────────────────┤
+│ [4xx 按 error_code 拆分]   │ [UNSUPPORTED_PAYLOAD 趋势] │
 ├────────────────────────────┴────────────────────────────┤
 │ [状态分布 - verified/invalid/unreachable/discovered]     │
 ├─────────────────────────────────────────────────────────┤
@@ -365,6 +383,8 @@
 - Ingest 请求量（按 sender 分组）
 - 延迟分布（P50/P95/P99 时序）
 - 错误码分布（堆叠柱状图）
+- **4xx 响应按 error_code 拆分（堆叠面积图，突出 `UNSUPPORTED_PAYLOAD_VERSION` 占比）**
+- **`UNSUPPORTED_PAYLOAD_VERSION` 趋势（独立时序线，含日/周同比）**
 - 幂等命中率
 - 速率限制触发详情（按 IP/sender）
 - 载荷大小分布
@@ -398,6 +418,8 @@
 3. 若多为 `HMAC_INVALID` → 检查是否存在异常请求来源（防滥用）
 4. 若多为 `PAYLOAD_ERROR` → 检查是否有 CLI 版本异常
 5. 若多为 `RATE_LIMITED` → 评估限流阈值是否过严
+6. 若多为 `UNSUPPORTED_PAYLOAD_VERSION` → 旧版 CLI 未升级，通知用户更新 CLI 版本
+7. 若多为 `VALIDATION_ERROR` → 检查新协议契约字段约束是否过严
 
 **处置**：
 - DB 问题：联系 Neon 支持或检查连接池配置
@@ -465,7 +487,7 @@
 | 前缀 | 模块 | 范围 |
 |------|------|------|
 | T-CLI | CLI 异步上报 | T-CLI-01 ~ T-CLI-06 |
-| T-ING | Ingest API | T-ING-01 ~ T-ING-10 |
+| T-ING | Ingest API | T-ING-01 ~ T-ING-17 |
 | T-NRM | Normalize Worker | T-NRM-01 ~ T-NRM-09 |
 | T-QRY | Query API | T-QRY-01 ~ T-QRY-10 |
-| T-E2E | 全链路 E2E | T-E2E-01 ~ T-E2E-06 |
+| T-E2E | 全链路 E2E | T-E2E-01 ~ T-E2E-07 |
