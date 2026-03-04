@@ -91,4 +91,5 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(newInjectRolePromptCmd())
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newHookCmd())
+	rootCmd.AddCommand(newCatalogCmd())
 }
