@@ -17,5 +17,6 @@ func newCatalogCmd() *cobra.Command {
 	cmd.AddCommand(newCatalogNormalizeCmd())
 	cmd.AddCommand(newCatalogStatsCmd())
 	cmd.AddCommand(newCatalogDiscoverCmd())
+	cmd.AddCommand(newCatalogServeCmd())
 	return cmd
 }
