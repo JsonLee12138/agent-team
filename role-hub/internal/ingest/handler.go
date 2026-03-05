@@ -8,6 +8,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,7 +19,7 @@ import (
 type Store interface {
 	GetIngestEvent(ctx context.Context, key string) (*storage.IngestEvent, error)
 	InsertIngestEvent(ctx context.Context, key string, responseCode int, responseBody []byte) error
-	UpsertRoleRecord(ctx context.Context, record storage.RoleRecord) error
+	UpsertRoleRecords(ctx context.Context, records []storage.RoleRecord) []error
 }
 
 type Handler struct {
@@ -26,14 +28,20 @@ type Handler struct {
 	maxResults    int
 	rateLimiter   *RateLimiter
 	cleanupTicker *time.Ticker
+	inflight      chan struct{}
+	dbTimeout     time.Duration
 }
 
-func NewHandler(store Store, maxBodyBytes int64, maxResults int, limiter *RateLimiter) *Handler {
+func NewHandler(store Store, maxBodyBytes int64, maxResults int, limiter *RateLimiter, maxInflight int, dbTimeout time.Duration) *Handler {
 	h := &Handler{
 		store:        store,
 		maxBodyBytes: maxBodyBytes,
 		maxResults:   maxResults,
 		rateLimiter:  limiter,
+		dbTimeout:    dbTimeout,
+	}
+	if maxInflight > 0 {
+		h.inflight = make(chan struct{}, maxInflight)
 	}
 	if limiter != nil {
 		h.cleanupTicker = time.NewTicker(10 * time.Minute)
@@ -63,7 +71,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if isLegacyPayload(payload) {
+	rawMap, rawErr := decodeRaw(payload)
+	if rawErr == nil && isLegacyPayload(rawMap) {
 		writeError(w, http.StatusBadRequest, "UNSUPPORTED_PAYLOAD_VERSION", "legacy roles[] payload is not supported", nil)
 		return
 	}
@@ -84,9 +93,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	missingFields := []string(nil)
+	if rawErr == nil {
+		missingFields = findMissingFields(rawMap)
+	}
 	issues := ValidateRequest(req, h.maxResults)
-	if len(issues) > 0 {
-		writeError(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "payload validation failed", issues)
+	if len(issues) > 0 || len(missingFields) > 0 {
+		writeErrorWithMissing(w, http.StatusUnprocessableEntity, "VALIDATION_ERROR", "payload validation failed", issues, missingFields)
 		return
 	}
 
@@ -104,13 +117,26 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := h.process(r.Context(), req)
+	if !h.acquireInflight() {
+		writeError(w, http.StatusTooManyRequests, "CONCURRENCY_LIMIT", "too many concurrent requests", nil)
+		return
+	}
+	defer h.releaseInflight()
+
+	ctx := r.Context()
+	if h.dbTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, h.dbTimeout)
+		defer cancel()
+	}
+
+	resp := h.process(ctx, req)
 	body, err := json.Marshal(resp)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to encode response", nil)
 		return
 	}
-	if err := h.store.InsertIngestEvent(r.Context(), req.IdempotencyKey, http.StatusOK, body); err != nil {
+	if err := h.store.InsertIngestEvent(ctx, req.IdempotencyKey, http.StatusOK, body); err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to persist idempotency", nil)
 		return
 	}
@@ -127,9 +153,17 @@ func (h *Handler) process(ctx context.Context, req IngestRequest) IngestResponse
 		IdempotencyKey: req.IdempotencyKey,
 	}
 
+	records := make([]storage.RoleRecord, 0, len(req.Results))
+	for _, result := range req.Results {
+		records = append(records, mapToRecord(result))
+	}
+	errs := h.store.UpsertRoleRecords(ctx, records)
 	for i, result := range req.Results {
-		record := mapToRecord(result)
-		if err := h.store.UpsertRoleRecord(ctx, record); err != nil {
+		var err error
+		if i < len(errs) {
+			err = errs[i]
+		}
+		if err != nil {
 			resp.Rejected++
 			resp.Errors = append(resp.Errors, IngestFailure{Index: i, Repo: result.Repo, Message: "upsert failed"})
 			continue
@@ -158,11 +192,15 @@ func mapToRecord(result IngestResult) storage.RoleRecord {
 	}
 }
 
-func isLegacyPayload(payload []byte) bool {
+func decodeRaw(payload []byte) (map[string]json.RawMessage, error) {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(payload, &raw); err != nil {
-		return false
+		return nil, err
 	}
+	return raw, nil
+}
+
+func isLegacyPayload(raw map[string]json.RawMessage) bool {
 	_, ok := raw["roles"]
 	return ok
 }
@@ -181,6 +219,40 @@ func writeError(w http.ResponseWriter, status int, code, message string, details
 	_, _ = w.Write(body)
 }
 
+func writeErrorWithMissing(w http.ResponseWriter, status int, code, message string, details []FieldDetail, missing []string) {
+	if len(missing) == 0 {
+		writeError(w, status, code, message, details)
+		return
+	}
+	resp := ErrorResponse{Error: ErrorBody{Code: code, Message: message, Details: details, MissingFields: missing}}
+	body, _ := json.Marshal(resp)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write(body)
+}
+
+func (h *Handler) acquireInflight() bool {
+	if h.inflight == nil {
+		return true
+	}
+	select {
+	case h.inflight <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (h *Handler) releaseInflight() {
+	if h.inflight == nil {
+		return
+	}
+	select {
+	case <-h.inflight:
+	default:
+	}
+}
+
 func clientKey(r *http.Request) string {
 	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
 		parts := strings.Split(forwarded, ",")
@@ -194,4 +266,49 @@ func clientKey(r *http.Request) string {
 		return host
 	}
 	return r.RemoteAddr
+}
+
+func findMissingFields(raw map[string]json.RawMessage) []string {
+	missing := make(map[string]struct{})
+	checkRequired(raw, missing, "idempotency_key", "trace_id", "timestamp", "query", "result_count", "results")
+
+	if rawResults, ok := raw["results"]; ok && !isMissing(rawResults) {
+		var items []map[string]json.RawMessage
+		if err := json.Unmarshal(rawResults, &items); err == nil {
+			for i, item := range items {
+				prefix := "results[" + strconv.Itoa(i) + "]"
+				checkRequired(item, missing, prefix+".repo", prefix+".role_path")
+			}
+		}
+	}
+
+	if len(missing) == 0 {
+		return nil
+	}
+	ordered := make([]string, 0, len(missing))
+	for field := range missing {
+		ordered = append(ordered, field)
+	}
+	sort.Strings(ordered)
+	return ordered
+}
+
+func checkRequired(raw map[string]json.RawMessage, missing map[string]struct{}, fields ...string) {
+	for _, field := range fields {
+		key := field
+		if dot := strings.LastIndex(field, "."); dot != -1 {
+			key = field[dot+1:]
+		}
+		if val, ok := raw[key]; !ok || isMissing(val) {
+			missing[field] = struct{}{}
+		}
+	}
+}
+
+func isMissing(raw json.RawMessage) bool {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return true
+	}
+	trimmed := bytes.TrimSpace(raw)
+	return bytes.Equal(trimmed, []byte("null"))
 }

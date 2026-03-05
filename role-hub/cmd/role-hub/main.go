@@ -56,6 +56,12 @@ func runServe() error {
 		return err
 	}
 	defer db.Close()
+	storage.ConfigurePool(db, storage.PoolOptions{
+		MaxOpenConns: cfg.DBMaxOpenConns,
+		MaxIdleConns: cfg.DBMaxIdleConns,
+		MaxLifetime:  cfg.DBConnMaxLife,
+		MaxIdleTime:  cfg.DBConnMaxIdle,
+	})
 
 	if err := storage.ApplyMigrations(ctx, db, cfg.DBDialect); err != nil {
 		return err
@@ -67,7 +73,7 @@ func runServe() error {
 	}
 
 	limiter := ingest.NewRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst)
-	handler := ingest.NewHandler(store, cfg.MaxBodyBytes, cfg.MaxResultsCount, limiter)
+	handler := ingest.NewHandler(store, cfg.MaxBodyBytes, cfg.MaxResultsCount, limiter, cfg.MaxInflight, cfg.DBTimeout)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/v1/ingest", handler)
@@ -102,6 +108,12 @@ func runMigrate() error {
 		return err
 	}
 	defer db.Close()
+	storage.ConfigurePool(db, storage.PoolOptions{
+		MaxOpenConns: cfg.DBMaxOpenConns,
+		MaxIdleConns: cfg.DBMaxIdleConns,
+		MaxLifetime:  cfg.DBConnMaxLife,
+		MaxIdleTime:  cfg.DBConnMaxIdle,
+	})
 
 	if err := storage.ApplyMigrations(ctx, db, cfg.DBDialect); err != nil {
 		return err

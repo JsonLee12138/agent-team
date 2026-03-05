@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/JsonLee12138/agent-team/role-hub/internal/storage"
 )
@@ -31,7 +32,7 @@ func setupTestStore(t *testing.T) *storage.Store {
 func TestIngestHandler_AcceptsNewPayload(t *testing.T) {
 	store := setupTestStore(t)
 	limiter := NewRateLimiter(10, 10)
-	handler := NewHandler(store, 1<<20, 100, limiter)
+	handler := NewHandler(store, 1<<20, 100, limiter, 10, time.Second)
 
 	payload := IngestRequest{
 		IdempotencyKey: "idem-1",
@@ -65,7 +66,7 @@ func TestIngestHandler_AcceptsNewPayload(t *testing.T) {
 
 func TestIngestHandler_RejectsLegacyPayload(t *testing.T) {
 	store := setupTestStore(t)
-	handler := NewHandler(store, 1<<20, 100, nil)
+	handler := NewHandler(store, 1<<20, 100, nil, 10, time.Second)
 
 	legacy := []byte(`{"roles":[{"name":"legacy"}]}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/ingest", bytes.NewReader(legacy))
@@ -82,7 +83,7 @@ func TestIngestHandler_RejectsLegacyPayload(t *testing.T) {
 
 func TestIngestHandler_Idempotency(t *testing.T) {
 	store := setupTestStore(t)
-	handler := NewHandler(store, 1<<20, 100, nil)
+	handler := NewHandler(store, 1<<20, 100, nil, 10, time.Second)
 
 	payload := IngestRequest{
 		IdempotencyKey: "idem-2",
@@ -111,7 +112,7 @@ func TestIngestHandler_Idempotency(t *testing.T) {
 func TestIngestHandler_RateLimit(t *testing.T) {
 	store := setupTestStore(t)
 	limiter := NewRateLimiter(0.1, 1)
-	handler := NewHandler(store, 1<<20, 100, limiter)
+	handler := NewHandler(store, 1<<20, 100, limiter, 10, time.Second)
 
 	payload := IngestRequest{
 		IdempotencyKey: "idem-3",
@@ -141,5 +142,34 @@ func TestIngestHandler_RateLimit(t *testing.T) {
 	handler.ServeHTTP(w2, req2)
 	if w2.Code != http.StatusTooManyRequests {
 		t.Fatalf("second status = %d", w2.Code)
+	}
+}
+
+func TestIngestHandler_MissingFields(t *testing.T) {
+	store := setupTestStore(t)
+	handler := NewHandler(store, 1<<20, 100, nil, 10, time.Second)
+
+	payload := []byte(`{
+		"trace_id":"trace-1",
+		"timestamp":"2026-03-05T00:00:00Z",
+		"query":"search",
+		"result_count":1,
+		"results":[{"role_path":"skills/backend"}]
+	}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/ingest", bytes.NewReader(payload))
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte("\"missing_fields\"")) {
+		t.Fatalf("expected missing_fields in response, got %s", w.Body.String())
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte("idempotency_key")) {
+		t.Fatalf("expected idempotency_key missing, got %s", w.Body.String())
+	}
+	if !bytes.Contains(w.Body.Bytes(), []byte("results[0].repo")) {
+		t.Fatalf("expected results[0].repo missing, got %s", w.Body.String())
 	}
 }

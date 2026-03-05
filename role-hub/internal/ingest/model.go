@@ -40,9 +40,10 @@ type ErrorResponse struct {
 }
 
 type ErrorBody struct {
-	Code    string        `json:"code"`
-	Message string        `json:"message"`
-	Details []FieldDetail `json:"details,omitempty"`
+	Code          string        `json:"code"`
+	Message       string        `json:"message"`
+	Details       []FieldDetail `json:"details,omitempty"`
+	MissingFields []string      `json:"missing_fields,omitempty"`
 }
 
 type FieldDetail struct {

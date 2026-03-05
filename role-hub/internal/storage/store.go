@@ -76,28 +76,69 @@ func (s *Store) InsertIngestEvent(ctx context.Context, key string, responseCode 
 	return err
 }
 
-func (s *Store) UpsertRoleRecord(ctx context.Context, record RoleRecord) error {
-	var tagsJSON any
-	if record.Tags != nil {
-		encoded, err := json.Marshal(record.Tags)
-		if err != nil {
-			return err
-		}
-		tagsJSON = string(encoded)
-	} else {
-		tagsJSON = nil
+func (s *Store) UpsertRoleRecords(ctx context.Context, records []RoleRecord) []error {
+	if len(records) == 0 {
+		return nil
 	}
-	_, err := s.db.ExecContext(ctx, s.stmtUpsertRole,
-		record.RepoOwner,
-		record.RepoName,
-		record.RolePath,
-		record.Name,
-		record.Description,
-		record.SourceURL,
-		record.Score,
-		tagsJSON,
-	)
-	return err
+	errs := make([]error, len(records))
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		for i := range errs {
+			errs[i] = err
+		}
+		return errs
+	}
+
+	stmt, err := tx.PrepareContext(ctx, s.stmtUpsertRole)
+	if err != nil {
+		_ = tx.Rollback()
+		for i := range errs {
+			errs[i] = err
+		}
+		return errs
+	}
+	defer stmt.Close()
+
+	for i, record := range records {
+		tagsJSON, err := encodeTags(record.Tags)
+		if err != nil {
+			errs[i] = err
+			continue
+		}
+		if _, err := stmt.ExecContext(ctx,
+			record.RepoOwner,
+			record.RepoName,
+			record.RolePath,
+			record.Name,
+			record.Description,
+			record.SourceURL,
+			record.Score,
+			tagsJSON,
+		); err != nil {
+			errs[i] = err
+		}
+	}
+
+	if commitErr := tx.Commit(); commitErr != nil {
+		for i := range errs {
+			if errs[i] == nil {
+				errs[i] = commitErr
+			}
+		}
+	}
+	return errs
+}
+
+func encodeTags(tags []string) (any, error) {
+	if tags == nil {
+		return nil, nil
+	}
+	encoded, err := json.Marshal(tags)
+	if err != nil {
+		return nil, err
+	}
+	return string(encoded), nil
 }
 
 // RoleRecord is the normalized storage shape.

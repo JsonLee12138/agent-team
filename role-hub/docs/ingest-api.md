@@ -60,6 +60,7 @@ If some rows fail upsert, `rejected` is incremented and `errors` includes per-ro
 - `400 UNSUPPORTED_PAYLOAD_VERSION`: legacy `roles[]` payload
 - `422 VALIDATION_ERROR`: field validation failed
 - `429 RATE_LIMITED`: too many requests
+- `429 CONCURRENCY_LIMIT`: too many concurrent requests
 
 Example:
 
@@ -68,6 +69,7 @@ Example:
   "error": {
     "code": "VALIDATION_ERROR",
     "message": "payload validation failed",
+    "missing_fields": ["idempotency_key", "results[0].repo"],
     "details": [
       {"field": "results[0].repo", "message": "must be owner/repo"}
     ]
@@ -81,12 +83,28 @@ Example:
 export ROLE_HUB_DB_DIALECT=sqlite
 export ROLE_HUB_DB_DSN='file:rolehub.db?cache=shared'
 export ROLE_HUB_HTTP_ADDR=':8080'
+export ROLE_HUB_DB_MAX_OPEN_CONNS=20
+export ROLE_HUB_DB_MAX_IDLE_CONNS=10
+export ROLE_HUB_DB_CONN_MAX_LIFETIME=30m
+export ROLE_HUB_DB_CONN_MAX_IDLE_TIME=5m
+export ROLE_HUB_DB_TIMEOUT=3s
+export ROLE_HUB_MAX_INFLIGHT=100
 
 cd role-hub
 
 go run ./cmd/role-hub migrate
 
 go run ./cmd/role-hub serve
+```
+
+## Load Test
+
+```bash
+ROLE_HUB_LOADTEST_TARGET=http://localhost:8080/api/v1/ingest \\
+ROLE_HUB_LOADTEST_REQUESTS=500 \\
+ROLE_HUB_LOADTEST_CONCURRENCY=50 \\
+ROLE_HUB_LOADTEST_TIMEOUT=5s \\
+go run ./cmd/loadtest
 ```
 
 ## cURL Example
