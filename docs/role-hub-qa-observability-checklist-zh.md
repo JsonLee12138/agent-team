@@ -1,15 +1,16 @@
 # role-hub QA/可观测性基线检查单（M7）
 
-> 版本：v1.1 | 更新日期：2026-03-04
+> 版本：v1.2 | 更新日期：2026-03-05
 > 角色：QA/可观测性工程师（worker-6）
 > 依赖：M1~M6 构建产物
 > 主控决策：直接上线（无灰度）、安装量公开、Ingest 为公开接口+防滥用、不做旧 payload 兼容
+> 变更摘要（v1.2）：新增 Frontend（M6）测试矩阵（T-FE-01~09）、全链路 E2E 新增含 Frontend 场景（T-E2E-08~10）、新增 Frontend 指标与告警、更新回归/发布检查单
 
 ---
 
 ## 目录
 
-1. [测试矩阵](#1-测试矩阵cliingestnormalizequery)
+1. [测试矩阵](#1-测试矩阵cliingestnormalizequeryfrontend)
 2. [核心指标定义](#2-核心指标定义)
 3. [告警规则与阈值](#3-告警规则与阈值)
 4. [日志规范与链路追踪](#4-日志规范与链路追踪)
@@ -20,7 +21,7 @@
 
 ---
 
-## 1. 测试矩阵（CLI→Ingest→Normalize→Query）
+## 1. 测试矩阵（CLI→Ingest→Normalize→Query→Frontend）
 
 ### 1.1 CLI 异步上报（M1）
 
@@ -84,7 +85,21 @@
 | T-QRY-09 | 空结果查询 | 返回空数组，非 500 | P0 | 正确的空态响应 |
 | T-QRY-10 | 安装量字段返回 | `install_count` 正确返回 | P0 | 安装量公开决策，数值准确 |
 
-### 1.5 全链路 E2E 场景
+### 1.5 Frontend（M6）
+
+| 编号 | 场景 | 预期结果 | 优先级 | 验收标准 |
+|------|------|----------|--------|----------|
+| T-FE-01 | 角色列表页初始加载 | 从 Query API 获取数据并渲染列表 | P0 | 首屏内容在 2 秒内可见（LCP ≤ 2s）；仅展示 `verified` 角色 |
+| T-FE-02 | 关键词搜索交互 | 输入关键词触发 Query API 查询，实时更新列表 | P0 | 防抖 ≥ 300ms；搜索结果与 Query API 返回一致 |
+| T-FE-03 | 筛选器（作用域/来源/更新时间） | 筛选条件正确传递给 Query API，列表刷新 | P0 | 筛选结果与 API 返回一致；筛选状态 URL 可分享 |
+| T-FE-04 | 分页/加载更多 | 正确调用 offset/limit，无数据重复或遗漏 | P0 | 边界值通过（最后一页显示正确条数） |
+| T-FE-05 | 角色详情页展示 | 展示完整元数据：名称、描述、安装命令、来源仓库、安装量 | P0 | 安装量字段正确展示（公开决策） |
+| T-FE-06 | Query API 错误时的降级展示 | 当 Query API 返回 5xx 时，显示错误提示，不空白崩溃 | P0 | 用户可见错误信息；无 JS 未捕获异常 |
+| T-FE-07 | Query API 慢响应下的 Loading 状态 | 超过 500ms 未返回时显示 Loading 骨架屏 | P1 | 骨架屏正常展示，完成后正确渲染内容 |
+| T-FE-08 | 安装命令一键复制 | 点击复制按钮，命令写入剪贴板 | P1 | Clipboard API 成功调用；复制内容与 API 返回 `install_cmd` 一致 |
+| T-FE-09 | 空结果态展示 | 无匹配角色时展示空态 UI | P0 | 不显示 spinner 或空白页；有引导文案 |
+
+### 1.6 全链路 E2E 场景
 
 | 编号 | 场景 | 覆盖模块 | 预期结果 | 优先级 |
 |------|------|----------|----------|--------|
@@ -95,6 +110,9 @@
 | T-E2E-05 | Ingest API 被滥用攻击 | M2 | 速率限制生效，正常流量不受影响 | P0 |
 | T-E2E-06 | request_id 全链路追踪 | M1→M2→M4→M5 | 同一 request_id 贯穿所有日志 | P0 |
 | T-E2E-07 | 旧版 CLI 发送 `roles[]` payload | M1→M2 | Ingest 返回 400+UNSUPPORTED_PAYLOAD_VERSION，CLI 静默处理不崩溃 | P0 |
+| T-E2E-08 | CLI find → Frontend 可见完整链路（含 Frontend） | M1→M2→M4→M5→M6 | 新角色上报后，在 Frontend 列表页可被搜索并展示详情，E2E 延迟 < 5 分钟 | P0 |
+| T-E2E-09 | 不合规角色不在 Frontend 展示 | M1→M2→M4→M5→M6 | invalid 角色不出现在 Frontend 列表；搜索无结果正确显示空态 | P0 |
+| T-E2E-10 | Query API 宕机时 Frontend 降级 | M5→M6 | Frontend 展示错误提示，不崩溃，日志记录服务降级事件 | P0 |
 
 ---
 
@@ -135,7 +153,18 @@
 | `query_error_rate` | 5xx 响应占比 | < 0.1% | API 网关日志 |
 | `query_request_volume` | 每分钟查询量 | 基线参考 | API 网关日志 |
 
-### 2.4 数据质量
+### 2.4 前端层（Frontend）
+
+| 指标名称 | 计算方式 | 目标值 | 采集源 |
+|----------|----------|--------|--------|
+| `fe_lcp` | 首屏最大内容渲染时间（LCP） | ≤ 2s（p75） | Vercel Speed Insights / RUM |
+| `fe_fid` | 首次输入延迟（FID） | ≤ 100ms | Vercel Speed Insights / RUM |
+| `fe_cls` | 累积布局偏移（CLS） | < 0.1 | Vercel Speed Insights / RUM |
+| `fe_error_rate` | JS 未捕获异常 / 页面访问量 | < 0.5% | Sentry / 错误监控 |
+| `fe_api_error_rate` | Query API 调用失败率（从前端视角） | < 1% | 前端 fetch 监控 |
+| `fe_search_latency_p95` | 搜索请求从发起到结果渲染 P95 | < 1s | RUM 自定义指标 |
+
+### 2.5 数据质量
 
 | 指标名称 | 计算方式 | 目标值 | 采集源 |
 |----------|----------|--------|--------|
@@ -145,7 +174,7 @@
 | `status_distribution` | 各状态占比 | verified 占主导 | `role_records.status` |
 | `install_count_accuracy` | 安装量计数与实际偏差 | 无重复计算 | `role_records.install_count` |
 
-### 2.5 防滥用
+### 2.6 防滥用
 
 | 指标名称 | 计算方式 | 目标值 | 采集源 |
 |----------|----------|--------|--------|
@@ -176,6 +205,7 @@
 | QueryLatencyDegraded | `query_list_latency_p95 > 500ms` | 连续 10 分钟 | Slack #alerts | 检查查询计划、索引命中 |
 | DataFreshnessDegraded | `data_freshness_p95 > 60 min` | 连续 30 分钟 | Slack #alerts | 检查 Normalize Worker 处理效率 |
 | UnsupportedPayloadHigh | `ingest_unsupported_payload_ratio > 30%` 且 `UNSUPPORTED_PAYLOAD_VERSION` 绝对量 > 50/h | 连续 1 小时 | Slack #alerts | 排查是否有大量旧版 CLI 未升级 |
+| FrontendHighErrorRate | `fe_error_rate > 1%` 且 `fe_api_error_rate > 2%` | 连续 10 分钟 | Slack #alerts | 检查 Query API 连通性、前端错误日志 |
 
 ### 3.3 Info（记录观察，无需立即行动）
 
@@ -237,7 +267,8 @@
 - [ ] T-ING-01~17：Ingest API 全场景通过（含旧 payload 拒绝与新协议契约校验）
 - [ ] T-NRM-01~09：Normalize Worker 全场景通过
 - [ ] T-QRY-01~10：Query API 全场景通过
-- [ ] T-E2E-01~07：全链路 E2E 场景通过（含旧版 CLI 兼容性）
+- [ ] T-FE-01~09：Frontend 全场景通过（含错误降级与空态展示）
+- [ ] T-E2E-01~10：全链路 E2E 场景通过（含含 Frontend 可见性与 Query API 宕机降级）
 
 ### 5.2 性能回归
 
@@ -490,4 +521,5 @@
 | T-ING | Ingest API | T-ING-01 ~ T-ING-17 |
 | T-NRM | Normalize Worker | T-NRM-01 ~ T-NRM-09 |
 | T-QRY | Query API | T-QRY-01 ~ T-QRY-10 |
-| T-E2E | 全链路 E2E | T-E2E-01 ~ T-E2E-07 |
+| T-FE | Frontend（M6） | T-FE-01 ~ T-FE-09 |
+| T-E2E | 全链路 E2E | T-E2E-01 ~ T-E2E-10 |
