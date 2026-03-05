@@ -8,11 +8,47 @@ The catalog API exposes role list/search/detail/repository/stats endpoints for f
 agent-team catalog serve --addr :8787
 ```
 
+Override polling intervals (optional):
+
+```bash
+agent-team catalog serve --addr :8787 --normalize-interval 2m --visibility-refresh-interval 10s
+```
+
 Base URL (default):
 
 ```
 http://localhost:8787/api
 ```
+
+## Polling configuration
+
+Catalog polling defaults are stored in `.agents/catalog-pipeline.yaml` (auto-created on first `catalog serve` run).
+
+```yaml
+version: 1
+normalize:
+  interval: 2m
+visibility:
+  refresh_interval: 10s
+```
+
+- `normalize.interval`: background normalization cadence. Set `0` to disable.
+- `visibility.refresh_interval`: API cache refresh cadence. Set `0` to disable caching (always read from disk).
+
+### E2E latency model (discover → verified → visible)
+
+Assuming events arrive uniformly between polls:
+
+```
+P50 ≈ normalize.interval/2 + visibility.refresh_interval/2
+```
+
+Example comparison (legacy ops defaults vs new defaults):
+
+| Setting | normalize.interval | visibility.refresh_interval | Estimated P50 |
+| --- | --- | --- | --- |
+| Before (legacy) | 10m | 60s | ~5m30s |
+| After (default) | 2m | 10s | ~1m05s |
 
 ## Response envelope
 

@@ -11,8 +11,15 @@ import (
 const catalogAPIBasePath = "/api"
 
 // NewCatalogAPIHandler builds the HTTP handler for catalog queries.
+// It uses a zero-refresh store (always read from disk).
 func NewCatalogAPIHandler(catalogPath string) http.Handler {
-	api := &catalogAPI{catalogPath: catalogPath}
+	store := NewCatalogStore(catalogPath, 0)
+	return NewCatalogAPIHandlerWithStore(store)
+}
+
+// NewCatalogAPIHandlerWithStore builds the HTTP handler backed by a store cache.
+func NewCatalogAPIHandlerWithStore(store *CatalogStore) http.Handler {
+	api := &catalogAPI{store: store}
 	mux := http.NewServeMux()
 	mux.HandleFunc(catalogAPIBasePath+"/roles/search", api.handleRoleSearch)
 	mux.HandleFunc(catalogAPIBasePath+"/roles/", api.handleRoleDetail)
@@ -23,7 +30,7 @@ func NewCatalogAPIHandler(catalogPath string) http.Handler {
 }
 
 type catalogAPI struct {
-	catalogPath string
+	store *CatalogStore
 }
 
 type apiEnvelope struct {
@@ -85,7 +92,7 @@ func (api *catalogAPI) handleRoleList(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_status", err.Error())
 		return
 	}
-	catalog, err := ReadRoleRepoCatalog(api.catalogPath)
+	catalog, err := api.store.Get()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "catalog_read_failed", err.Error())
 		return
@@ -117,7 +124,7 @@ func (api *catalogAPI) handleRoleSearch(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "invalid_status", err.Error())
 		return
 	}
-	catalog, err := ReadRoleRepoCatalog(api.catalogPath)
+	catalog, err := api.store.Get()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "catalog_read_failed", err.Error())
 		return
@@ -147,7 +154,7 @@ func (api *catalogAPI) handleRoleDetail(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "invalid_status", err.Error())
 		return
 	}
-	catalog, err := ReadRoleRepoCatalog(api.catalogPath)
+	catalog, err := api.store.Get()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "catalog_read_failed", err.Error())
 		return
@@ -176,7 +183,7 @@ func (api *catalogAPI) handleRepoDetail(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "invalid_status", err.Error())
 		return
 	}
-	catalog, err := ReadRoleRepoCatalog(api.catalogPath)
+	catalog, err := api.store.Get()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "catalog_read_failed", err.Error())
 		return
@@ -209,7 +216,7 @@ func (api *catalogAPI) handleStats(w http.ResponseWriter, r *http.Request) {
 		writeMethodNotAllowed(w)
 		return
 	}
-	catalog, err := ReadRoleRepoCatalog(api.catalogPath)
+	catalog, err := api.store.Get()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "catalog_read_failed", err.Error())
 		return
