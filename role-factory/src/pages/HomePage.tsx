@@ -1,10 +1,12 @@
 import { useState, useMemo, useCallback } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { SearchBar } from '@/components/SearchBar'
 import { RoleCard } from '@/components/RoleCard'
 import { Sidebar } from '@/components/Sidebar'
 import { EmptyState } from '@/components/EmptyState'
 import { RoleCardSkeleton } from '@/components/Skeleton'
 import { useRoles } from '@/hooks/useQueries'
+import { getErrorMessage } from '@/api/client'
 
 export function HomePage() {
   const [search, setSearch] = useState('')
@@ -14,9 +16,10 @@ export function HomePage() {
 
   const debouncedSearch = useDebounce(search, 300)
 
-  const { data, isLoading } = useRoles({
+  const { data, isLoading, isError, error, refetch, isFetching } = useRoles({
     search: debouncedSearch,
     category,
+    framework: frameworks,
     sort,
   })
 
@@ -69,7 +72,7 @@ export function HomePage() {
           {/* Sort Controls */}
           <div className="flex items-center justify-between">
             <span className="text-sm text-text-sub font-ui">
-              {data ? `${data.total} roles` : 'Loading...'}
+              {isError ? 'Failed to load roles' : data ? `${data.total} roles` : 'Loading...'}
             </span>
             <select
               value={sort}
@@ -89,6 +92,15 @@ export function HomePage() {
                 <RoleCardSkeleton key={i} />
               ))}
             </div>
+          ) : isError ? (
+            <EmptyState
+              title="Unable to load roles"
+              description={getErrorMessage(error)}
+              showClearButton={false}
+              actionLabel={isFetching ? 'Retrying...' : 'Retry'}
+              onAction={() => refetch()}
+              icon={<AlertTriangle size={64} className="text-warning" />}
+            />
           ) : roles.length === 0 ? (
             <EmptyState onClear={handleClearFilters} />
           ) : (

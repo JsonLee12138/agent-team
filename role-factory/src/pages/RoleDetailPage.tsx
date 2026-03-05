@@ -1,17 +1,18 @@
 import { Link } from '@tanstack/react-router'
-import { ChevronRight, Copy, CheckCircle2 } from 'lucide-react'
+import { ChevronRight, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { useRole } from '@/hooks/useQueries'
 import { CopyButton } from '@/components/CopyButton'
 import { Tag } from '@/components/Tag'
 import { PageSkeleton, Skeleton } from '@/components/Skeleton'
 import { EmptyState } from '@/components/EmptyState'
+import { getErrorMessage } from '@/api/client'
 
 interface RoleDetailPageProps {
   name: string
 }
 
 export function RoleDetailPage({ name }: RoleDetailPageProps) {
-  const { data: role, isLoading } = useRole(name)
+  const { data: role, isLoading, isError, error, refetch, isFetching } = useRole(name)
 
   if (isLoading) {
     return (
@@ -29,6 +30,19 @@ export function RoleDetailPage({ name }: RoleDetailPageProps) {
           </div>
         </div>
       </PageSkeleton>
+    )
+  }
+
+  if (isError) {
+    return (
+      <EmptyState
+        title="Unable to load role"
+        description={getErrorMessage(error)}
+        showClearButton={false}
+        actionLabel={isFetching ? 'Retrying...' : 'Retry'}
+        onAction={() => refetch()}
+        icon={<AlertTriangle size={64} className="text-warning" />}
+      />
     )
   }
 

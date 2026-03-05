@@ -1,4 +1,4 @@
-import { CATEGORIES, FRAMEWORKS } from '@/api/mock-data'
+import { CATEGORIES, FRAMEWORKS } from '@/constants/filters'
 
 interface SidebarProps {
   selectedCategory: string

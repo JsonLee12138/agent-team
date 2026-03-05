@@ -1,8 +1,9 @@
-import { Link } from '@tanstack/react-router'
+import { AlertTriangle } from 'lucide-react'
 import { useRepo } from '@/hooks/useQueries'
 import { RoleCard } from '@/components/RoleCard'
 import { PageSkeleton, Skeleton, RoleCardSkeleton } from '@/components/Skeleton'
 import { EmptyState } from '@/components/EmptyState'
+import { getErrorMessage } from '@/api/client'
 
 interface RepoDetailPageProps {
   owner: string
@@ -10,7 +11,7 @@ interface RepoDetailPageProps {
 }
 
 export function RepoDetailPage({ owner, repo }: RepoDetailPageProps) {
-  const { data: repository, isLoading } = useRepo(owner, repo)
+  const { data: repository, isLoading, isError, error, refetch, isFetching } = useRepo(owner, repo)
 
   if (isLoading) {
     return (
@@ -27,6 +28,19 @@ export function RepoDetailPage({ owner, repo }: RepoDetailPageProps) {
           </div>
         </div>
       </PageSkeleton>
+    )
+  }
+
+  if (isError) {
+    return (
+      <EmptyState
+        title="Unable to load repository"
+        description={getErrorMessage(error)}
+        showClearButton={false}
+        actionLabel={isFetching ? 'Retrying...' : 'Retry'}
+        onAction={() => refetch()}
+        icon={<AlertTriangle size={64} className="text-warning" />}
+      />
     )
   }
 

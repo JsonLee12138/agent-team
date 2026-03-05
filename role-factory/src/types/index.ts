@@ -33,7 +33,7 @@ export interface Repository {
 export interface RolesQueryParams {
   search?: string
   category?: string
-  framework?: string
+  framework?: string | string[]
   sort?: 'relevance' | 'installs' | 'newest'
   page?: number
   limit?: number
