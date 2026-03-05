@@ -90,7 +90,7 @@ export ROLE_HUB_DB_CONN_MAX_IDLE_TIME=5m
 export ROLE_HUB_DB_TIMEOUT=3s
 export ROLE_HUB_MAX_INFLIGHT=100
 
-cd role-hub
+cd hub-server
 
 go run ./cmd/role-hub migrate
 

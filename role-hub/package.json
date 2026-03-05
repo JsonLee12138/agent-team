@@ -1,0 +1,42 @@
+{
+  "name": "role-hub",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"unocss -c uno.config.ts \\\"app/**/*.{ts,tsx}\\\" -o app/styles/uno.css --watch\" \"remix dev\"",
+    "build:css": "unocss -c uno.config.ts \"app/**/*.{ts,tsx}\" -o app/styles/uno.css",
+    "build": "npm run build:css && remix build",
+    "start": "remix-serve build/index.js",
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests",
+    "e2e": "playwright test --pass-with-no-tests"
+  },
+  "dependencies": {
+    "@remix-run/node": "^2.17.4",
+    "@remix-run/react": "^2.17.4",
+    "@remix-run/serve": "^2.17.4",
+    "better-sqlite3": "^11.8.1",
+    "lucide-react": "^0.576.0",
+    "pg": "^8.13.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.58.2",
+    "@remix-run/dev": "^2.17.4",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.48.0",
+    "unocss": "^66.6.4",
+    "vitest": "^2.1.5"
+  }
+}
