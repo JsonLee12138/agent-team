@@ -31,16 +31,37 @@ func newRoleListCmd() *cobra.Command {
 
 func (a *App) RunRoleList() error {
 	root := a.Git.Root()
-	roles := internal.ListAvailableRoles(root)
-	if len(roles) == 0 {
+
+	// Project roles
+	projectRoles := internal.ListAvailableRoles(root)
+	// Global roles
+	globalRoles, _ := internal.ListGlobalRoles()
+
+	if len(projectRoles) == 0 && len(globalRoles) == 0 {
 		fmt.Println("No roles found. Create one using the role-creator skill.")
 		return nil
 	}
 
-	fmt.Printf("%-24s %s\n", "Role", "Path")
-	fmt.Printf("%-24s %s\n", "────────────────────────", "──────────────────────────")
-	for _, role := range roles {
-		fmt.Printf("%-24s %s\n", role, internal.RoleDir(root, role))
+	if len(projectRoles) > 0 {
+		fmt.Println("Project roles (.agents/teams/):")
+		fmt.Printf("  %-24s %s\n", "Role", "Path")
+		fmt.Printf("  %-24s %s\n", "────────────────────────", "──────────────────────────")
+		for _, role := range projectRoles {
+			fmt.Printf("  %-24s %s\n", role, internal.RoleDir(root, role))
+		}
+		fmt.Println()
 	}
+
+	if len(globalRoles) > 0 {
+		fmt.Println("Global roles (~/.agents/roles/):")
+		fmt.Printf("  %-24s %s\n", "Role", "Path")
+		fmt.Printf("  %-24s %s\n", "────────────────────────", "──────────────────────────")
+		for _, r := range globalRoles {
+			fmt.Printf("  %-24s %s\n", r.RoleName, r.Path)
+		}
+		fmt.Println()
+	}
+
+	fmt.Printf("Total: %d role(s) (%d project, %d global)\n", len(projectRoles)+len(globalRoles), len(projectRoles), len(globalRoles))
 	return nil
 }
