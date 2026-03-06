@@ -11,6 +11,23 @@ English | [中文](./README.zh.md)
 
 ---
 
+## Table of Contents
+
+- [Installation](#️-installation)
+  - [AI-Native (Recommended)](#-ai-native-recommended)
+  - [Manual Installation](#-manual-installation)
+- [Upgrade](#-upgrade)
+- [Quick Start](#-quick-start)
+- [The Toolkit](#-the-toolkit)
+- [Supported Providers](#-supported-providers)
+- [Advanced Usage](#️-advanced-usage)
+  - [CLI Reference](#cli-reference)
+  - [Directory Structure](#directory-structure)
+  - [Environment Variables](#environment-variables)
+- [License](#-license)
+
+---
+
 ## 🛠️ Installation
 
 ### 🤖 AI-Native (Recommended)
@@ -33,6 +50,17 @@ Let your AI agent set itself up. It only takes two steps:
 | **Go Install** | `go install github.com/JsonLee12138/agent-team@latest` |
 | **Claude Plugin** | `/plugin marketplace add JsonLee12138/agent-team` |
 | **Gemini Ext** | `gemini extensions install https://github.com/JsonLee12138/agent-team` |
+
+---
+
+## 🔄 Upgrade
+
+| Method | Command |
+| :--- | :--- |
+| **Claude Plugin** | `/plugin marketplace update agent-team` |
+| **Skill** | `npx skills add JsonLee12138/agent-team -a '*' -y` |
+| **Homebrew** | `brew update && brew upgrade agent-team` |
+| **Go Install** | `go install github.com/JsonLee12138/agent-team@latest` |
 
 ---
 

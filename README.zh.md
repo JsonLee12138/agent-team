@@ -11,6 +11,23 @@
 
 ---
 
+## 目录
+
+- [安装](#️-安装)
+  - [AI 自助安装（推荐）](#-ai-自助安装推荐)
+  - [手动安装](#-手动安装)
+- [升级](#-升级)
+- [快速开始](#-快速开始)
+- [工具箱](#-工具箱)
+- [支持的 Provider](#-支持的-provider)
+- [高级用法](#️-高级用法)
+  - [CLI 命令参考](#cli-命令参考)
+  - [目录结构](#目录结构)
+  - [环境变量](#环境变量)
+- [License](#-license)
+
+---
+
 ## 🛠️ 安装
 
 ### 🤖 AI 自助安装（推荐）
@@ -33,6 +50,17 @@
 | **Go Install** | `go install github.com/JsonLee12138/agent-team@latest` |
 | **Claude Plugin** | `/plugin marketplace add JsonLee12138/agent-team` |
 | **Gemini Ext** | `gemini extensions install https://github.com/JsonLee12138/agent-team` |
+
+---
+
+## 🔄 升级
+
+| 方式 | 命令 |
+| :--- | :--- |
+| **Claude Plugin** | `/plugin marketplace update agent-team` |
+| **Skill** | `npx skills add JsonLee12138/agent-team -a '*' -y` |
+| **Homebrew** | `brew update && brew upgrade agent-team` |
+| **Go Install** | `go install github.com/JsonLee12138/agent-team@latest` |
 
 ---
 
