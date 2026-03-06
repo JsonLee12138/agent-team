@@ -226,7 +226,7 @@ func TestInjectSection(t *testing.T) {
 	t.Run("preserves other tags", func(t *testing.T) {
 		dir := t.TempDir()
 		fp := filepath.Join(dir, "test.md")
-		initial := "<!-- OPENSPEC:START -->\nopenspec content\n<!-- OPENSPEC:END -->\n"
+		initial := "<!-- OTHER:START -->\nother content\n<!-- OTHER:END -->\n"
 		os.WriteFile(fp, []byte(initial), 0644)
 
 		err := InjectSection(fp, "AGENT_TEAM", "role prompt")
@@ -236,8 +236,8 @@ func TestInjectSection(t *testing.T) {
 
 		data, _ := os.ReadFile(fp)
 		content := string(data)
-		if !strings.Contains(content, "openspec content") {
-			t.Error("OPENSPEC content should be preserved")
+		if !strings.Contains(content, "other content") {
+			t.Error("OTHER content should be preserved")
 		}
 		if !strings.Contains(content, "role prompt") {
 			t.Error("AGENT_TEAM content should be injected")

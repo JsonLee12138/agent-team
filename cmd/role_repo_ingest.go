@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -47,10 +48,19 @@ func reportRoleRepoInstallIngest(source internal.RoleRepoSource, installed []int
 		})
 	}
 
-	wg := newRoleHubReporter().ReportAsync("install:"+source.FullName(), results, internal.GenerateTraceID())
-	if roleHubIngestDebugEnabled() && wg != nil {
-		wg.Wait()
+	traceID := internal.GenerateTraceID()
+	wg := newRoleHubReporter().ReportAsync("install:"+source.FullName(), results, traceID)
+	if wg == nil {
+		return
 	}
+
+	if roleHubIngestDebugEnabled() {
+		fmt.Fprintf(os.Stderr, "[role-hub-ingest] waiting for install report trace=%s roles=%d\n", traceID, len(results))
+		wg.Wait()
+		fmt.Fprintf(os.Stderr, "[role-hub-ingest] install report finished trace=%s\n", traceID)
+		return
+	}
+	wg.Wait()
 }
 
 func roleHubIngestDebugEnabled() bool {

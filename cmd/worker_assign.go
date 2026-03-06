@@ -18,7 +18,7 @@ func newWorkerAssignCmd() *cobra.Command {
 	var newWindow bool
 	cmd := &cobra.Command{
 		Use:   `assign <worker-id> "<description>" [provider]`,
-		Short: "Create an OpenSpec change and notify the worker session",
+		Short: "Create a task change and notify the worker session",
 		Args:  cobra.RangeArgs(2, 3),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			provider := ""

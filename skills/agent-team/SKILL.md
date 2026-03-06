@@ -3,11 +3,10 @@ name: agent-team
 description: >
   AI team role and worker manager for multi-agent development workflows.
   Uses Role (skill package) + Worker (instance) model with git worktrees.
-  Use when the user wants to create a team, create roles, manage workers,
-  assign tasks, check team status, or merge worker branches.
-  Triggers on /agent-team commands, "create a team", "batch create roles",
-  "create a role", "create a worker", "open worker session",
-  "assign task", "show team status", "merge worker branch".
+  Triggers: /agent-team, create a team, batch create roles, create a role,
+  create a worker, open worker session, assign task, show team status,
+  merge worker branch, search catalog, find role, install role,
+  check task status, role-hub.
 ---
 
 # agent-team
@@ -19,33 +18,25 @@ Manages AI team workflows using a **Role + Worker** dual-layer model with git wo
 
 For directory layout details, see [references/details.md](references/details.md).
 
-> **IMPORTANT — No Sandbox Mode**
+> **IMPORTANT -- No Sandbox Mode**
 > All `agent-team` commands MUST be run **without sandbox** (i.e. with `dangerouslyDisableSandbox: true` or equivalent).
 > agent-team manages git worktrees, creates/deletes directories outside the project root, spawns terminal sessions, and writes to `~/.agents/`. These operations will fail silently or error out inside a sandboxed shell.
 
 ## Install & Upgrade
 
-For per-provider installation and upgrade instructions (Claude Code Plugin, Gemini Extension, OpenCode npm Plugin, Codex Skill, Homebrew, Source), see [references/install-upgrade.md](references/install-upgrade.md).
+See [references/install-upgrade.md](references/install-upgrade.md). If `agent-team` binary is not found, follow the install guide.
 
-**Self-install check**: If `agent-team` binary is not found, follow the install guide to get it set up.
-
-## Project Initialization
+## Phase 1: Initialization
 
 ```bash
 agent-team init [--global-only] [--skip-detect]
 ```
 
-Runs first-time setup:
+Runs first-time setup: detects installed providers, creates `.agents/teams/` structure, and installs bundled roles to `~/.agents/roles/`.
 
-1. **Detects installed providers** — checks for `claude`, `gemini`, `opencode`, `codex` binaries on PATH
-2. **Creates project structure** — `.agents/teams/` with `.gitkeep` (skipped with `--global-only`)
-3. **Installs bundled roles** — copies plugin-bundled roles to `~/.agents/roles/`, hash-compares to skip/update as needed
+> **AI Behavior**: Detect missing `.agents/teams/` directory and prompt user to run `agent-team init`. Do NOT auto-run init.
 
-Use after initial installation or when updating the plugin to sync new bundled roles.
-
-## Role Management (AI Workflow)
-
-Roles are created and managed by AI using the **role-creator** skill. The CLI does not handle role creation.
+## Phase 2: Role Preparation
 
 ### Creating a Role
 
@@ -53,75 +44,59 @@ Roles are created and managed by AI using the **role-creator** skill. The CLI do
 2. If a role already exists in global `~/.agents/roles/`, prompt user to copy it to `.agents/teams/`
 3. Result: `.agents/teams/<role-name>/` with SKILL.md, system.md, references/role.yaml
 
-### Creating a Team (Batch Role Creation from Prompt)
+### Creating a Team (Batch Role Creation)
 
-Use this workflow when the user describes a team in natural language, for example:
-
-- "Create a frontend developer, a QA engineer, and a frontend architect role."
-- "I need frontend dev + testing + frontend architecture roles."
-
-Flow:
+When the user describes a team in natural language (e.g. "Create a frontend developer, a QA engineer, and a frontend architect role"):
 
 1. Parse the prompt into responsibility units (one role per responsibility).
-2. Normalize each role name to kebab-case, such as:
-   - frontend developer -> `frontend-dev`
-   - QA engineer -> `qa-engineer`
-   - frontend architect -> `frontend-architect`
+2. Normalize each role name to kebab-case (`frontend developer` -> `frontend-dev`).
 3. Present the draft role list and ask for one confirmation before execution.
 4. For each approved role, run the full **Creating a Role** workflow with `/role-creator --target-dir .agents/teams`.
 5. Return a per-role summary: `created`, `already exists`, or `failed` (with reason).
 6. Stop after role creation. Do NOT create workers in this flow.
 
 Rules:
+- Team creation is role-only. MUST NOT auto-run `worker create`, `worker open`, or `worker assign`.
+- If a role already exists, do not overwrite. Mark as `already exists`.
+- A single role failure does not cancel the batch. Continue and report final results.
 
-- Team creation in this skill is role-only. It MUST NOT auto-run `agent-team worker create`, `worker open`, or `worker assign`.
-- If a role already exists, do not overwrite it by default. Mark it as `already exists`.
-- A single role failure does not cancel the whole batch. Continue and report final results.
+### Role Discovery Flow
 
-### Listing Roles
+When a role is not found locally:
+
+1. Ask user: "Create from scratch?" or "Search Role Hub?"
+2. If search: `agent-team catalog search <query>` -> show results -> `agent-team role-repo add <source> --role <name>`
+3. If no match or declined: fall back to create from scratch
+
+### Role Repo Management
+
+```bash
+# Search GitHub for role repositories
+agent-team role-repo find <query>
+
+# Install roles from a repository
+agent-team role-repo add <owner/repo> [--role <name>] [-g] [-y]
+
+# List installed repository-managed roles
+agent-team role-repo list [-g] [--json]
+
+# Check installed roles for remote updates
+agent-team role-repo check
+
+# Update installed roles from remote sources
+agent-team role-repo update
+
+# Remove installed repository-managed roles
+agent-team role-repo remove <name>
+```
+
+### Listing Local Roles
 
 ```bash
 agent-team role list
 ```
 
-Shows all available roles in `.agents/teams/`.
-
-### Finding Remote Roles
-
-```bash
-# Direct search (shows up to 6 results)
-agent-team role-repo find <query>
-
-# Interactive mode (no arguments in terminal)
-agent-team role-repo find
-```
-
-Searches GitHub for role repositories. In interactive mode, prompts for a query and offers to install the selected role.
-
-### Installing Remote Roles
-
-```bash
-agent-team role-repo add <owner/repo> [--role <name>] [-g] [-y]
-```
-
-In interactive mode (no `--global` flag), prompts for scope (Project or Global) and confirmation before installing.
-
-### Listing Installed Roles
-
-```bash
-# Show both project and global roles
-agent-team role-repo list
-
-# Show only global roles
-agent-team role-repo list -g
-
-# JSON output
-agent-team role-repo list --json
-```
-
-Displays installed roles with source, update date, and scope breakdown.
-
-## Worker Management (CLI Commands)
+## Phase 3: Worker Lifecycle
 
 ### Create a worker
 
@@ -129,7 +104,7 @@ Displays installed roles with source, update date, and scope breakdown.
 agent-team worker create <role-name>
 ```
 
-Creates worktree `.worktrees/<worker-id>/` with branch `team/<worker-id>`, generates config, and initializes `.tasks/` directory.
+Creates worktree `.worktrees/<worker-id>/` with branch `team/<worker-id>`, generates config, initializes `.tasks/` directory, and automatically opens a session window.
 
 ### Open a worker session
 
@@ -137,7 +112,9 @@ Creates worktree `.worktrees/<worker-id>/` with branch `team/<worker-id>`, gener
 agent-team worker open <worker-id> [claude|codex|opencode] [--model <model>] [--new-window]
 ```
 
-Copies role + dependency skills into the worktree, generates CLAUDE.md/AGENTS.md from role's system.md, and opens a terminal tab with the chosen AI provider.
+Copies role + dependency skills into the worktree, generates CLAUDE.md/AGENTS.md from role's system.md, and opens a terminal tab with the chosen AI provider. See [references/platforms.md](references/platforms.md).
+
+> **AI Behavior (Session Start)**: Ensure worker loads role context and is aware of pending tasks.
 
 ### Assign a change
 
@@ -145,26 +122,13 @@ Copies role + dependency skills into the worktree, generates CLAUDE.md/AGENTS.md
 agent-team worker assign <worker-id> "<description>" [provider] [--proposal <file>] [--design <file>] [--verify-cmd <cmd>] [--new-window]
 ```
 
-Creates a task change at `.tasks/changes/<timestamp>-<slug>/` with:
-- `--proposal` → `proposal.md` (work requirements)
-- `--design` → `design.md` (architecture decisions)
-- `--verify-cmd` → stored in `change.yaml` for worker verification
+Creates a task change at `.tasks/changes/<timestamp>-<slug>/` and sends a `[New Change Assigned]` notification. The CLI auto-opens the worker session if not running.
 
-The CLI auto-opens the worker session if not running and sends a `[New Change Assigned]` notification.
+**Before running this command**, the controller MUST:
 
-**Before running this command**, the controller MUST execute the Assign Readiness Gate.
-
-### Assign Readiness Gate (Required)
-
-Before running `agent-team worker assign ...`, the controller MUST execute a readiness handshake.
-
-- MUST send `AGENT_TEAM_PING <worker-id> <attempt>` and wait for matching `AGENT_TEAM_PONG <worker-id> <attempt>`
-- MUST use: first wait `5s`, retry interval `5s`, maximum `3` attempts
-- MUST inspect worker window on timeout before retrying
-- MUST send provider open command when `codex`, `claude`, or `opencode` workspace is not open
-- MUST fail fast after attempt 3 with structured error output and stop assign
-
-For protocol details, diagnostics checklist, retry state flow, and error templates, see [references/readiness.md](references/readiness.md).
+1. Complete the brainstorming process -> [references/brainstorming.md](references/brainstorming.md)
+2. Pass the Assign Readiness Gate -> [references/readiness.md](references/readiness.md)
+3. **Sync worktree with main**: If worker exists with no uncommitted changes, rebase/merge latest main. If uncommitted changes exist, ask user first.
 
 ### Check status
 
@@ -181,7 +145,10 @@ agent-team worker merge <worker-id>
 ```
 
 Merges `team/<worker-id>` into the current branch with `--no-ff`.
-After merging, do NOT automatically delete the worker.
+
+### Close a session
+
+Close the terminal without deleting the worktree/branch. Can reopen later with `worker open`.
 
 ### Delete a worker
 
@@ -189,54 +156,89 @@ After merging, do NOT automatically delete the worker.
 agent-team worker delete <worker-id>
 ```
 
-Closes the running session, removes the worktree, deletes the branch, and cleans up `agents/workers/<worker-id>/`.
+Closes the running session, removes the worktree, deletes the branch, and cleans up config. **Irreversible.**
 
-## Communication
+### AI Behavior -- Worker Cleanup Rules
 
-### Reply to a worker
+- After task completion notification: do NOT auto-merge. Ask user: "Review code, merge, or assign next task?"
+- After merge: do NOT auto-delete. Ask user: "Keep worker or delete?"
+- NEVER run `worker delete` without explicit user approval
+- Closing a session does NOT require confirmation
+
+### AI Behavior -- Idle Worker Scheduling
+
+- Inform user when a worker is idle with pending tasks. Do NOT auto-assign.
+
+## Phase 4: Task & Monitoring
+
+### Task Commands
 
 ```bash
-agent-team reply <worker-id> "<answer>"
+agent-team task list                  # List all task changes
+agent-team task show <id>             # Show task details
+agent-team task done <id>             # Mark task as done
+agent-team task verify <id>           # Run verification
+agent-team task archive <id>          # Archive a task change
 ```
 
-### Reply to main controller (used by workers)
+### Worker TDD Cycle
 
-```bash
-agent-team reply-main "<message>"
-```
-
-Messages appear in the controller's terminal as `[Worker: <worker-id>] <message>`.
-
-For the full bidirectional communication protocol and message templates, see [references/details.md](references/details.md).
-
-## What Workers Do (Controller Reference)
-
-Workers follow a TDD cycle upon receiving a `[New Change Assigned]` notification: read requirements → write acceptance tests → implement (marking tasks done) → run verify → notify main with result.
-
-Workers notify the controller using `reply-main` with one of:
-- `"Task completed: <summary>; verify: passed"`
-- `"Task completed: <summary>; verify: failed — <reason>"`
-- `"Task completed: <summary>; verify: skipped"`
-- `"Need decision: <problem or options>"` (when blocked)
+Workers follow a TDD cycle upon receiving a `[New Change Assigned]` notification: read requirements -> write acceptance tests -> implement (marking tasks done) -> run verify -> notify main with result.
 
 Full worker workflow details: [references/worker-workflow.md](references/worker-workflow.md)
 
-## Brainstorming (Required Before Assign)
+### Worker Notification Formats
 
-<HARD-GATE>
-Do NOT execute `agent-team worker assign`, write any code, or take any implementation action
-until you have presented a design and the user has explicitly approved it.
-This applies to EVERY assignment regardless of perceived simplicity.
-</HARD-GATE>
+Workers notify the controller using `reply-main` with one of:
+- `"Task completed: <summary>; verify: passed"`
+- `"Task completed: <summary>; verify: failed -- <reason>"`
+- `"Task completed: <summary>; verify: skipped"`
+- `"Need decision: <problem or options>"` (when blocked)
 
-When the user intends to assign new work to a worker, you MUST follow the brainstorming process.
+> **AI Behavior (Task Completion)**: Check verify result, surface to user, ask how to proceed. Do NOT auto-merge.
 
-For the full checklist, principles, and anti-patterns, see [references/brainstorming.md](references/brainstorming.md).
+## Phase 5: Communication
+
+```bash
+# Controller -> Worker
+agent-team reply <worker-id> "<answer>"
+
+# Worker -> Controller
+agent-team reply-main "<message>"
+```
+
+Messages appear in the controller's terminal as `[Worker: <worker-id>] <message>`. For full protocol details, see [references/details.md](references/details.md).
+
+> **AI Behavior**: Surface worker questions to user immediately. Do NOT answer on behalf of user. Batch-present multiple blocked workers.
+
+## Catalog (Role Hub)
+
+Query commands for browsing the role catalog:
+
+```bash
+agent-team catalog search <query>     # Search verified roles
+agent-team catalog show <name>        # Show role details
+agent-team catalog list               # List all roles
+agent-team catalog repo <owner/repo>  # Show roles from a repository
+agent-team catalog stats              # Show catalog statistics
+```
+
+Admin commands (`discover`, `normalize`, `serve`) are available via `agent-team catalog --help`.
+
+Links to **Phase 2: Role Discovery Flow** for installing found roles.
 
 ## Backend Selection
 
-The default terminal backend is **WezTerm**. To use **tmux** instead, set the environment variable:
+Default terminal backend is **WezTerm**. To use **tmux**:
 
 ```bash
 AGENT_TEAM_BACKEND=tmux agent-team <command>
 ```
+
+## Migration
+
+```bash
+agent-team migrate
+```
+
+Migrates legacy `agents/` directory to `.agents/`.

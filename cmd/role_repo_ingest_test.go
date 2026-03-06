@@ -85,7 +85,7 @@ func (d *delayedReporter) ReportAsync(string, []internal.RoleRepoSearchResult, s
 	return &wg
 }
 
-func TestReportRoleRepoInstallIngestIsAsyncByDefault(t *testing.T) {
+func TestReportRoleRepoInstallIngestWaitsForReportByDefault(t *testing.T) {
 	origDebug := os.Getenv(roleHubIngestDebugEnv)
 	t.Cleanup(func() {
 		if origDebug == "" {
@@ -108,8 +108,8 @@ func TestReportRoleRepoInstallIngestIsAsyncByDefault(t *testing.T) {
 
 	start := time.Now()
 	reportRoleRepoInstallIngest(source, installed)
-	if got := time.Since(start); got > 60*time.Millisecond {
-		t.Fatalf("reportRoleRepoInstallIngest should return quickly in async mode, got %v", got)
+	if got := time.Since(start); got < 100*time.Millisecond {
+		t.Fatalf("default mode should wait for report completion, got %v", got)
 	}
 }
 

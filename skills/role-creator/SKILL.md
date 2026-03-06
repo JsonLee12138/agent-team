@@ -22,82 +22,63 @@ Target directory options:
 
 ## Required Workflow
 
-1. Normalize role input:
-   - `role-name` must be kebab-case (default: `frontend-dev` when not provided).
-2. Auto-generate role fields first (do not ask user to draft them by default):
+1. **Normalize Input** — validate role name as kebab-case.
+2. **Generate Role Fields** — auto-generate fields, delegate to `/brainstorming` on rejection.
+3. **Select Skills** — `find-skills` recommendations, user selection, manual additions.
+4. **Execute CLI** — run `agent-team role create` with approved parameters.
+5. **Validate Output** — verify three managed files match expected template structure.
+
+## Step 1: Normalize Input
+
+- `role-name` must be kebab-case (default: `frontend-dev` when not provided).
+- If the input is not kebab-case, suggest a normalized version and confirm with user.
+
+## Step 2: Generate Role Fields
+
+1. Auto-generate the following fields (do not ask user to draft them by default):
    - `description`
    - `system goal`
-   - `in-scope` (comma-separated output)
-   - `out-of-scope` (comma-separated output)
-3. If user rejects the auto result, or AI confidence is low, run the full brainstorming process below.
-4. After fields are approved, run skills selection flow.
-5. Ask user for target directory (`skills` or `.agents/teams`).
-6. If target is `.agents/teams` and the role already exists in global `~/.claude/skills/`, ask if user wants to copy from there instead of generating.
-7. Execute generator script to write files deterministically.
+   - `in-scope` (comma-separated)
+   - `out-of-scope` (comma-separated)
+2. Present generated fields for user approval.
+3. If user rejects, or AI confidence is low (ambiguous scope, conflicting boundaries, vague goals), delegate to `/brainstorming` skill for structured refinement.
+4. After fields are approved, ask user for target directory (`skills` or `.agents/teams`).
+5. If target is `.agents/teams` and the role already exists in global `~/.claude/skills/`, ask if user wants to copy from there instead of generating.
 
-## Brainstorming Trigger Policy
+## Step 3: Select Skills
 
-- Default flow: auto-generate role fields first.
-- Enter full brainstorming when either condition is met:
-  - User says the auto-generated role fields are not acceptable.
-  - AI detects low confidence (ambiguous scope, conflicting boundaries, or vague goals).
-
-## Brainstorming Process
-
-1. **Explore context** — scan existing role skills under `skills/*/` and `.agents/teams/*/`, templates, and recent commits for patterns.
-2. **Ask clarifying questions** — one question per message; prefer multiple choice; focus on role purpose and scope boundaries.
-3. **Confirm fields** — present the final `description`, `system_goal`, `in_scope`, `out_of_scope` for user approval before generation.
-
-## Skills Selection UX (After Fields Are Approved)
-
-1. Run `find-skills` first to get recommendation candidates.
-2. Show recommendation list in checkbox format (primary) with numbered indices:
-
-   ```text
-   Recommended skills:
-   1. [ ] skill-a
-   2. [ ] skill-b
-
-   Reply in either format:
-   - Edit checkboxes to [x]/[ ]
-   - Or send numbers, e.g. 1,2
-   ```
-
-3. Parse precedence:
-   - Checkbox parsing is primary.
-   - Numeric parsing (`1,3,5`) is fallback.
-   - If both checkbox and numeric forms are present, checkbox result wins.
-4. Ask for manual additions after selection:
-
-   ```text
-   Any additional skills to add manually? (comma-separated, optional)
-   ```
-
-5. Merge selected skills and manual additions with de-duplication, then confirm final list.
-6. Final skills may be empty and should be persisted as `skills: []` in `references/role.yaml`.
+1. Run `find-skills` to get recommendation candidates.
+2. Show recommendation list and let user select desired skills.
+3. Ask for manual additions after selection.
+4. Merge selected + manual additions with de-duplication, then confirm final list.
+5. Final skills may be empty — will be persisted as `skills: []` in `references/role.yaml`.
 
 If `find-skills` is unavailable or returns empty, skip recommendations and ask for manual additions only.
 
-### Local Skill Resolution
+## Step 4: Execute CLI
 
-After the final skills list is confirmed, resolve each plain skill name against local directories:
+### CLI Reference
 
-1. For each skill in the final list that is a **plain name** (no `/`), scan local paths:
-   - `skills/*/`, `.agents/teams/*/`, `.claude/skills/*/`, `~/.claude/skills/*/`
-2. If a local copy is found, ask the user whether to replace it with a full scoped path:
+| Flag | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `<role-name>` | arg | yes | — | Role name (kebab-case) |
+| `--description` | string | yes | — | Role description |
+| `--system-goal` | string | yes | — | Primary objective for system.md |
+| `--in-scope` | string[] | no | (from description) | In-scope items (repeatable, comma-separated) |
+| `--out-of-scope` | string[] | no | fallback text | Out-of-scope items (repeatable, comma-separated) |
+| `--skills` | string | no | `""` | Final selected skills (comma-separated) |
+| `--recommended-skills` | string | no | `""` | Recommended skills from find-skills |
+| `--add-skills` | string | no | `""` | Skills to add on top of selection |
+| `--remove-skills` | string | no | `""` | Skills to remove from candidate list |
+| `--manual-skills` | string | no | `""` | Manual fallback when recommendations unavailable |
+| `--target-dir` | string | no | `skills` | Target: `skills`, `.agents/teams`, or custom path |
+| `--overwrite` | string | no | `ask` | Overwrite mode: `ask`/`yes`/`no` |
+| `--repo-root` | string | no | `.` | Repository root path |
+| `--force` | bool | no | `false` | Skip global duplicate check |
 
-   ```text
-   Skill 'vitest' found locally at skills/vitest/.
-   Use find-skills to look up its full remote path (e.g. antfu/skills@vitest)?  [y/N]
-   ```
+Skills resolution priority: `--skills` > `--recommended-skills` > `--manual-skills`, then `--add-skills` appended, `--remove-skills` excluded.
 
-   - **y** → run `find-skills` for that skill name, present matches, let user pick the scoped path to replace the plain name.
-   - **N (default)** → keep the plain name as-is.
-
-3. Skills that already have a scoped path (containing `/`) are kept unchanged.
-4. Update the final list with any replacements before passing to the generator script.
-
-## Generate Command
+### Examples
 
 For open-source publishing (default):
 
@@ -130,7 +111,28 @@ agent-team role create product-manager \
   --system-goal "Define clear product requirements and priorities"
 ```
 
-> Minimum required CLI version: includes `role create` subcommand.
+## Step 5: Validate Output
+
+Verify three files against actual template structure:
+
+1. **`SKILL.md`** — contains role name, description, and trigger keywords derived from in-scope items.
+2. **`references/role.yaml`** — must contain:
+   - `name` — role name
+   - `description` — role description
+   - `system_prompt_file: system.md`
+   - `scope.in_scope` — list of in-scope items
+   - `scope.out_of_scope` — list of out-of-scope items
+   - `constraints.single_role_focus: true`
+   - `skills` — list of selected skills (may be empty `[]`)
+3. **`system.md`** — contains system goal and operating constraints.
+
+If any file is missing or contains unexpected content, report the discrepancy and offer to regenerate.
+
+## Overwrite Behavior
+
+- Controlled by `--overwrite` flag (`ask`/`yes`/`no`).
+- On overwrite, backup is created at `<parent>/.backup/<role-name>-<timestamp>/`.
+- Only managed files are overwritten (`SKILL.md`, `references/role.yaml`, `system.md`).
 
 ## Runtime Skill Discovery (Role Usage Guideline)
 
@@ -142,23 +144,3 @@ Generated roles should follow this behavior at runtime:
 4. Install the selected skill and use it to complete the task.
 5. After successful use, suggest adding the skill to the role's `references/role.yaml` for future sessions.
 6. If `find-skills` is unavailable or returns no match, the role should notify the user and proceed with best-effort execution.
-
-This ensures roles are self-sufficient and can dynamically extend their capabilities without manual reconfiguration.
-
-## Overwrite Behavior
-
-- If the target directory exists, the script asks for confirmation before overwrite.
-- On confirmation, it creates a backup at:
-  - `<parent>/.backup/<role-name>-<timestamp>/`
-- Then it overwrites managed files only (`SKILL.md`, `references/role.yaml`, `system.md`).
-
-## Validation
-
-After generation, verify the output files exist and contain expected content:
-
-1. Check all three managed files exist in `<target>/<role-name>/`:
-   - `SKILL.md` — contains role name, description, and trigger keywords
-   - `references/role.yaml` — contains `description`, `system_goal`, `in_scope`, `out_of_scope`, `skills`
-   - `system.md` — contains system goal and scope instructions
-2. Verify field values in `references/role.yaml` match the approved inputs (description, system goal, scopes, skills list).
-3. If any file is missing or contains unexpected content, report the discrepancy and offer to regenerate.

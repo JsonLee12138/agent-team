@@ -265,11 +265,14 @@ func GenerateTraceID() string {
 	)
 }
 
-// GenerateIdempotencyKey creates a deterministic key from query + results
-// so duplicate reports for the same search are safely deduplicated server-side.
-func GenerateIdempotencyKey(query string, results []RoleRepoSearchResult) string {
+// GenerateIdempotencyKey creates a deterministic key for one report event.
+// The key stays stable across retries for the same traceID, while different
+// traceIDs (separate events) get different keys.
+func GenerateIdempotencyKey(query string, results []RoleRepoSearchResult, traceID string) string {
 	h := sha256.New()
 	h.Write([]byte(query))
+	h.Write([]byte{0})
+	h.Write([]byte(traceID))
 	h.Write([]byte{0})
 	for _, r := range results {
 		h.Write([]byte(r.Repo))
@@ -292,7 +295,7 @@ func buildPayload(query string, results []RoleRepoSearchResult, traceID string) 
 		}
 	}
 	return IngestPayload{
-		IdempotencyKey: GenerateIdempotencyKey(query, results),
+		IdempotencyKey: GenerateIdempotencyKey(query, results, traceID),
 		TraceID:        traceID,
 		Timestamp:      time.Now().UTC().Format(time.RFC3339),
 		Query:          query,

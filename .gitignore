@@ -17,3 +17,5 @@ docs/plans/
 .turbo/
 agents/workers
 .tasks/
+.backup/
+roles-lock.json

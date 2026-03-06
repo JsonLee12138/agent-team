@@ -17,8 +17,8 @@ func TestGenerateIdempotencyKeyDeterministic(t *testing.T) {
 		{Name: "frontend", Repo: "acme/roles", RolePath: "skills/frontend"},
 		{Name: "backend", Repo: "acme/roles", RolePath: "skills/backend"},
 	}
-	key1 := GenerateIdempotencyKey("test-query", results)
-	key2 := GenerateIdempotencyKey("test-query", results)
+	key1 := GenerateIdempotencyKey("test-query", results, "trace-a")
+	key2 := GenerateIdempotencyKey("test-query", results, "trace-a")
 	if key1 != key2 {
 		t.Fatalf("idempotency keys should be deterministic: %s != %s", key1, key2)
 	}
@@ -31,8 +31,8 @@ func TestGenerateIdempotencyKeyDiffersOnQuery(t *testing.T) {
 	results := []RoleRepoSearchResult{
 		{Name: "frontend", Repo: "acme/roles", RolePath: "skills/frontend"},
 	}
-	key1 := GenerateIdempotencyKey("query-a", results)
-	key2 := GenerateIdempotencyKey("query-b", results)
+	key1 := GenerateIdempotencyKey("query-a", results, "trace-a")
+	key2 := GenerateIdempotencyKey("query-b", results, "trace-a")
 	if key1 == key2 {
 		t.Fatal("different queries should produce different keys")
 	}
@@ -45,8 +45,8 @@ func TestGenerateIdempotencyKeyDiffersOnResults(t *testing.T) {
 	resultsB := []RoleRepoSearchResult{
 		{Name: "backend", Repo: "acme/roles", RolePath: "skills/backend"},
 	}
-	key1 := GenerateIdempotencyKey("same-query", resultsA)
-	key2 := GenerateIdempotencyKey("same-query", resultsB)
+	key1 := GenerateIdempotencyKey("same-query", resultsA, "trace-a")
+	key2 := GenerateIdempotencyKey("same-query", resultsB, "trace-a")
 	if key1 == key2 {
 		t.Fatal("different results should produce different keys")
 	}
@@ -260,6 +260,31 @@ func TestBuildPayloadFields(t *testing.T) {
 	}
 	if payload.IdempotencyKey == "" {
 		t.Fatal("idempotency key should not be empty")
+	}
+}
+
+func TestBuildPayloadIdempotencyKeyDiffersAcrossInstallEvents(t *testing.T) {
+	results := []RoleRepoSearchResult{
+		{Name: "frontend", Repo: "acme/r", RolePath: "skills/frontend", SourceURL: "https://github.com/acme/r"},
+	}
+
+	first := buildPayload("install:acme/r", results, "trace-install-a")
+	second := buildPayload("install:acme/r", results, "trace-install-b")
+
+	if first.IdempotencyKey == second.IdempotencyKey {
+		t.Fatalf("install events with different trace IDs should have different idempotency keys: %s", first.IdempotencyKey)
+	}
+}
+
+func TestGenerateIdempotencyKeyDiffersOnTraceID(t *testing.T) {
+	results := []RoleRepoSearchResult{
+		{Name: "frontend", Repo: "acme/roles", RolePath: "skills/frontend"},
+	}
+
+	keyA := GenerateIdempotencyKey("install:acme/roles", results, "trace-a")
+	keyB := GenerateIdempotencyKey("install:acme/roles", results, "trace-b")
+	if keyA == keyB {
+		t.Fatal("different trace IDs should produce different keys")
 	}
 }
 
