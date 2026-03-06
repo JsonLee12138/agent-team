@@ -34,7 +34,6 @@ function buildRoleRecord(row: RoleRow): RoleRecord {
   const roleName = row.name || row.role_path.split('/').pop() || 'unknown'
   const id = `${row.repo_owner}/${row.repo_name}/${row.role_path}`
   const tags = parseTags(row.tags)
-  const score = row.score ?? 0
   const nowIso = toIsoString(row.updated_at || row.created_at)
 
   return {

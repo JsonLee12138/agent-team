@@ -1,4 +1,4 @@
-import type { LoaderFunctionArgs } from '@remix-run/node'
+import type { LoaderFunctionArgs, MetaFunction } from '@remix-run/node'
 import { json } from '@remix-run/node'
 import { Link, useLoaderData, useNavigation, useRevalidator } from '@remix-run/react'
 import { AlertTriangle, CheckCircle2, ChevronRight } from 'lucide-react'
@@ -8,6 +8,7 @@ import { PageSkeleton, Skeleton } from '~/components/Skeleton'
 import { EmptyState } from '~/components/EmptyState'
 import { getRoleByName } from '~/server/roles.server'
 import { getErrorMessage } from '~/utils/errors'
+import { buildCanonical, buildJsonLd, buildMeta } from '~/utils/seo'
 import type { RoleRecord } from '~/types'
 
 interface LoaderData {
@@ -27,6 +28,41 @@ export async function loader({ params }: LoaderFunctionArgs) {
   } catch (error) {
     return json<LoaderData>({ role: null, error: getErrorMessage(error) }, { status: 500 })
   }
+}
+
+export const meta: MetaFunction<typeof loader> = ({ data, params }) => {
+  const name = params.name ?? 'Role'
+  if (!data?.role) {
+    return [{ title: `${name} | Role Hub` }]
+  }
+  const { role } = data
+  const canonical = buildCanonical(`/roles/${role.role_name}`)
+  const description = role.description || `Install and use the ${role.display_name} AI role with agent-team.`
+  return [
+    ...buildMeta({ title: role.display_name, description, canonical }),
+    {
+      'script:ld+json': buildJsonLd({
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: buildCanonical('/') },
+          { '@type': 'ListItem', position: 2, name: 'Roles', item: buildCanonical('/') },
+          { '@type': 'ListItem', position: 3, name: role.display_name, item: canonical },
+        ],
+      }),
+    },
+    {
+      'script:ld+json': buildJsonLd({
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: role.display_name,
+        description,
+        url: canonical,
+        applicationCategory: 'DeveloperApplication',
+        keywords: role.tags.join(', '),
+      }),
+    },
+  ]
 }
 
 export default function RoleDetailPage() {

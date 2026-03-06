@@ -1,4 +1,4 @@
-import type { LoaderFunctionArgs } from '@remix-run/node'
+import type { LoaderFunctionArgs, MetaFunction } from '@remix-run/node'
 import { json } from '@remix-run/node'
 import {
   useLoaderData,
@@ -15,6 +15,7 @@ import { EmptyState } from '~/components/EmptyState'
 import { RoleCardSkeleton } from '~/components/Skeleton'
 import { getRoles } from '~/server/roles.server'
 import { getErrorMessage } from '~/utils/errors'
+import { buildCanonical, buildJsonLd, buildMeta } from '~/utils/seo'
 import type { PaginatedResponse, RoleRecord, RolesQueryParams } from '~/types'
 
 interface LoaderData {
@@ -29,6 +30,31 @@ const emptyData: PaginatedResponse<RoleRecord> = {
   page: 1,
   limit: 12,
   hasMore: false,
+}
+
+export const meta: MetaFunction = () => {
+  const canonical = buildCanonical('/')
+  const description = 'Discover, install, and share AI roles for agent-team. Browse 2,400+ community-built roles.'
+  return [
+    ...buildMeta({ title: 'Role Hub', description, canonical }),
+    {
+      'script:ld+json': buildJsonLd({
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: 'Role Hub',
+        url: canonical,
+        description,
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: {
+            '@type': 'EntryPoint',
+            urlTemplate: `${canonical}?search={search_term_string}`,
+          },
+          'query-input': 'required name=search_term_string',
+        },
+      }),
+    },
+  ]
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {

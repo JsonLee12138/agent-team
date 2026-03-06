@@ -1,4 +1,4 @@
-import type { LoaderFunctionArgs } from '@remix-run/node'
+import type { LoaderFunctionArgs, MetaFunction } from '@remix-run/node'
 import { json } from '@remix-run/node'
 import { useLoaderData, useNavigation, useRevalidator } from '@remix-run/react'
 import { AlertTriangle } from 'lucide-react'
@@ -7,6 +7,7 @@ import { PageSkeleton, Skeleton, RoleCardSkeleton } from '~/components/Skeleton'
 import { EmptyState } from '~/components/EmptyState'
 import { getRepo } from '~/server/roles.server'
 import { getErrorMessage } from '~/utils/errors'
+import { buildCanonical, buildMeta } from '~/utils/seo'
 import type { Repository } from '~/types'
 
 interface LoaderData {
@@ -27,6 +28,19 @@ export async function loader({ params }: LoaderFunctionArgs) {
   } catch (error) {
     return json<LoaderData>({ repository: null, error: getErrorMessage(error) }, { status: 500 })
   }
+}
+
+export const meta: MetaFunction<typeof loader> = ({ data, params }) => {
+  const owner = params.owner ?? ''
+  const repo = params.repo ?? ''
+  if (!data?.repository) {
+    return [{ title: `${owner}/${repo} | Role Hub` }]
+  }
+  const { repository } = data
+  const canonical = buildCanonical(`/repos/${repository.owner}/${repository.repo}`)
+  const description =
+    repository.description || `Browse AI roles published by ${repository.owner}/${repository.repo} on Role Hub.`
+  return buildMeta({ title: `${repository.owner}/${repository.repo}`, description, canonical })
 }
 
 export default function RepoDetailPage() {
