@@ -134,16 +134,39 @@ func (a *App) RunRoleRepoAdd(in io.Reader, out io.Writer, sourceArg string, role
 	now := time.Now().UTC()
 	success := 0
 	failed := 0
+	installed := make([]internal.RoleRepoRemoteRole, 0, len(selected))
+	overwritePolicy := &roleOverwritePolicy{}
 	for _, role := range selected {
 		_, backup, installErr := internal.InstallRoleRepoRemoteRole(context.Background(), client, role, installRoot, overwrite, time.Now)
 		if installErr != nil {
 			if errors.Is(installErr, internal.ErrRoleRepoInstallConflict) {
-				fmt.Fprintf(out, "- skipped %s (already exists, use -y to overwrite)\n", role.Candidate.Name)
+				shouldOverwrite, decideErr := decideRoleOverwriteOnConflict(
+					in,
+					out,
+					role.Candidate.Name,
+					overwrite,
+					overwritePolicy,
+					isInteractiveInput,
+					promptSingleChoice,
+				)
+				if decideErr != nil {
+					return decideErr
+				}
+				if !shouldOverwrite {
+					fmt.Fprintf(out, "- skipped %s (already exists)\n", role.Candidate.Name)
+					continue
+				}
+				_, backup, installErr = internal.InstallRoleRepoRemoteRole(context.Background(), client, role, installRoot, true, time.Now)
+				if installErr != nil {
+					fmt.Fprintf(out, "- failed %s: %v\n", role.Candidate.Name, installErr)
+					failed++
+					continue
+				}
+			} else {
+				fmt.Fprintf(out, "- failed %s: %v\n", role.Candidate.Name, installErr)
+				failed++
 				continue
 			}
-			fmt.Fprintf(out, "- failed %s: %v\n", role.Candidate.Name, installErr)
-			failed++
-			continue
 		}
 		entry := internal.RoleRepoLockEntry{
 			Name:        role.Candidate.Name,
@@ -165,14 +188,69 @@ func (a *App) RunRoleRepoAdd(in io.Reader, out io.Writer, sourceArg string, role
 			fmt.Fprintf(out, "+ installed %s\n", role.Candidate.Name)
 		}
 		success++
+		installed = append(installed, role)
 	}
 
 	if err := internal.WriteRoleRepoLock(lockPath, lock); err != nil {
 		return err
 	}
+	reportRoleRepoInstallIngest(source, installed)
 	fmt.Fprintf(out, "Done. success=%d failed=%d\n", success, failed)
 	if failed > 0 {
 		return fmt.Errorf("one or more roles failed to install")
 	}
 	return nil
+}
+
+type roleOverwritePolicy struct {
+	applyAll     bool
+	overwriteAll bool
+}
+
+func decideRoleOverwriteOnConflict(
+	in io.Reader,
+	out io.Writer,
+	roleName string,
+	overwrite bool,
+	policy *roleOverwritePolicy,
+	interactiveFn func(io.Reader) bool,
+	chooseFn func(io.Reader, io.Writer, string, []string, string) (string, error),
+) (bool, error) {
+	if overwrite {
+		return true, nil
+	}
+	if policy != nil && policy.applyAll {
+		return policy.overwriteAll, nil
+	}
+	if !interactiveFn(in) {
+		return false, nil
+	}
+	choice, err := chooseFn(
+		in,
+		out,
+		fmt.Sprintf("Role %s already exists. Overwrite?", roleName),
+		[]string{"Yes", "No", "All", "None"},
+		"No",
+	)
+	if err != nil {
+		return false, err
+	}
+	switch choice {
+	case "Yes":
+		return true, nil
+	case "All":
+		if policy != nil {
+			policy.applyAll = true
+			policy.overwriteAll = true
+		}
+		return true, nil
+	case "None":
+		if policy != nil {
+			policy.applyAll = true
+			policy.overwriteAll = false
+		}
+		return false, nil
+	default:
+		return false, nil
+	}
 }

@@ -28,12 +28,8 @@ func promptSelectNames(in io.Reader, out io.Writer, title string, options []stri
 	if !isInteractiveInput(in) {
 		return options, nil
 	}
-	selected := append([]string{}, options...)
-	prompt := &survey.MultiSelect{
-		Message: title,
-		Options: options,
-		Default: options,
-	}
+	selected := []string{}
+	prompt := buildRoleRepoMultiSelect(title, options)
 	if err := survey.AskOne(prompt, &selected, survey.WithValidator(survey.Required)); err != nil {
 		if err == terminal.InterruptErr {
 			return nil, fmt.Errorf("selection cancelled")
@@ -41,6 +37,14 @@ func promptSelectNames(in io.Reader, out io.Writer, title string, options []stri
 		return nil, err
 	}
 	return selected, nil
+}
+
+func buildRoleRepoMultiSelect(title string, options []string) *survey.MultiSelect {
+	return &survey.MultiSelect{
+		Message: title,
+		Options: options,
+		Default: []string{},
+	}
 }
 
 func promptSingleChoice(in io.Reader, out io.Writer, message string, options []string, defaultChoice string) (string, error) {

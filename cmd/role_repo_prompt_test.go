@@ -38,3 +38,14 @@ func TestPromptSingleChoice_NonInteractiveDefault(t *testing.T) {
 		t.Fatalf("selected=%q, want B", got)
 	}
 }
+
+func TestBuildRoleRepoMultiSelect_DefaultNoneSelected(t *testing.T) {
+	p := buildRoleRepoMultiSelect("Select", []string{"a", "b", "c"})
+	defaults, ok := p.Default.([]string)
+	if !ok {
+		t.Fatalf("default type=%T, want []string", p.Default)
+	}
+	if len(defaults) != 0 {
+		t.Fatalf("default selected count=%d, want 0", len(defaults))
+	}
+}

@@ -10,19 +10,33 @@ import (
 	"io"
 	"log"
 	"math/rand/v2"
+	"net"
 	"net/http"
+	neturl "net/url"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 )
 
 const (
-	defaultRoleHubIngestURL = "https://role-hub.agent-team.dev/api/v1/ingest"
-	roleHubIngestTimeout    = 5 * time.Second
+	defaultRoleHubIngestURL = "https://role-hub.vercel.app/api/v1/ingest"
+	defaultRoleHubTimeout   = 15 * time.Second
+	roleHubProxyEnv         = "AGENT_TEAM_ROLE_HUB_PROXY"
 	roleHubMaxRetries       = 2
 	roleHubBaseBackoff      = 500 * time.Millisecond
 )
+
+type roleHubSystemProxySettings struct {
+	HTTP  *neturl.URL
+	HTTPS *neturl.URL
+	SOCKS *neturl.URL
+}
+
+var proxyFromEnvironment = http.ProxyFromEnvironment
+var loadRoleHubSystemProxySettings = loadSystemProxySettings
 
 // IngestPayload is the data sent to role-hub after a find operation.
 type IngestPayload struct {
@@ -54,6 +68,7 @@ type IngestClient struct {
 // It is disabled when AGENT_TEAM_ROLE_HUB_URL is set to "off" or empty.
 func NewIngestClient() *IngestClient {
 	url := strings.TrimSpace(os.Getenv("AGENT_TEAM_ROLE_HUB_URL"))
+	timeout := parseRoleHubTimeout()
 	enabled := true
 	if url == "off" {
 		enabled = false
@@ -62,24 +77,178 @@ func NewIngestClient() *IngestClient {
 	if url == "" && enabled {
 		url = defaultRoleHubIngestURL
 	}
+	url = normalizeRoleHubIngestURL(url)
 	return &IngestClient{
-		httpClient: &http.Client{Timeout: roleHubIngestTimeout},
+		httpClient: newRoleHubHTTPClient(timeout),
 		baseURL:    url,
 		logger:     log.New(os.Stderr, "[role-hub-ingest] ", log.LstdFlags),
 		enabled:    enabled,
 	}
 }
 
+func normalizeRoleHubIngestURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return raw
+	}
+	u, err := neturl.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return strings.TrimRight(raw, "/")
+	}
+	if u.Path == "" || u.Path == "/" {
+		u.Path = "/api/v1/ingest"
+		u.RawPath = ""
+		u.RawQuery = ""
+		u.Fragment = ""
+	}
+	if u.Path == "/api/v1/ingest/" {
+		u.Path = "/api/v1/ingest"
+		u.RawPath = ""
+	}
+	return u.String()
+}
+
 // NewIngestClientForTest creates an IngestClient pointing at a test server.
 func NewIngestClientForTest(baseURL string, httpClient *http.Client) *IngestClient {
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: roleHubIngestTimeout}
+		httpClient = newRoleHubHTTPClient(defaultRoleHubTimeout)
 	}
 	return &IngestClient{
 		httpClient: httpClient,
 		baseURL:    baseURL,
 		logger:     log.New(io.Discard, "", 0),
 		enabled:    true,
+	}
+}
+
+func parseRoleHubTimeout() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("AGENT_TEAM_ROLE_HUB_TIMEOUT"))
+	if raw == "" {
+		return defaultRoleHubTimeout
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d <= 0 {
+		return defaultRoleHubTimeout
+	}
+	return d
+}
+
+func newRoleHubHTTPClient(timeout time.Duration) *http.Client {
+	proxyFn := newRoleHubProxyFunc()
+	if base, ok := http.DefaultTransport.(*http.Transport); ok {
+		transport := base.Clone()
+		transport.Proxy = proxyFn
+		return &http.Client{Timeout: timeout, Transport: transport}
+	}
+	return &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			Proxy: proxyFn,
+		},
+	}
+}
+
+func newRoleHubProxyFunc() func(*http.Request) (*neturl.URL, error) {
+	explicitProxy := parseProxyURL(strings.TrimSpace(os.Getenv(roleHubProxyEnv)))
+	systemProxy := loadRoleHubSystemProxySettings()
+
+	return func(req *http.Request) (*neturl.URL, error) {
+		if explicitProxy != nil {
+			return explicitProxy, nil
+		}
+		if envProxy, err := proxyFromEnvironment(req); envProxy != nil || err != nil {
+			return envProxy, err
+		}
+		return selectSystemProxy(req, systemProxy), nil
+	}
+}
+
+func parseProxyURL(raw string) *neturl.URL {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "http://" + raw
+	}
+	parsed, err := neturl.Parse(raw)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return nil
+	}
+	return parsed
+}
+
+func selectSystemProxy(req *http.Request, settings roleHubSystemProxySettings) *neturl.URL {
+	if req == nil || req.URL == nil {
+		return nil
+	}
+	scheme := strings.ToLower(req.URL.Scheme)
+	if scheme == "https" && settings.HTTPS != nil {
+		return settings.HTTPS
+	}
+	if settings.HTTP != nil {
+		return settings.HTTP
+	}
+	if settings.SOCKS != nil {
+		return settings.SOCKS
+	}
+	return nil
+}
+
+func loadSystemProxySettings() roleHubSystemProxySettings {
+	if runtime.GOOS != "darwin" {
+		return roleHubSystemProxySettings{}
+	}
+	out, err := exec.Command("scutil", "--proxy").Output()
+	if err != nil {
+		return roleHubSystemProxySettings{}
+	}
+	return parseDarwinSystemProxySettings(string(out))
+}
+
+func parseDarwinSystemProxySettings(raw string) roleHubSystemProxySettings {
+	values := map[string]string{}
+	lines := strings.Split(raw, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || !strings.Contains(line, ":") {
+			continue
+		}
+		parts := strings.SplitN(line, ":", 2)
+		key := strings.TrimSpace(parts[0])
+		val := strings.TrimSpace(parts[1])
+		values[key] = val
+	}
+
+	settings := roleHubSystemProxySettings{}
+	if values["HTTPEnable"] == "1" {
+		settings.HTTP = buildHostPortProxyURL("http", values["HTTPProxy"], values["HTTPPort"])
+	}
+	if values["HTTPSEnable"] == "1" {
+		settings.HTTPS = buildHostPortProxyURL("http", values["HTTPSProxy"], values["HTTPSPort"])
+	}
+	if values["SOCKSEnable"] == "1" {
+		settings.SOCKS = buildHostPortProxyURL("socks5", values["SOCKSProxy"], values["SOCKSPort"])
+	}
+	return settings
+}
+
+func buildHostPortProxyURL(scheme, host, port string) *neturl.URL {
+	host = strings.TrimSpace(host)
+	port = strings.TrimSpace(port)
+	scheme = strings.TrimSpace(scheme)
+	if host == "" {
+		return nil
+	}
+	if scheme == "" {
+		scheme = "http"
+	}
+	if port == "" {
+		port = "80"
+	}
+	return &neturl.URL{
+		Scheme: scheme,
+		Host:   net.JoinHostPort(host, port),
 	}
 }
 
@@ -179,7 +348,11 @@ func (c *IngestClient) reportWithRetry(payload IngestPayload) {
 
 // doPost sends a single HTTP POST to the ingest endpoint.
 func (c *IngestClient) doPost(traceID string, body []byte) error {
-	ctx, cancel := context.WithTimeout(context.Background(), roleHubIngestTimeout)
+	timeout := defaultRoleHubTimeout
+	if c.httpClient != nil && c.httpClient.Timeout > 0 {
+		timeout = c.httpClient.Timeout
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL, bytes.NewReader(body))

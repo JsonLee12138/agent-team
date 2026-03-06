@@ -224,6 +224,18 @@ AI 会先进行头脑风暴产出设计文档，然后创建任务并通知 work
 >
 > "从 owner/repo 安装角色。"
 
+建议先安装本仓库已发布的角色：
+
+```bash
+agent-team role-repo add JsonLee12138/agent-team
+```
+
+只安装某个指定角色：
+
+```bash
+agent-team role-repo add JsonLee12138/agent-team --role frontend-architect
+```
+
 ## 自带角色
 
 本仓库在 `.agents/teams/` 中包含以下自带角色：
@@ -284,7 +296,7 @@ AI 会先进行头脑风暴产出设计文档，然后创建任务并通知 work
 
 | 命令 | 说明 |
 |------|------|
-| `agent-team role-repo search <query>` | 基于严格角色路径契约搜索 GitHub 角色 |
+| `agent-team role-repo find <query>` | 基于严格角色路径契约搜索 GitHub 角色 |
 | `agent-team role-repo add <source> [--role <name>...] [--list] [-g] [-y]` | 从 `owner/repo` 或 GitHub URL 发现并安装角色 |
 | `agent-team role-repo list [-g]` | 查看所选 scope 下已安装的仓库角色 |
 | `agent-team role-repo remove [roles...] [-g] [-y]` | 删除已安装角色并清理锁文件条目 |
@@ -295,6 +307,18 @@ AI 会先进行头脑风暴产出设计文档，然后创建任务并通知 work
 
 - `skills/<role>/references/role.yaml`
 - `.agents/teams/<role>/references/role.yaml`
+
+`role-repo add` 交互行为：
+
+- 当发现多个角色且未指定 `--role` 时，多选框默认**不预选**任何角色。
+- 若目标目录已存在且未设置 `-y`，交互模式会提供覆盖选项：`Yes / No / All / None`。
+- `-y` 仍表示对所选角色统一强制覆盖，不再逐个确认。
+
+Role-hub 入库行为（针对仓库安装）：
+
+- `role-repo find` 不会触发入库。
+- `role-repo add` 对安装成功的角色执行异步上报（默认不阻塞）。
+- 本地调试可设置 `AGENT_TEAM_ROLE_HUB_DEBUG=1`，等待上报完成。
 
 #### Worker 命令
 
@@ -362,6 +386,10 @@ AI 会先进行头脑风暴产出设计文档，然后创建任务并通知 work
 | 变量 | 说明 |
 |------|------|
 | `AGENT_TEAM_BACKEND` | 终端后端：`wezterm`（默认）或 `tmux` |
+| `AGENT_TEAM_ROLE_HUB_URL` | Role-hub 上报地址。默认：`https://role-hub.vercel.app/api/v1/ingest` |
+| `AGENT_TEAM_ROLE_HUB_PROXY` | Role-hub 上报显式代理（最高优先级，例如 `http://127.0.0.1:7890`） |
+| `AGENT_TEAM_ROLE_HUB_TIMEOUT` | 上报请求超时（Go duration 格式）。默认：`15s` |
+| `AGENT_TEAM_ROLE_HUB_DEBUG` | 设为 `1/true/yes/on/debug` 时，上报改为等待完成（便于本地调试） |
 
 ## License
 

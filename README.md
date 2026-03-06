@@ -224,6 +224,18 @@ The AI will run brainstorming first to produce a design doc, then create the tas
 >
 > "Install roles from owner/repo."
 
+Install roles published by this repository first:
+
+```bash
+agent-team role-repo add JsonLee12138/agent-team
+```
+
+Install a specific role only:
+
+```bash
+agent-team role-repo add JsonLee12138/agent-team --role frontend-architect
+```
+
 ## Built-in Roles
 
 This repository includes several built-in roles in `.agents/teams/`:
@@ -284,7 +296,7 @@ All commands run inside a Git repository.
 
 | Command | Description |
 |---------|-------------|
-| `agent-team role-repo search <query>` | Search GitHub roles using strict role path contracts |
+| `agent-team role-repo find <query>` | Search GitHub roles using strict role path contracts |
 | `agent-team role-repo add <source> [--role <name>...] [--list] [-g] [-y]` | Discover and install role(s) from `owner/repo` or GitHub URL |
 | `agent-team role-repo list [-g]` | List installed repository-managed roles in selected scope |
 | `agent-team role-repo remove [roles...] [-g] [-y]` | Remove installed roles and clean lock entries |
@@ -295,6 +307,18 @@ Accepted remote role path contracts:
 
 - `skills/<role>/references/role.yaml`
 - `.agents/teams/<role>/references/role.yaml`
+
+`role-repo add` interactive behavior:
+
+- When multiple roles are discovered and `--role` is not specified, the multi-select starts with **no default selection**.
+- If an install target already exists and `-y` is not set, interactive mode prompts overwrite choice with `Yes / No / All / None`.
+- `-y` still forces overwrite for all selected roles without additional prompts.
+
+Role-hub ingest behavior (for repository installs):
+
+- `role-repo find` does not ingest records.
+- `role-repo add` reports successful installs to role-hub in async mode (non-blocking by default).
+- Set `AGENT_TEAM_ROLE_HUB_DEBUG=1` to wait for ingest completion during local debugging.
 
 #### Worker commands
 
@@ -362,6 +386,10 @@ project-root/
 | Variable | Description |
 |----------|-------------|
 | `AGENT_TEAM_BACKEND` | Terminal backend: `wezterm` (default) or `tmux` |
+| `AGENT_TEAM_ROLE_HUB_URL` | Role-hub ingest endpoint. Default: `https://role-hub.vercel.app/api/v1/ingest` |
+| `AGENT_TEAM_ROLE_HUB_PROXY` | Explicit proxy for role-hub ingest requests (highest priority, e.g. `http://127.0.0.1:7890`) |
+| `AGENT_TEAM_ROLE_HUB_TIMEOUT` | Ingest request timeout (Go duration). Default: `15s` |
+| `AGENT_TEAM_ROLE_HUB_DEBUG` | If set (`1/true/yes/on/debug`), wait for ingest completion instead of async fire-and-forget |
 
 ## License
 

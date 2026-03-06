@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -258,5 +260,234 @@ func TestBuildPayloadFields(t *testing.T) {
 	}
 	if payload.IdempotencyKey == "" {
 		t.Fatal("idempotency key should not be empty")
+	}
+}
+
+func TestNewIngestClientDefaultsToVercelIngestURL(t *testing.T) {
+	orig := os.Getenv("AGENT_TEAM_ROLE_HUB_URL")
+	t.Cleanup(func() {
+		if orig == "" {
+			os.Unsetenv("AGENT_TEAM_ROLE_HUB_URL")
+			return
+		}
+		os.Setenv("AGENT_TEAM_ROLE_HUB_URL", orig)
+	})
+	os.Unsetenv("AGENT_TEAM_ROLE_HUB_URL")
+
+	client := NewIngestClient()
+	if client.baseURL != "https://role-hub.vercel.app/api/v1/ingest" {
+		t.Fatalf("default baseURL=%q, want %q", client.baseURL, "https://role-hub.vercel.app/api/v1/ingest")
+	}
+}
+
+func TestNewIngestClientNormalizesRootURLToIngestPath(t *testing.T) {
+	orig := os.Getenv("AGENT_TEAM_ROLE_HUB_URL")
+	t.Cleanup(func() {
+		if orig == "" {
+			os.Unsetenv("AGENT_TEAM_ROLE_HUB_URL")
+			return
+		}
+		os.Setenv("AGENT_TEAM_ROLE_HUB_URL", orig)
+	})
+	os.Setenv("AGENT_TEAM_ROLE_HUB_URL", "https://role-hub.vercel.app/")
+
+	client := NewIngestClient()
+	if client.baseURL != "https://role-hub.vercel.app/api/v1/ingest" {
+		t.Fatalf("normalized baseURL=%q, want %q", client.baseURL, "https://role-hub.vercel.app/api/v1/ingest")
+	}
+}
+
+func TestNewIngestClientUsesDefaultTimeout(t *testing.T) {
+	orig := os.Getenv("AGENT_TEAM_ROLE_HUB_TIMEOUT")
+	t.Cleanup(func() {
+		if orig == "" {
+			os.Unsetenv("AGENT_TEAM_ROLE_HUB_TIMEOUT")
+			return
+		}
+		os.Setenv("AGENT_TEAM_ROLE_HUB_TIMEOUT", orig)
+	})
+	os.Unsetenv("AGENT_TEAM_ROLE_HUB_TIMEOUT")
+
+	client := NewIngestClient()
+	if client.httpClient.Timeout != 15*time.Second {
+		t.Fatalf("default timeout=%v, want %v", client.httpClient.Timeout, 15*time.Second)
+	}
+}
+
+func TestNewIngestClientUsesTimeoutFromEnv(t *testing.T) {
+	orig := os.Getenv("AGENT_TEAM_ROLE_HUB_TIMEOUT")
+	t.Cleanup(func() {
+		if orig == "" {
+			os.Unsetenv("AGENT_TEAM_ROLE_HUB_TIMEOUT")
+			return
+		}
+		os.Setenv("AGENT_TEAM_ROLE_HUB_TIMEOUT", orig)
+	})
+	os.Setenv("AGENT_TEAM_ROLE_HUB_TIMEOUT", "30s")
+
+	client := NewIngestClient()
+	if client.httpClient.Timeout != 30*time.Second {
+		t.Fatalf("configured timeout=%v, want %v", client.httpClient.Timeout, 30*time.Second)
+	}
+}
+
+func TestParseProxyURLAddsScheme(t *testing.T) {
+	parsed := parseProxyURL("127.0.0.1:7890")
+	if parsed == nil {
+		t.Fatal("expected proxy URL")
+	}
+	if parsed.Scheme != "http" || parsed.Host != "127.0.0.1:7890" {
+		t.Fatalf("parsed=%s, want http://127.0.0.1:7890", parsed.String())
+	}
+}
+
+func TestParseDarwinSystemProxySettings(t *testing.T) {
+	raw := `
+HTTPEnable : 1
+HTTPProxy : 127.0.0.1
+HTTPPort : 8080
+HTTPSEnable : 1
+HTTPSProxy : 127.0.0.1
+HTTPSPort : 7890
+SOCKSEnable : 1
+SOCKSProxy : 127.0.0.1
+SOCKSPort : 1080
+`
+	settings := parseDarwinSystemProxySettings(raw)
+	if settings.HTTP == nil || settings.HTTPS == nil || settings.SOCKS == nil {
+		t.Fatalf("unexpected settings: %+v", settings)
+	}
+	if settings.HTTP.Host != "127.0.0.1:8080" {
+		t.Fatalf("http host=%q, want 127.0.0.1:8080", settings.HTTP.Host)
+	}
+	if settings.HTTPS.Host != "127.0.0.1:7890" {
+		t.Fatalf("https host=%q, want 127.0.0.1:7890", settings.HTTPS.Host)
+	}
+	if settings.SOCKS.Scheme != "socks5" || settings.SOCKS.Host != "127.0.0.1:1080" {
+		t.Fatalf("socks proxy=%v, want socks5://127.0.0.1:1080", settings.SOCKS)
+	}
+}
+
+func TestNewRoleHubProxyFuncPrefersExplicitProxy(t *testing.T) {
+	origProxyEnv := os.Getenv(roleHubProxyEnv)
+	origProxyFromEnv := proxyFromEnvironment
+	origLoadSystem := loadRoleHubSystemProxySettings
+	t.Cleanup(func() {
+		if origProxyEnv == "" {
+			os.Unsetenv(roleHubProxyEnv)
+		} else {
+			os.Setenv(roleHubProxyEnv, origProxyEnv)
+		}
+		proxyFromEnvironment = origProxyFromEnv
+		loadRoleHubSystemProxySettings = origLoadSystem
+	})
+
+	os.Setenv(roleHubProxyEnv, "127.0.0.1:7890")
+	proxyFromEnvironment = func(*http.Request) (*neturl.URL, error) {
+		return parseProxyURL("http://127.0.0.1:8080"), nil
+	}
+	loadRoleHubSystemProxySettings = func() roleHubSystemProxySettings {
+		return roleHubSystemProxySettings{HTTPS: parseProxyURL("http://127.0.0.1:9090")}
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+	got, err := newRoleHubProxyFunc()(req)
+	if err != nil {
+		t.Fatalf("proxy error: %v", err)
+	}
+	if got == nil || got.Host != "127.0.0.1:7890" {
+		t.Fatalf("proxy host=%v, want 127.0.0.1:7890", got)
+	}
+}
+
+func TestNewRoleHubProxyFuncFallsBackToSystemProxy(t *testing.T) {
+	origProxyEnv := os.Getenv(roleHubProxyEnv)
+	origProxyFromEnv := proxyFromEnvironment
+	origLoadSystem := loadRoleHubSystemProxySettings
+	t.Cleanup(func() {
+		if origProxyEnv == "" {
+			os.Unsetenv(roleHubProxyEnv)
+		} else {
+			os.Setenv(roleHubProxyEnv, origProxyEnv)
+		}
+		proxyFromEnvironment = origProxyFromEnv
+		loadRoleHubSystemProxySettings = origLoadSystem
+	})
+
+	os.Unsetenv(roleHubProxyEnv)
+	proxyFromEnvironment = func(*http.Request) (*neturl.URL, error) { return nil, nil }
+	loadRoleHubSystemProxySettings = func() roleHubSystemProxySettings {
+		return roleHubSystemProxySettings{HTTPS: parseProxyURL("http://127.0.0.1:7891")}
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+	got, err := newRoleHubProxyFunc()(req)
+	if err != nil {
+		t.Fatalf("proxy error: %v", err)
+	}
+	if got == nil || got.Host != "127.0.0.1:7891" {
+		t.Fatalf("proxy host=%v, want 127.0.0.1:7891", got)
+	}
+}
+
+func TestNewRoleHubProxyFuncFallsBackToSystemSocksProxy(t *testing.T) {
+	origProxyEnv := os.Getenv(roleHubProxyEnv)
+	origProxyFromEnv := proxyFromEnvironment
+	origLoadSystem := loadRoleHubSystemProxySettings
+	t.Cleanup(func() {
+		if origProxyEnv == "" {
+			os.Unsetenv(roleHubProxyEnv)
+		} else {
+			os.Setenv(roleHubProxyEnv, origProxyEnv)
+		}
+		proxyFromEnvironment = origProxyFromEnv
+		loadRoleHubSystemProxySettings = origLoadSystem
+	})
+
+	os.Unsetenv(roleHubProxyEnv)
+	proxyFromEnvironment = func(*http.Request) (*neturl.URL, error) { return nil, nil }
+	loadRoleHubSystemProxySettings = func() roleHubSystemProxySettings {
+		return roleHubSystemProxySettings{SOCKS: parseProxyURL("socks5://127.0.0.1:1080")}
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+	got, err := newRoleHubProxyFunc()(req)
+	if err != nil {
+		t.Fatalf("proxy error: %v", err)
+	}
+	if got == nil || got.Scheme != "socks5" || got.Host != "127.0.0.1:1080" {
+		t.Fatalf("proxy=%v, want socks5://127.0.0.1:1080", got)
+	}
+}
+
+func TestNewRoleHubProxyFuncPrefersEnvProxyOverSystem(t *testing.T) {
+	origProxyEnv := os.Getenv(roleHubProxyEnv)
+	origProxyFromEnv := proxyFromEnvironment
+	origLoadSystem := loadRoleHubSystemProxySettings
+	t.Cleanup(func() {
+		if origProxyEnv == "" {
+			os.Unsetenv(roleHubProxyEnv)
+		} else {
+			os.Setenv(roleHubProxyEnv, origProxyEnv)
+		}
+		proxyFromEnvironment = origProxyFromEnv
+		loadRoleHubSystemProxySettings = origLoadSystem
+	})
+
+	os.Unsetenv(roleHubProxyEnv)
+	proxyFromEnvironment = func(*http.Request) (*neturl.URL, error) {
+		return parseProxyURL("http://127.0.0.1:8111"), nil
+	}
+	loadRoleHubSystemProxySettings = func() roleHubSystemProxySettings {
+		return roleHubSystemProxySettings{HTTPS: parseProxyURL("http://127.0.0.1:7892")}
+	}
+
+	req, _ := http.NewRequest(http.MethodGet, "https://example.com", nil)
+	got, err := newRoleHubProxyFunc()(req)
+	if err != nil {
+		t.Fatalf("proxy error: %v", err)
+	}
+	if got == nil || got.Host != "127.0.0.1:8111" {
+		t.Fatalf("proxy host=%v, want 127.0.0.1:8111", got)
 	}
 }

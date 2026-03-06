@@ -76,7 +76,7 @@ export default function RoleDetailPage() {
     )
   }
 
-  const installCmd = `agent-team role install ${role.role_name}`
+  const installCmd = `agent-team role-repo add ${role.source_owner}/${role.source_repo} --role ${role.role_name}`
 
   return (
     <div className="flex flex-col gap-10 px-6 lg:px-20 py-10">

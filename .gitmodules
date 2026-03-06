@@ -1,0 +1,3 @@
+[submodule "role-hub"]
+	path = "role-hub"
+	url = https://github.com/JsonLee12138/role-hub.git

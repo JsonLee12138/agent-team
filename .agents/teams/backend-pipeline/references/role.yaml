@@ -1,0 +1,13 @@
+name: backend-pipeline
+description: "Backend normalize worker and query API role"
+system_prompt_file: system.md
+scope:
+  in_scope:
+    - "normalize worker"
+    - "query API and pagination"
+  out_of_scope:
+    - "database migration ownership"
+    - "frontend implementation"
+constraints:
+  single_role_focus: true
+skills: []

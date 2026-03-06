@@ -7,7 +7,6 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
-	"github.com/JsonLee12138/agent-team/internal"
 	"github.com/spf13/cobra"
 )
 
@@ -45,8 +44,7 @@ func (a *App) RunRoleRepoFind(in io.Reader, out io.Writer, query string) error {
 }
 
 func (a *App) roleRepoFindDirect(out io.Writer, query string) error {
-	traceID := internal.GenerateTraceID()
-	client := internal.NewRoleRepoGitHubClient()
+	client := newRoleRepoSearchClient()
 	results, err := client.SearchRoleRepos(context.Background(), query)
 	if err != nil {
 		return err
@@ -60,10 +58,6 @@ func (a *App) roleRepoFindDirect(out io.Writer, query string) error {
 	if len(results) > 6 {
 		results = results[:6]
 	}
-
-	// Fire-and-forget ingest report (non-blocking).
-	ingest := internal.NewIngestClient()
-	ingest.ReportAsync(query, results, traceID)
 
 	fmt.Fprintf(out, "Found %d role(s):\n\n", len(results))
 	fmt.Fprintf(out, "  %-18s %-28s %s\n", "ROLE", "REPOSITORY", "PATH")
@@ -89,8 +83,7 @@ func (a *App) roleRepoFindInteractive(in io.Reader, out io.Writer) error {
 		return err
 	}
 
-	traceID := internal.GenerateTraceID()
-	client := internal.NewRoleRepoGitHubClient()
+	client := newRoleRepoSearchClient()
 	results, err := client.SearchRoleRepos(context.Background(), query)
 	if err != nil {
 		return err
@@ -104,10 +97,6 @@ func (a *App) roleRepoFindInteractive(in io.Reader, out io.Writer) error {
 	if len(results) > 6 {
 		results = results[:6]
 	}
-
-	// Fire-and-forget ingest report (non-blocking).
-	ingest := internal.NewIngestClient()
-	ingest.ReportAsync(query, results, traceID)
 
 	// Build numbered options
 	options := make([]string, len(results))

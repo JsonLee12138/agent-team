@@ -13,7 +13,7 @@ export function Navbar() {
           Directory
         </Link>
         <a
-          href="https://github.com/agent-team"
+          href="https://github.com/JsonLee12138/agent-team"
           target="_blank"
           rel="noopener noreferrer"
           className="text-sm font-medium text-text-sub no-underline hover:text-primary transition-colors font-ui"
