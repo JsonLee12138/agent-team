@@ -1,6 +1,21 @@
 import { createHash } from 'node:crypto'
 import { listRoleRows, listRoleRowsByRepo, type RoleRow } from './db.server'
+import { fetchRoleContent } from './github.server'
 import type { PaginatedResponse, Repository, RoleRecord, RolesQueryParams } from '~/types'
+
+function parseJsonArray(raw: string | string[] | null | undefined): string[] {
+  if (!raw) return []
+  if (Array.isArray(raw)) return raw
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed.map(String) : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
 
 function parseTags(raw: RoleRow['tags']): string[] {
   if (!raw) return []
@@ -49,6 +64,10 @@ function buildRoleRecord(row: RoleRow): RoleRecord {
     folder_hash: createHash('sha1').update(id).digest('hex').slice(0, 8),
     install_count: row.install_count ?? 0,
     tags,
+    system_md: row.system_md ?? undefined,
+    skills: parseJsonArray(row.skills_json),
+    in_scope: parseJsonArray(row.in_scope_json),
+    out_of_scope: parseJsonArray(row.out_of_scope_json),
     last_verified_at: nowIso,
     created_at: toIsoString(row.created_at),
     updated_at: toIsoString(row.updated_at),
@@ -84,7 +103,9 @@ function filterRoles(roles: RoleRecord[], params: RolesQueryParams): RoleRecord[
     const frameworks = Array.isArray(params.framework) ? params.framework : [params.framework]
     const normalized = frameworks.map((fw) => fw.toLowerCase())
     if (normalized.length > 0) {
-      filtered = filtered.filter((role) => role.tags.some((tag) => normalized.includes(tag.toLowerCase())))
+      filtered = filtered.filter((role) =>
+        normalized.some((fw) => matchesSearch(role, fw)),
+      )
     }
   }
 
@@ -130,8 +151,23 @@ export async function getRoles(params: RolesQueryParams = {}): Promise<Paginated
 export async function getRoleByName(name: string): Promise<RoleRecord | null> {
   const rows = await listRoleRows()
   const target = name.toLowerCase()
-  const match = rows.map(buildRoleRecord).find((role) => role.role_name.toLowerCase() === target)
-  return match ?? null
+  const role = rows.map(buildRoleRecord).find((r) => r.role_name.toLowerCase() === target)
+  if (!role) return null
+
+  // If system_md is missing from DB, fallback to GitHub
+  if (!role.system_md) {
+    try {
+      const content = await fetchRoleContent(role.source_owner, role.source_repo, role.role_path)
+      if (content.system_md) role.system_md = content.system_md
+      if (content.skills && role.skills.length === 0) role.skills = content.skills
+      if (content.in_scope && role.in_scope.length === 0) role.in_scope = content.in_scope
+      if (content.out_of_scope && role.out_of_scope.length === 0) role.out_of_scope = content.out_of_scope
+    } catch {
+      // GitHub fallback is best-effort
+    }
+  }
+
+  return role
 }
 
 export async function getRepo(owner: string, repo: string): Promise<Repository | null> {

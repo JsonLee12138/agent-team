@@ -20,12 +20,6 @@ export function Navbar() {
         >
           GitHub
         </a>
-        <a
-          href="#"
-          className="text-sm font-medium text-text-sub no-underline hover:text-primary transition-colors font-ui"
-        >
-          Docs
-        </a>
       </nav>
     </header>
   )

@@ -1,7 +1,8 @@
 import type { LoaderFunctionArgs, MetaFunction } from '@remix-run/node'
 import { json } from '@remix-run/node'
 import { Link, useLoaderData, useNavigation, useRevalidator } from '@remix-run/react'
-import { AlertTriangle, CheckCircle2, ChevronRight } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, ChevronRight, Shield, ShieldOff } from 'lucide-react'
+import Markdown from 'react-markdown'
 import { CopyButton } from '~/components/CopyButton'
 import { Tag } from '~/components/Tag'
 import { PageSkeleton, Skeleton } from '~/components/Skeleton'
@@ -142,13 +143,20 @@ export default function RoleDetailPage() {
 
       <div className="flex flex-col lg:flex-row gap-12 lg:gap-20">
         <div className="flex-1 min-w-0 flex flex-col gap-5">
-          <h2 className="text-2xl font-bold text-text-main font-ui m-0">README.md</h2>
-          <div className="text-base text-text-sub font-ui leading-relaxed whitespace-pre-wrap">
-            {role.readme ?? role.description}
-          </div>
+          <h2 className="text-2xl font-bold text-text-main font-ui m-0">system.md</h2>
+          {role.system_md ? (
+            <div className="prose prose-sm max-w-none text-text-sub font-ui [&_h1]:text-text-main [&_h2]:text-text-main [&_h3]:text-text-main [&_h1]:font-ui [&_h2]:font-ui [&_h3]:font-ui [&_strong]:text-text-main [&_a]:text-primary [&_code]:text-primary [&_code]:bg-surface [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-surface [&_pre]:border [&_pre]:border-border [&_pre]:rounded-lg [&_ul]:list-disc [&_ol]:list-decimal [&_li]:text-text-sub [&_blockquote]:border-l-3 [&_blockquote]:border-primary/30 [&_blockquote]:pl-4 [&_blockquote]:text-text-sub">
+              <Markdown>{role.system_md}</Markdown>
+            </div>
+          ) : (
+            <p className="text-base text-text-sub font-ui leading-relaxed">
+              {role.description || 'No system prompt available.'}
+            </p>
+          )}
         </div>
 
-        <div className="w-full lg:w-80 flex-shrink-0">
+        <div className="w-full lg:w-80 flex-shrink-0 flex flex-col gap-6">
+          {/* Metadata */}
           <div className="border border-border rounded-xl p-6 flex flex-col gap-4">
             <h4 className="text-xs font-bold text-text-sub tracking-widest uppercase font-ui m-0">Metadata</h4>
 
@@ -156,6 +164,13 @@ export default function RoleDetailPage() {
               <div className="w-8 h-8 rounded-full bg-surface border border-border" />
               <span className="text-sm font-semibold text-text-main font-ui">{role.source_owner}</span>
             </div>
+
+            {role.description && (
+              <div className="flex flex-col gap-2">
+                <span className="text-xs text-text-sub font-ui">Description</span>
+                <p className="text-sm text-text-main font-ui m-0 leading-relaxed">{role.description}</p>
+              </div>
+            )}
 
             <div className="flex flex-col gap-2">
               <span className="text-xs text-text-sub font-ui">Repository</span>
@@ -182,6 +197,55 @@ export default function RoleDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Skills */}
+          {role.skills.length > 0 && (
+            <div className="border border-border rounded-xl p-6 flex flex-col gap-4">
+              <h4 className="text-xs font-bold text-text-sub tracking-widest uppercase font-ui m-0">Skills</h4>
+              <ul className="flex flex-col gap-2 m-0 p-0 list-none">
+                {role.skills.map((skill) => (
+                  <li key={skill} className="text-sm text-text-main font-code bg-surface border border-border rounded-lg px-3 py-2 break-all">
+                    {skill}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Scope Boundaries */}
+          {(role.in_scope.length > 0 || role.out_of_scope.length > 0) && (
+            <div className="border border-border rounded-xl p-6 flex flex-col gap-5">
+              <h4 className="text-xs font-bold text-text-sub tracking-widest uppercase font-ui m-0">Scope Boundaries</h4>
+
+              {role.in_scope.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <Shield size={14} className="text-verified" />
+                    <span className="text-xs font-semibold text-verified font-ui">In Scope</span>
+                  </div>
+                  <ul className="flex flex-col gap-1.5 m-0 pl-5 list-disc">
+                    {role.in_scope.map((item) => (
+                      <li key={item} className="text-sm text-text-sub font-ui">{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {role.out_of_scope.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <ShieldOff size={14} className="text-text-sub" />
+                    <span className="text-xs font-semibold text-text-sub font-ui">Out of Scope</span>
+                  </div>
+                  <ul className="flex flex-col gap-1.5 m-0 pl-5 list-disc">
+                    {role.out_of_scope.map((item) => (
+                      <li key={item} className="text-sm text-text-sub font-ui">{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

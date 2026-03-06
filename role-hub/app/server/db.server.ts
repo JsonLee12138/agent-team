@@ -13,6 +13,10 @@ export interface RoleRow {
   score: number | null
   install_count: number
   tags: string | string[] | null
+  system_md: string | null
+  skills_json: string | string[] | null
+  in_scope_json: string | string[] | null
+  out_of_scope_json: string | string[] | null
   created_at: string | Date
   updated_at: string | Date
 }
@@ -104,14 +108,31 @@ async function initialize(): Promise<void> {
 
 function migrateSqlite(db: Database): void {
   const cols = db.pragma('table_info(role_records)') as { name: string }[]
-  if (!cols.some((c) => c.name === 'install_count')) {
+  const colNames = new Set(cols.map((c) => c.name))
+  if (!colNames.has('install_count')) {
     db.exec('ALTER TABLE role_records ADD COLUMN install_count INTEGER NOT NULL DEFAULT 0')
+  }
+  if (!colNames.has('system_md')) {
+    db.exec('ALTER TABLE role_records ADD COLUMN system_md TEXT')
+  }
+  if (!colNames.has('skills_json')) {
+    db.exec('ALTER TABLE role_records ADD COLUMN skills_json TEXT')
+  }
+  if (!colNames.has('in_scope_json')) {
+    db.exec('ALTER TABLE role_records ADD COLUMN in_scope_json TEXT')
+  }
+  if (!colNames.has('out_of_scope_json')) {
+    db.exec('ALTER TABLE role_records ADD COLUMN out_of_scope_json TEXT')
   }
 }
 
 async function migratePostgres(pool: Pool): Promise<void> {
   await pool.query(`
-    ALTER TABLE role_records ADD COLUMN IF NOT EXISTS install_count INTEGER NOT NULL DEFAULT 0
+    ALTER TABLE role_records ADD COLUMN IF NOT EXISTS install_count INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE role_records ADD COLUMN IF NOT EXISTS system_md TEXT;
+    ALTER TABLE role_records ADD COLUMN IF NOT EXISTS skills_json JSONB;
+    ALTER TABLE role_records ADD COLUMN IF NOT EXISTS in_scope_json JSONB;
+    ALTER TABLE role_records ADD COLUMN IF NOT EXISTS out_of_scope_json JSONB;
   `)
 }
 
@@ -186,6 +207,10 @@ export interface RoleRecordInput {
   source_url?: string
   score?: number | null
   tags?: string[]
+  system_md?: string
+  skills?: string[]
+  in_scope?: string[]
+  out_of_scope?: string[]
 }
 
 export async function upsertRoleRecords(records: RoleRecordInput[]): Promise<(Error | null)[]> {
@@ -195,14 +220,18 @@ export async function upsertRoleRecords(records: RoleRecordInput[]): Promise<(Er
 
   if (sqliteDb) {
     const stmt = sqliteDb.prepare(`
-      INSERT INTO role_records (repo_owner, repo_name, role_path, name, description, source_url, score, tags, created_at, updated_at)
-      VALUES (?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+      INSERT INTO role_records (repo_owner, repo_name, role_path, name, description, source_url, score, tags, system_md, skills_json, in_scope_json, out_of_scope_json, created_at, updated_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
       ON CONFLICT (repo_owner, repo_name, role_path)
       DO UPDATE SET name=excluded.name,
                     description=excluded.description,
                     source_url=excluded.source_url,
                     score=excluded.score,
                     tags=excluded.tags,
+                    system_md=COALESCE(excluded.system_md, role_records.system_md),
+                    skills_json=COALESCE(excluded.skills_json, role_records.skills_json),
+                    in_scope_json=COALESCE(excluded.in_scope_json, role_records.in_scope_json),
+                    out_of_scope_json=COALESCE(excluded.out_of_scope_json, role_records.out_of_scope_json),
                     updated_at=CURRENT_TIMESTAMP;
     `)
 
@@ -210,6 +239,9 @@ export async function upsertRoleRecords(records: RoleRecordInput[]): Promise<(Er
       items.forEach((record, index) => {
         try {
           const tags = record.tags && record.tags.length > 0 ? JSON.stringify(record.tags) : null
+          const skillsJson = record.skills && record.skills.length > 0 ? JSON.stringify(record.skills) : null
+          const inScopeJson = record.in_scope && record.in_scope.length > 0 ? JSON.stringify(record.in_scope) : null
+          const outOfScopeJson = record.out_of_scope && record.out_of_scope.length > 0 ? JSON.stringify(record.out_of_scope) : null
           stmt.run(
             record.repo_owner,
             record.repo_name,
@@ -219,6 +251,10 @@ export async function upsertRoleRecords(records: RoleRecordInput[]): Promise<(Er
             record.source_url ?? null,
             record.score ?? null,
             tags,
+            record.system_md ?? null,
+            skillsJson,
+            inScopeJson,
+            outOfScopeJson,
           )
         } catch (error) {
           errors[index] = error as Error
@@ -236,20 +272,27 @@ export async function upsertRoleRecords(records: RoleRecordInput[]): Promise<(Er
   try {
     await client.query('BEGIN')
     const stmt = `
-      INSERT INTO role_records (repo_owner, repo_name, role_path, name, description, source_url, score, tags, created_at, updated_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+      INSERT INTO role_records (repo_owner, repo_name, role_path, name, description, source_url, score, tags, system_md, skills_json, in_scope_json, out_of_scope_json, created_at, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
       ON CONFLICT (repo_owner, repo_name, role_path)
       DO UPDATE SET name=EXCLUDED.name,
                     description=EXCLUDED.description,
                     source_url=EXCLUDED.source_url,
                     score=EXCLUDED.score,
                     tags=EXCLUDED.tags,
+                    system_md=COALESCE(EXCLUDED.system_md, role_records.system_md),
+                    skills_json=COALESCE(EXCLUDED.skills_json, role_records.skills_json),
+                    in_scope_json=COALESCE(EXCLUDED.in_scope_json, role_records.in_scope_json),
+                    out_of_scope_json=COALESCE(EXCLUDED.out_of_scope_json, role_records.out_of_scope_json),
                     updated_at=CURRENT_TIMESTAMP;
     `
 
     for (const [index, record] of records.entries()) {
       try {
         const tags = record.tags && record.tags.length > 0 ? JSON.stringify(record.tags) : null
+        const skillsJson = record.skills && record.skills.length > 0 ? JSON.stringify(record.skills) : null
+        const inScopeJson = record.in_scope && record.in_scope.length > 0 ? JSON.stringify(record.in_scope) : null
+        const outOfScopeJson = record.out_of_scope && record.out_of_scope.length > 0 ? JSON.stringify(record.out_of_scope) : null
         await client.query(stmt, [
           record.repo_owner,
           record.repo_name,
@@ -259,6 +302,10 @@ export async function upsertRoleRecords(records: RoleRecordInput[]): Promise<(Er
           record.source_url ?? null,
           record.score ?? null,
           tags,
+          record.system_md ?? null,
+          skillsJson,
+          inScopeJson,
+          outOfScopeJson,
         ])
       } catch (error) {
         errors[index] = error as Error

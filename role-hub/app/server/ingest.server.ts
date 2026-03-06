@@ -18,6 +18,10 @@ export interface IngestResult {
   source_url?: string
   score?: number | null
   tags?: string[]
+  system_md?: string
+  skills?: string[]
+  in_scope?: string[]
+  out_of_scope?: string[]
 }
 
 export interface IngestResponse {
@@ -214,6 +218,10 @@ function mapToRecord(result: IngestResult): RoleRecordInput {
     source_url: result.source_url,
     score: result.score ?? null,
     tags: result.tags ?? [],
+    system_md: result.system_md,
+    skills: result.skills,
+    in_scope: result.in_scope,
+    out_of_scope: result.out_of_scope,
   }
 }
 
