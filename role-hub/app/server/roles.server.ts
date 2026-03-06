@@ -48,7 +48,7 @@ function buildRoleRecord(row: RoleRow): RoleRecord {
     source_ref: 'main',
     status: 'verified',
     folder_hash: createHash('sha1').update(id).digest('hex').slice(0, 8),
-    install_count: Math.max(0, Math.round(score * 10000)),
+    install_count: row.install_count ?? 0,
     tags,
     last_verified_at: nowIso,
     created_at: toIsoString(row.created_at),

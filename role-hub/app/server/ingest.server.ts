@@ -1,5 +1,5 @@
 import { loadConfig } from './config.server'
-import { getIngestEvent, insertIngestEvent, upsertRoleRecords, type RoleRecordInput } from './db.server'
+import { getIngestEvent, incrementInstallCounts, insertIngestEvent, upsertRoleRecords, type RoleRecordInput } from './db.server'
 
 export interface IngestRequest {
   idempotency_key: string
@@ -169,6 +169,14 @@ export async function handleIngestRequest(request: Request): Promise<Response> {
 async function processIngest(req: IngestRequest): Promise<IngestResponse> {
   const records: RoleRecordInput[] = req.results.map((result) => mapToRecord(result))
   const errors = await upsertRoleRecords(records)
+
+  if (req.query.startsWith('install:')) {
+    const installKeys = req.results.map((result) => {
+      const [owner = '', repo = ''] = result.repo.split('/')
+      return { repo_owner: owner, repo_name: repo, role_path: result.role_path }
+    })
+    await incrementInstallCounts(installKeys)
+  }
 
   const response: IngestResponse = {
     status: 'ok',

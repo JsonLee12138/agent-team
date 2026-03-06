@@ -11,6 +11,7 @@ export interface RoleRow {
   description: string | null
   source_url: string | null
   score: number | null
+  install_count: number
   tags: string | string[] | null
   created_at: string | Date
   updated_at: string | Date
@@ -38,6 +39,7 @@ CREATE TABLE IF NOT EXISTS role_records (
   description TEXT,
   source_url TEXT,
   score REAL,
+  install_count INTEGER NOT NULL DEFAULT 0,
   tags TEXT,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -64,6 +66,7 @@ CREATE TABLE IF NOT EXISTS role_records (
   description TEXT,
   source_url TEXT,
   score DOUBLE PRECISION,
+  install_count INTEGER NOT NULL DEFAULT 0,
   tags JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -90,11 +93,26 @@ async function initialize(): Promise<void> {
     const filePath = parseSqlitePath(config.dbDsn)
     sqliteDb = new Database(filePath)
     sqliteDb.exec(SQLITE_SCHEMA)
+    migrateSqlite(sqliteDb)
     return
   }
 
   pgPool = new Pool({ connectionString: config.dbDsn })
   await pgPool.query(POSTGRES_SCHEMA)
+  await migratePostgres(pgPool)
+}
+
+function migrateSqlite(db: Database): void {
+  const cols = db.pragma('table_info(role_records)') as { name: string }[]
+  if (!cols.some((c) => c.name === 'install_count')) {
+    db.exec('ALTER TABLE role_records ADD COLUMN install_count INTEGER NOT NULL DEFAULT 0')
+  }
+}
+
+async function migratePostgres(pool: Pool): Promise<void> {
+  await pool.query(`
+    ALTER TABLE role_records ADD COLUMN IF NOT EXISTS install_count INTEGER NOT NULL DEFAULT 0
+  `)
 }
 
 function parseSqlitePath(dsn: string): string {
@@ -252,6 +270,51 @@ export async function upsertRoleRecords(records: RoleRecordInput[]): Promise<(Er
   } catch (error) {
     await client.query('ROLLBACK')
     return errors.map((existing) => existing ?? (error as Error))
+  } finally {
+    client.release()
+  }
+}
+
+export interface InstallCountKey {
+  repo_owner: string
+  repo_name: string
+  role_path: string
+}
+
+export async function incrementInstallCounts(keys: InstallCountKey[]): Promise<void> {
+  if (keys.length === 0) return
+  await ensureInitialized()
+
+  if (sqliteDb) {
+    const stmt = sqliteDb.prepare(`
+      UPDATE role_records
+      SET install_count = install_count + 1, updated_at = CURRENT_TIMESTAMP
+      WHERE repo_owner = ? AND repo_name = ? AND role_path = ?
+    `)
+    const tx = sqliteDb.transaction((items: InstallCountKey[]) => {
+      for (const key of items) {
+        stmt.run(key.repo_owner, key.repo_name, key.role_path)
+      }
+    })
+    tx(keys)
+    return
+  }
+
+  if (!pgPool) return
+  const client = await pgPool.connect()
+  try {
+    await client.query('BEGIN')
+    for (const key of keys) {
+      await client.query(
+        `UPDATE role_records
+         SET install_count = install_count + 1, updated_at = CURRENT_TIMESTAMP
+         WHERE repo_owner = $1 AND repo_name = $2 AND role_path = $3`,
+        [key.repo_owner, key.repo_name, key.role_path],
+      )
+    }
+    await client.query('COMMIT')
+  } catch {
+    await client.query('ROLLBACK')
   } finally {
     client.release()
   }

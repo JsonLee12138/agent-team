@@ -1,4 +1,4 @@
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, Download } from 'lucide-react'
 import { Link } from '@remix-run/react'
 import { CopyButton } from './CopyButton'
 import { Tag } from './Tag'
@@ -32,8 +32,11 @@ export function RoleCard({ role }: RoleCardProps) {
       )}
 
       <div className="flex items-center justify-between w-full pt-3 border-t border-border">
-        <span className="text-xs text-text-sub font-ui">v1.0.2</span>
-        <CopyButton text={`agent-team role install ${role.role_name}`} />
+        <span className="text-xs text-text-sub font-ui flex items-center gap-1">
+          <Download size={12} />
+          {role.install_count >= 1000 ? `${(role.install_count / 1000).toFixed(1)}k` : role.install_count}
+        </span>
+        <CopyButton text={`agent-team role-repo add ${role.source_owner}/${role.source_repo} --role ${role.role_name}`} />
       </div>
     </Link>
   )
