@@ -44,7 +44,7 @@ var launchCommands = map[string]string{
 	"claude":   "claude --dangerously-skip-permissions",
 	"codex":    "codex --dangerously-bypass-approvals-and-sandbox",
 	"opencode": "opencode",
-	"gemini":   "gemini",
+	"gemini":   "gemini --approval-mode yolo",
 }
 
 func FindWtBase(root string) string {

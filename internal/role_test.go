@@ -125,6 +125,8 @@ func TestBuildLaunchCmd(t *testing.T) {
 		{"claude", "", "claude --dangerously-skip-permissions"},
 		{"codex", "gpt-5", "codex --dangerously-bypass-approvals-and-sandbox --model gpt-5"},
 		{"opencode", "", "opencode"},
+		{"gemini", "", "gemini --approval-mode yolo"},
+		{"gemini", "gemini-2.5-pro", "gemini --approval-mode yolo --model gemini-2.5-pro"},
 		{"", "", "claude --dangerously-skip-permissions"},
 	}
 	for _, tt := range tests {
