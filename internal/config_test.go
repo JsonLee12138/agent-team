@@ -10,7 +10,7 @@ import (
 
 func TestWorkerConfigRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "workers", "dev-001", "config.yaml")
+	path := filepath.Join(dir, ".worktrees", "dev-001", "worker.yaml")
 
 	original := &WorkerConfig{
 		WorkerID:     "dev-001",

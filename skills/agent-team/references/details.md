@@ -17,7 +17,8 @@
 
 ```
 .worktrees/<worker-id>/
-  .gitignore                       <- excludes .gitignore, .claude/, .codex/, .tasks/
+  .gitignore                       <- excludes .gitignore, .claude/, .codex/, .gemini/, .opencode/, .tasks/, worker.yaml
+  worker.yaml                      <- worker instance config (excluded from git)
   .claude/
     skills/                        <- dynamically copied on open
       <role-skill>/
@@ -28,6 +29,7 @@
       <dependency-skill-1>/
   CLAUDE.md                        <- generated from role system.md
   AGENTS.md                        <- generated from role system.md
+  GEMINI.md                        <- generated from role system.md
   .tasks/
     config.yaml                    <- verify defaults (command, timeout), lifecycle
     changes/                       <- active changes (managed by task system)
@@ -38,13 +40,16 @@
         tests.md                   <- acceptance criteria (written by worker, TDD)
 ```
 
-### Worker config.yaml
+### worker.yaml
 
 ```yaml
 worker_id: frontend-dev-001
 role: frontend-dev
-default_provider: claude
+role_scope: ""                     # "project" | "global", omitted when empty
+role_path: ""                      # absolute path for global roles, omitted when empty
+provider: claude
 default_model: ""
+main_session_id: ""
 pane_id: ""
 controller_pane_id: ""
 created_at: "2026-02-26T10:00:00Z"
@@ -92,7 +97,7 @@ Reply appears in the worker's terminal as `[Main Controller Reply]`.
 
 The worker AI must NOT proceed on blocked tasks until it receives a reply.
 
-The controller's pane ID is saved in `config.yaml` (`controller_pane_id`) when `agent-team worker open` runs.
+The controller's pane ID is saved in `worker.yaml` (`controller_pane_id`) when `agent-team worker open` runs.
 
 ## Skills Copying
 

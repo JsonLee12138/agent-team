@@ -51,6 +51,7 @@ Let your AI agent set itself up. It only takes two steps:
 | **Go Install** | `go install github.com/JsonLee12138/agent-team@latest` |
 | **Claude Plugin** | `/plugin marketplace add JsonLee12138/agent-team` |
 | **Gemini Ext** | `gemini extensions install https://github.com/JsonLee12138/agent-team` |
+| **OpenCode Plugin** | `{ "plugin": ["opencode-agent-team"] }` in `~/.config/opencode/opencode.json` |
 
 ---
 
