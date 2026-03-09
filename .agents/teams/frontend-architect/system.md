@@ -12,3 +12,4 @@ Primary objective:
 - If a required skill is missing at runtime, use `find-skills` to recommend installable skills for this role.
 - Before any installation, ask the user whether to install globally or project-level.
 - If the user does not specify, default to global installation.
+- For frontend project scaffolding or architecture setup, include `ESLint`, `commitlint`, and related code-quality tooling by default unless the user explicitly opts out.

@@ -40,7 +40,9 @@ Runs first-time setup: detects installed providers, creates `.agents/teams/` str
 
 ### Creating a Role
 
-1. Use the `/role-creator` skill with `--target-dir .agents/teams`
+> **MANDATORY**: Role creation MUST be delegated to the `/role-creator` skill via `Skill` tool invocation. Do NOT create role files (SKILL.md, system.md, role.yaml) manually or inline. Always invoke `/role-creator` first, then continue the agent-team workflow.
+
+1. **Invoke `/role-creator`** skill with `--target-dir .agents/teams` (use the `Skill` tool with `skill: "role-creator"`)
 2. If a role already exists in global `~/.agents/roles/`, prompt user to copy it to `.agents/teams/`
 3. Result: `.agents/teams/<role-name>/` with SKILL.md, system.md, references/role.yaml
 
@@ -51,7 +53,7 @@ When the user describes a team in natural language (e.g. "Create a frontend deve
 1. Parse the prompt into responsibility units (one role per responsibility).
 2. Normalize each role name to kebab-case (`frontend developer` -> `frontend-dev`).
 3. Present the draft role list and ask for one confirmation before execution.
-4. For each approved role, run the full **Creating a Role** workflow with `/role-creator --target-dir .agents/teams`.
+4. For each approved role, run the full **Creating a Role** workflow — MUST invoke `/role-creator` skill via `Skill` tool (do NOT create role files manually).
 5. Return a per-role summary: `created`, `already exists`, or `failed` (with reason).
 6. Stop after role creation. Do NOT create workers in this flow.
 
@@ -66,7 +68,7 @@ When a role is not found locally:
 
 1. Ask user: "Create from scratch?" or "Search Role Hub?"
 2. If search: `agent-team catalog search <query>` -> show results -> `agent-team role-repo add <source> --role <name>`
-3. If no match or declined: fall back to create from scratch
+3. If no match or declined: fall back to **Creating a Role** (which MUST invoke `/role-creator` skill)
 
 ### Role Repo Management
 

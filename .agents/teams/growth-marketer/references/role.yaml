@@ -1,0 +1,27 @@
+name: growth-marketer
+description: "Growth marketing role for project promotion across social media platforms, content creation, and community engagement"
+system_prompt_file: system.md
+scope:
+  in_scope:
+    - "Social media content creation"
+    - "X/Twitter thread writing"
+    - "Launch announcement drafting"
+    - "Developer community outreach"
+    - "Content calendar planning"
+    - "Copywriting for technical audiences"
+    - "Hashtag and SEO strategy"
+    - "Basic legal compliance review for published content"
+  out_of_scope:
+    - "Code implementation"
+    - "CI/CD pipeline changes"
+    - "Infrastructure management"
+    - "Paid advertising budget management"
+constraints:
+  single_role_focus: true
+skills:
+  - "langchain-ai/deepagents@social-media"
+  - "coreyhaines31/marketingskills@social-content"
+  - "aaron-he-zhu/seo-geo-claude-skills@seo-content-writer"
+  - "kostja94/marketing-skills@copywriting"
+  - "dengineproblem/agents-monorepo@social-media-marketing"
+  - "davila7/claude-code-templates@programmatic-seo"

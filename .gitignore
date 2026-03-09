@@ -19,3 +19,5 @@ agents/workers
 .tasks/
 .backup/
 roles-lock.json
+blog
+docs/marketing

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"text/template"
 
 	"gopkg.in/yaml.v3"
 )
@@ -439,6 +440,85 @@ func InjectSection(filePath, tag, content string) error {
 	return os.WriteFile(filePath, []byte(fileContent), 0644)
 }
 
+// roleSectionData holds the template data for the AGENT_TEAM section.
+type roleSectionData struct {
+	RoleName string
+	WorkerID string
+	WtPath   string
+	Root     string
+	Skills   []string
+}
+
+var roleSectionTmpl = template.Must(template.New("roleSection").Parse(`
+## Skill-First Workflow
+
+**Role skill (MUST use):** ` + "`{{.RoleName}}`" + `
+
+When you receive ANY task, you MUST first invoke the ` + "`{{.RoleName}}`" + ` skill (via ` + "`/{{.RoleName}}`" + ` or the Skill tool). This is your primary skill that defines how you approach work. Never skip it.
+{{if .Skills}}
+**Dependency skills:**
+{{range .Skills}}
+- ` + "`{{.}}`" + `
+{{- end}}
+{{end}}
+**Workflow:**
+
+1. **Match skills first** — Check which of your available skills are relevant to the task before doing any direct work.
+2. **Invoke matched skills** — For each relevant skill, invoke it (via ` + "`/skill-name`" + ` or the Skill tool). Let the skill guide execution.
+3. **Combine skill outputs** — If a task spans multiple skills, invoke them in logical order and integrate their outputs.
+4. **Direct work only as fallback** — Only work directly when no available skill covers the requirement.
+5. **Dynamic skill discovery** — If no current skill matches, invoke ` + "`find-skills`" + ` to search for one. If found, use it and suggest adding it to the role for future sessions.
+
+## Development Environment
+
+You are working in an **isolated git worktree**. All development MUST happen here:
+
+- **Working directory**: ` + "`{{.WtPath}}`" + `
+- **Git branch**: ` + "`team/{{.WorkerID}}`" + ` (your dedicated branch)
+- **Main project root**: ` + "`{{.Root}}`" + `
+
+### Git Rules
+
+- All changes and commits go to the ` + "`team/{{.WorkerID}}`" + ` branch — this is already checked out
+- **Never** run ` + "`git checkout`" + `, ` + "`git switch`" + `, or change branches
+- **Never** merge or rebase from within this worktree
+- Commit regularly with clear messages as you complete work
+- The following paths are excluded by ` + "`.gitignore`" + ` and will NOT be committed: ` + "`.claude/`" + `, ` + "`.codex/`" + `, ` + "`.gemini/`" + `, ` + "`.opencode/`" + `, ` + "`.tasks/`" + `, ` + "`worker.yaml`" + `
+- **Never** place output documents, reports, or any deliverables in git-ignored directories. All work products must be in tracked paths so they are included in commits
+
+The main controller will merge your branch back to main when ready.
+
+### Task Completion Protocol
+
+Use the ` + "`agent-team`" + ` skill's **Reply to main controller (used by workers)** protocol for worker-to-main communication.
+For EVERY completed task, you MUST send a completion message to main controller.
+When any task is done:
+1. **Commit all work** — Before reporting, ensure all task-related changes are committed. Do NOT use ` + "`git add -A`" + ` or ` + "`git add .`" + ` blindly. Instead:
+   - Run ` + "`git status`" + ` to review changed files
+   - Only stage files that are **within the scope of your task** (e.g., if the task modifies ` + "`src/auth/`" + `, only stage files under that path)
+   - Ignore untracked files that are not part of your work (build artifacts, temp files, etc.)
+   - Commit with a clear message summarizing the changes:
+     ` + "```bash" + `
+     git add <specific-files-or-directories>
+     git commit -m "<clear summary of changes>"
+     ` + "```" + `
+   - If there are no uncommitted task-related changes (already committed during development), skip this step
+2. Run ` + "`agent-team task archive <worker-id> <change-name>`" + ` to archive the completed change
+3. After the archive attempt (success or failure), ALWAYS notify main controller:
+   ` + "```bash" + `
+   agent-team reply-main "Task completed: <summary>; change archived: <change-name>"
+   ` + "```" + `
+4. If archive fails, you may still report completion, but MUST include the failure details:
+   ` + "```bash" + `
+   agent-team reply-main "Task completed: <summary>; archive failed for <change-name>: <error>"
+   ` + "```" + `
+5. If you have blockers, questions, or implementation options, report them to main controller:
+   ` + "```bash" + `
+   agent-team reply-main "Need decision: <problem or options>"
+   ` + "```" + `
+6. Do not start the next task until the completion summary has been sent.
+`))
+
 // buildRoleSectionFromPath builds the AGENT_TEAM section content from the role at rolePath.
 func buildRoleSectionFromPath(wtPath, workerID, roleName, rolePath, root string) (string, error) {
 	roleSystemPath := filepath.Join(rolePath, "system.md")
@@ -450,63 +530,26 @@ func buildRoleSectionFromPath(wtPath, workerID, roleName, rolePath, root string)
 		return "", err
 	}
 
-	var b strings.Builder
-	b.Write(prompt)
-
-	// Inject skill-first workflow and available skills list
-	b.WriteString("\n## Skill-First Workflow\n\n")
-	fmt.Fprintf(&b, "**Role skill (MUST use):** `%s`\n\n", roleName)
-	fmt.Fprintf(&b, "When you receive ANY task, you MUST first invoke the `%s` skill (via `/%s` or the Skill tool). ", roleName, roleName)
-	b.WriteString("This is your primary skill that defines how you approach work. Never skip it.\n\n")
-
-	skills, skillErr := ReadRoleSkillsFromPath(rolePath)
-	if skillErr == nil && len(skills) > 0 {
-		b.WriteString("**Dependency skills:**\n\n")
-		for _, skill := range skills {
-			shortName := parseSkillName(skill)
-			fmt.Fprintf(&b, "- `%s`\n", shortName)
+	var skills []string
+	if s, sErr := ReadRoleSkillsFromPath(rolePath); sErr == nil {
+		for _, skill := range s {
+			skills = append(skills, parseSkillName(skill))
 		}
-		b.WriteString("\n")
 	}
 
-	b.WriteString("**Workflow:**\n\n")
-	b.WriteString("1. **Match skills first** — Check which of your available skills are relevant to the task before doing any direct work.\n")
-	b.WriteString("2. **Invoke matched skills** — For each relevant skill, invoke it (via `/skill-name` or the Skill tool). Let the skill guide execution.\n")
-	b.WriteString("3. **Combine skill outputs** — If a task spans multiple skills, invoke them in logical order and integrate their outputs.\n")
-	b.WriteString("4. **Direct work only as fallback** — Only work directly when no available skill covers the requirement.\n")
-	b.WriteString("5. **Dynamic skill discovery** — If no current skill matches, invoke `find-skills` to search for one. If found, use it and suggest adding it to the role for future sessions.\n")
+	data := roleSectionData{
+		RoleName: roleName,
+		WorkerID: workerID,
+		WtPath:   wtPath,
+		Root:     root,
+		Skills:   skills,
+	}
 
-	b.WriteString("\n## Development Environment\n\n")
-	b.WriteString("You are working in an **isolated git worktree**. All development MUST happen here:\n\n")
-	fmt.Fprintf(&b, "- **Working directory**: `%s`\n", wtPath)
-	fmt.Fprintf(&b, "- **Git branch**: `team/%s` (your dedicated branch)\n", workerID)
-	fmt.Fprintf(&b, "- **Main project root**: `%s`\n\n", root)
-	b.WriteString("### Git Rules\n\n")
-	fmt.Fprintf(&b, "- All changes and commits go to the `team/%s` branch — this is already checked out\n", workerID)
-	b.WriteString("- **Never** run `git checkout`, `git switch`, or change branches\n")
-	b.WriteString("- **Never** merge or rebase from within this worktree\n")
-	b.WriteString("- Commit regularly with clear messages as you complete work\n")
-	b.WriteString("- The following paths are excluded by `.gitignore` and will NOT be committed: `.claude/`, `.codex/`, `.gemini/`, `.opencode/`, `.tasks/`, `worker.yaml`\n")
-	b.WriteString("- **Never** place output documents, reports, or any deliverables in git-ignored directories. All work products must be in tracked paths so they are included in commits\n\n")
-	b.WriteString("The main controller will merge your branch back to main when ready.\n\n")
-	b.WriteString("### Task Completion Protocol\n\n")
-	b.WriteString("Use the `agent-team` skill's **Reply to main controller (used by workers)** protocol for worker-to-main communication.\n")
-	b.WriteString("For EVERY completed task, you MUST send a completion message to main controller.\n")
-	b.WriteString("When any task is done:\n")
-	b.WriteString("1. Run `agent-team task archive <worker-id> <change-name>` to archive the completed change\n")
-	b.WriteString("2. After the archive attempt (success or failure), ALWAYS notify main controller:\n")
-	b.WriteString("   ```bash\n")
-	b.WriteString("   agent-team reply-main \"Task completed: <summary>; change archived: <change-name>\"\n")
-	b.WriteString("   ```\n")
-	b.WriteString("3. If archive fails, you may still report completion, but MUST include the failure details:\n")
-	b.WriteString("   ```bash\n")
-	b.WriteString("   agent-team reply-main \"Task completed: <summary>; archive failed for <change-name>: <error>\"\n")
-	b.WriteString("   ```\n")
-	b.WriteString("4. If you have blockers, questions, or implementation options, report them to main controller:\n")
-	b.WriteString("   ```bash\n")
-	b.WriteString("   agent-team reply-main \"Need decision: <problem or options>\"\n")
-	b.WriteString("   ```\n")
-	b.WriteString("5. Do not start the next task until the completion summary has been sent.\n")
+	var b strings.Builder
+	b.Write(prompt)
+	if err := roleSectionTmpl.Execute(&b, data); err != nil {
+		return "", fmt.Errorf("execute role section template: %w", err)
+	}
 
 	return b.String(), nil
 }
