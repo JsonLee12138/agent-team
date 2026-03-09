@@ -35,8 +35,9 @@
 
 1. **安装 Skill**:
    ```bash
-   npx skills add JsonLee12138/agent-team -a '*' -y
+   npx skills add JsonLee12138/agent-team -a <platform> -y
    ```
+   将 `<platform>` 替换为你的 Provider：`claude`、`gemini`、`opencode` 或 `codex`。
 2. **对智能体说**:
    > "安装 agent-team 并初始化项目。"
 

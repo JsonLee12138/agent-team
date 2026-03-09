@@ -35,8 +35,9 @@ Let your AI agent set itself up. It only takes two steps:
 
 1. **Install the Skill**:
    ```bash
-   npx skills add JsonLee12138/agent-team -a '*' -y
+   npx skills add JsonLee12138/agent-team -a <platform> -y
    ```
+   Replace `<platform>` with your provider: `claude`, `gemini`, `opencode`, or `codex`.
 2. **Tell your Agent**:
    > "Install agent-team and initialize the project."
 

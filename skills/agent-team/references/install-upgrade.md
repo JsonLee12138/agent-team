@@ -2,6 +2,11 @@
 
 Per-provider instructions for installing and upgrading agent-team. AI agents can use these steps to self-install or self-upgrade when needed.
 
+> **IMPORTANT — Platform Selection Rule**
+> Before installing or upgrading skills, you **MUST** ask the user which platform(s) they use (e.g. `claude`, `gemini`, `opencode`, `codex`).
+> **NEVER** use `-a '*'` (all-platform wildcard) for project-level skill installation — it pollutes the project with config directories for providers the user does not use.
+> Global-level (`-g`) also requires explicit platform confirmation.
+
 ## Quick Check
 
 ```bash
@@ -122,19 +127,21 @@ This installs the skill files (SKILL.md, system.md, etc.) into the provider's sk
 
 ### Install
 
-Before running, confirm with the user:
-1. **Platform**: which agent platform(s) — see [platforms.md](platforms.md)
+Before running, you **MUST** confirm with the user:
+1. **Platform**: which specific agent platform(s) — see [platforms.md](platforms.md)
 2. **Scope**: project-level or global
 
+> **Do NOT use `-a '*'` for project-level installs.** Each platform creates its own config directory (`.claude/`, `.codex/`, etc.). Installing all platforms pollutes the project with unused directories and may conflict with existing provider configs.
+
 ```bash
-# Project-level (installs into .claude/skills/, .codex/skills/, etc.)
+# Project-level — specify platform explicitly
 npx skills add JsonLee12138/agent-team -a <platform> -y
 
-# Global
-npx skills add JsonLee12138/agent-team -a <platform> -y -g
+# Multiple specific platforms (if user confirms)
+npx skills add JsonLee12138/agent-team -a claude -a gemini -y
 
-# All supported platforms
-npx skills add JsonLee12138/agent-team -a '*' -y
+# Global — still requires explicit platform(s)
+npx skills add JsonLee12138/agent-team -a <platform> -y -g
 ```
 
 ### Upgrade
@@ -200,7 +207,7 @@ After installing (or upgrading), run:
 agent-team init
 ```
 
-This will:
+Before running `init`, ask the user which AI providers they use. This will:
 1. Detect installed AI providers (claude, gemini, opencode, codex)
 2. Create `.agents/teams/` project structure (if in a git repo)
 3. Install/update bundled roles to `~/.agents/roles/`
