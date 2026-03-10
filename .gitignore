@@ -1,6 +1,9 @@
 # Build output
 output
 
+# Build-time generated files
+internal/hooks.json
+
 # Dependencies
 node_modules/
 

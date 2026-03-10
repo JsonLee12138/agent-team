@@ -6,6 +6,7 @@ GORUN := GOROOT=$(HOME)/.gvm/gos/go1.24.2 $(HOME)/.gvm/gos/go1.24.2/bin/go
 .PHONY: build test lint clean install uninstall plugin-pack plugin-test migrate
 
 build:
+	cp hooks/hooks.json internal/hooks.json
 	$(GORUN) build -ldflags "-X github.com/JsonLee12138/agent-team/cmd.Version=$(VERSION)" -o $(BINARY) .
 
 test:

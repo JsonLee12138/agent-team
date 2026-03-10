@@ -71,6 +71,11 @@ func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow bool) er
 		return fmt.Errorf("inject role prompt: %w", err)
 	}
 
+	// Install/update hooks into .claude/settings.json
+	if err := internal.InstallHooksToSettings(wtPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: install hooks: %v\n", err)
+	}
+
 	// Spawn pane
 	paneID, err := a.Session.SpawnPane(wtPath, newWindow)
 	if err != nil || paneID == "" {
