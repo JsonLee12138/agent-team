@@ -92,4 +92,5 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newHookCmd())
 	rootCmd.AddCommand(newCatalogCmd())
+	rootCmd.AddCommand(newSkillCmd())
 }

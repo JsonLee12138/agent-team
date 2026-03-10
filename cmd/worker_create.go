@@ -26,6 +26,7 @@ var skillInstaller = internal.InstallSkillsForWorkerFromPath
 func newWorkerCreateCmd() *cobra.Command {
 	var model string
 	var newWindow bool
+	var fresh bool
 	cmd := &cobra.Command{
 		Use:   "create <role-name> [provider]",
 		Short: "Create a new worker and open its session",
@@ -35,15 +36,16 @@ func newWorkerCreateCmd() *cobra.Command {
 			if len(args) > 1 {
 				provider = args[1]
 			}
-			return GetApp(cmd).RunWorkerCreate(args[0], provider, model, newWindow)
+			return GetApp(cmd).RunWorkerCreate(args[0], provider, model, newWindow, fresh)
 		},
 	}
 	cmd.Flags().StringVarP(&model, "model", "m", "", "AI model identifier")
 	cmd.Flags().BoolVarP(&newWindow, "new-window", "w", false, "Open in a new window instead of a tab")
+	cmd.Flags().BoolVar(&fresh, "fresh", false, "Force re-install all skills, ignoring project cache")
 	return cmd
 }
 
-func (a *App) RunWorkerCreate(roleName, provider, model string, newWindow bool) error {
+func (a *App) RunWorkerCreate(roleName, provider, model string, newWindow, fresh bool) error {
 	root := a.Git.Root()
 
 	// 1. Resolve role (project → global priority)
@@ -159,7 +161,7 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, newWindow bool) 
 
 	// 13. Install skills
 	fmt.Printf("  Installing skills for role '%s'...\n", roleName)
-	if err := skillInstaller(wtPath, root, roleName, rolePath, provider); err != nil {
+	if err := skillInstaller(wtPath, root, roleName, rolePath, provider, fresh); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: skill installation had errors: %v\n", err)
 	}
 

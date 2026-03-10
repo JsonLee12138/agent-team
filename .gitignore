@@ -21,3 +21,9 @@ agents/workers
 roles-lock.json
 blog
 docs/marketing
+
+# Remote skill cache (installed by npx skills add)
+.claude/skills/
+.codex/skills/
+.opencode/skills/
+.gemini/skills/
