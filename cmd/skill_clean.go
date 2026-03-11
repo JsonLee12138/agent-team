@@ -12,19 +12,15 @@ import (
 func newSkillCleanCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "clean",
-		Short: "Remove all cached skills from project-level provider directories",
+		Short: "Remove all cached skills from project-level cache directory",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root := GetApp(cmd).Git.Root()
 
-			// Clean skill cache for all providers
-			providers := []string{".claude", ".codex", ".opencode", ".gemini"}
+			// Clean skill cache from .agents/.cache/skills/
+			dir := filepath.Join(root, ".agents", ".cache", "skills")
 			removed := 0
-			for _, p := range providers {
-				dir := filepath.Join(root, p, "skills")
-				entries, err := os.ReadDir(dir)
-				if err != nil {
-					continue // directory doesn't exist
-				}
+			entries, err := os.ReadDir(dir)
+			if err == nil {
 				for _, e := range entries {
 					full := filepath.Join(dir, e.Name())
 					if err := os.RemoveAll(full); err != nil {

@@ -23,7 +23,4 @@ blog
 docs/marketing
 
 # Remote skill cache (installed by npx skills add)
-.claude/skills/
-.codex/skills/
-.opencode/skills/
-.gemini/skills/
+.agents/.cache/

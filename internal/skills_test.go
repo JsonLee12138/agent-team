@@ -16,6 +16,8 @@ func TestParseSkillName(t *testing.T) {
 		{"jsonlee12138/prompts@eslint-config", "eslint-config"},
 		{"design-patterns-principles", "design-patterns-principles"},
 		{"org/repo@sub@deep", "deep"},
+		{"better-auth/better-icons", "better-icons"},
+		{"org/skill-name", "skill-name"},
 	}
 	for _, tt := range tests {
 		got := parseSkillName(tt.input)
@@ -102,13 +104,13 @@ func TestFindSkillPath(t *testing.T) {
 		}
 	})
 
-	t.Run("finds in .claude/skills/", func(t *testing.T) {
-		skillDir := filepath.Join(dir, ".claude", "skills", "local-cached-skill")
+	t.Run("finds in .agents/.cache/skills/", func(t *testing.T) {
+		skillDir := filepath.Join(dir, ".agents", ".cache", "skills", "local-cached-skill")
 		os.MkdirAll(skillDir, 0755)
 
 		got := findSkillPath(dir, "local-cached-skill")
 		if got != skillDir {
-			t.Errorf("findSkillPath(.claude/skills) = %q, want %q", got, skillDir)
+			t.Errorf("findSkillPath(.agents/.cache) = %q, want %q", got, skillDir)
 		}
 	})
 
@@ -454,10 +456,10 @@ func TestProjectSkillPath(t *testing.T) {
 	tests := []struct {
 		root, provider, skillName, wantSuffix string
 	}{
-		{"/project", "claude", "vite", filepath.Join(".claude", "skills", "vite")},
-		{"/project", "codex", "vitest", filepath.Join(".codex", "skills", "vitest")},
-		{"/project", "opencode", "eslint", filepath.Join(".opencode", "skills", "eslint")},
-		{"/project", "gemini", "prettier", filepath.Join(".gemini", "skills", "prettier")},
+		{"/project", "claude", "vite", filepath.Join(".agents", ".cache", "skills", "vite")},
+		{"/project", "codex", "vitest", filepath.Join(".agents", ".cache", "skills", "vitest")},
+		{"/project", "opencode", "eslint", filepath.Join(".agents", ".cache", "skills", "eslint")},
+		{"/project", "gemini", "prettier", filepath.Join(".agents", ".cache", "skills", "prettier")},
 	}
 	for _, tt := range tests {
 		got := projectSkillPath(tt.root, tt.provider, tt.skillName)

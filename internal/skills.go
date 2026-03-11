@@ -99,10 +99,15 @@ func CopySkillsToWorktree(wtPath, root, roleName string) error {
 	return CopySkillsToWorktreeFromPath(wtPath, root, roleName, RoleDir(root, roleName))
 }
 
-// parseSkillName extracts the short skill name from formats like
-// "antfu/skills@vite" → "vite", or returns the original name if no "@" is present.
+// parseSkillName extracts the short skill name from scoped formats:
+//   - "antfu/skills@vite" → "vite"       (org/repo@skill)
+//   - "better-auth/better-icons" → "better-icons"  (org/skill)
+//   - "vite" → "vite"                     (plain name)
 func parseSkillName(skillName string) string {
 	if idx := strings.LastIndex(skillName, "@"); idx >= 0 {
+		return skillName[idx+1:]
+	}
+	if idx := strings.LastIndex(skillName, "/"); idx >= 0 {
 		return skillName[idx+1:]
 	}
 	return skillName
@@ -131,7 +136,7 @@ func findSkillPath(root, skillName string) string {
 
 	// 远程下载回退（仅 scoped 格式）
 	if shortName != skillName {
-		targetDir := filepath.Join(root, ".claude", "skills")
+		targetDir := filepath.Join(root, ".agents", ".cache", "skills")
 		if downloaded := tryRemoteDownload(skillName, targetDir, shortName); downloaded != "" {
 			return downloaded
 		}
@@ -156,7 +161,7 @@ func buildSearchDirs(root string) []string {
 	}
 	dirs = append(dirs, filepath.Join(ResolveAgentsDir(root), "teams")) // 层 2: .agents/teams
 	dirs = append(dirs, filepath.Join(root, "skills"))                  // 层 3: project/skills
-	dirs = append(dirs, filepath.Join(root, ".claude", "skills"))       // 层 4: .claude/skills
+	dirs = append(dirs, filepath.Join(root, ".agents", ".cache", "skills")) // 层 4: project cache
 	if home, err := os.UserHomeDir(); err == nil {
 		dirs = append(dirs, filepath.Join(home, ".claude", "skills")) // 层 5: ~/.claude/skills
 	}
@@ -285,10 +290,15 @@ func InstallSkillsForWorkerFromPath(wtPath, root, roleName, rolePath, provider s
 				fmt.Fprintf(os.Stderr, "Warning: symlink cached skill '%s' failed: %v\n", shortName, err)
 			}
 		} else if isScopedSkill(skillName) {
-			// Scoped: npx skills add to project root, then symlink
+			// Scoped: npx skills add to project root, then move to cache, then symlink
 			fmt.Printf("  Installing skill '%s' via npx (project cache)...\n", skillName)
 			if err := runNpxSkillsAdd(root, skillName, provider); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: npx skills add '%s' failed: %v\n", skillName, err)
+				continue
+			}
+			// Move from npx output (<root>/.<provider>/skills/) to project cache
+			if err := moveNpxResultToCache(root, provider, shortName); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: move skill '%s' to cache failed: %v\n", shortName, err)
 				continue
 			}
 			if _, err := os.Stat(cachePath); err != nil {
@@ -307,10 +317,15 @@ func InstallSkillsForWorkerFromPath(wtPath, root, roleName, rolePath, provider s
 					fmt.Fprintf(os.Stderr, "Warning: symlink skill '%s' failed: %v\n", shortName, err)
 				}
 			} else {
-				// Fallback: npx skills add to project root, then symlink
+				// Fallback: npx skills add to project root, then move to cache, then symlink
 				fmt.Printf("  Skill '%s' not found locally, trying npx (project cache)...\n", skillName)
 				if err := runNpxSkillsAdd(root, skillName, provider); err != nil {
 					fmt.Fprintf(os.Stderr, "Error: skill '%s' not found locally and npx install failed: %v\n", skillName, err)
+					continue
+				}
+				// Move from npx output to project cache
+				if err := moveNpxResultToCache(root, provider, shortName); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: move skill '%s' to cache failed: %v\n", shortName, err)
 					continue
 				}
 				if _, err := os.Stat(cachePath); err != nil {
@@ -388,9 +403,10 @@ func skillTargetSuffix(provider string) string {
 }
 
 // projectSkillPath returns the project-level skill cache path for a given skill.
-// e.g. <root>/.claude/skills/<skillName>
+// e.g. <root>/.agents/.cache/skills/<skillName>
+// The provider parameter is kept for call-site compatibility but ignored internally.
 func projectSkillPath(root, provider, skillName string) string {
-	return filepath.Join(root, skillTargetSuffix(provider), skillName)
+	return filepath.Join(root, ".agents", ".cache", "skills", skillName)
 }
 
 // symlinkSkill creates a symlink in the worktree pointing to targetPath.
@@ -419,6 +435,41 @@ func symlinkSkill(wtPath, provider, skillName, targetPath string) error {
 		fmt.Fprintf(os.Stderr, "Warning: symlink not supported, falling back to copy for '%s'\n", skillName)
 		return copyDir(targetPath, linkPath)
 	}
+	return nil
+}
+
+// moveNpxResultToCache moves the skill installed by npx from <root>/.agents/skills/<name>
+// to the project cache at <root>/.agents/.cache/skills/<name>.
+// npx skills add installs real files to <cwd>/.agents/skills/ and creates symlinks
+// in <cwd>/.<provider>/skills/. We relocate the real files and clean up the symlinks.
+func moveNpxResultToCache(root, provider, shortName string) error {
+	// npx installs real files to .agents/skills/<name>
+	npxPath := filepath.Join(root, ".agents", "skills", shortName)
+	cachePath := projectSkillPath(root, provider, shortName)
+
+	if _, err := os.Stat(npxPath); err != nil {
+		return fmt.Errorf("npx result not found at %s: %w", npxPath, err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(cachePath), 0755); err != nil {
+		return err
+	}
+	os.RemoveAll(cachePath)
+
+	if err := os.Rename(npxPath, cachePath); err != nil {
+		// Cross-device fallback: copy then remove
+		if cpErr := copyDir(npxPath, cachePath); cpErr != nil {
+			return cpErr
+		}
+		os.RemoveAll(npxPath)
+	}
+
+	// Clean up the symlink npx created in .<provider>/skills/
+	npxLink := filepath.Join(root, skillTargetSuffix(provider), shortName)
+	if isSymlink(npxLink) {
+		os.Remove(npxLink)
+	}
+
 	return nil
 }
 
