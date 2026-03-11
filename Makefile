@@ -3,7 +3,7 @@ VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev
 GO := $(shell command -v go1.24.2 2>/dev/null || GOROOT=$$HOME/.gvm/gos/go1.24.2 echo $$HOME/.gvm/gos/go1.24.2/bin/go 2>/dev/null || echo go)
 GORUN := GOROOT=$(HOME)/.gvm/gos/go1.24.2 $(HOME)/.gvm/gos/go1.24.2/bin/go
 
-.PHONY: build test lint clean install uninstall plugin-pack plugin-test migrate
+.PHONY: build test lint clean install uninstall plugin-pack plugin-test migrate release
 
 build:
 	$(GORUN) build -ldflags "-X github.com/JsonLee12138/agent-team/cmd.Version=$(VERSION)" -o $(BINARY) .
@@ -52,4 +52,23 @@ plugin-test: build
 # Run the migrate subcommand (move agents/ → .agents/)
 migrate: build
 	@./$(BINARY) migrate
+
+# Release: bump version files, commit, tag, and push
+# Usage: make release V=x.y.z
+release:
+	@test -n "$(V)" || (echo "Usage: make release V=x.y.z" && exit 1)
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "Error: working tree has uncommitted changes. Commit or stash first." >&2; \
+		exit 1; \
+	fi
+	@if git rev-parse "v$(V)" >/dev/null 2>&1; then \
+		echo "Error: tag v$(V) already exists." >&2; \
+		exit 1; \
+	fi
+	@scripts/bump-version.sh $(V)
+	@git add .claude-plugin/plugin.json .claude-plugin/marketplace.json gemini-extension.json
+	@git commit -m "chore: bump version to $(V)"
+	@git tag "v$(V)"
+	@git push && git push --tags
+	@echo "✓ Released v$(V) — goreleaser will build automatically"
 
