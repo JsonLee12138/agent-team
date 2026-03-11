@@ -591,3 +591,73 @@ func TestFreshFlag(t *testing.T) {
 		t.Errorf("content after fresh = %q, want %q", content, "# v2\n")
 	}
 }
+
+func TestFindCachedSkillUsage(t *testing.T) {
+	dir := t.TempDir()
+	wtBase := ".worktrees"
+
+	// Create cache with two skills
+	cacheDir := filepath.Join(dir, ".agents", ".cache", "skills")
+	os.MkdirAll(filepath.Join(cacheDir, "vite"), 0755)
+	os.WriteFile(filepath.Join(cacheDir, "vite", "SKILL.md"), []byte("# vite\n"), 0644)
+	os.MkdirAll(filepath.Join(cacheDir, "vitest"), 0755)
+	os.WriteFile(filepath.Join(cacheDir, "vitest", "SKILL.md"), []byte("# vitest\n"), 0644)
+
+	// Create a worktree with symlink to "vite" cache
+	wt1 := filepath.Join(dir, wtBase, "dev-001")
+	wt1Skills := filepath.Join(wt1, ".claude", "skills")
+	os.MkdirAll(wt1Skills, 0755)
+	absVite, _ := filepath.Abs(filepath.Join(cacheDir, "vite"))
+	os.Symlink(absVite, filepath.Join(wt1Skills, "vite"))
+
+	// Create another worktree with symlink to "vite" cache (different worker)
+	wt2 := filepath.Join(dir, wtBase, "dev-002")
+	wt2Skills := filepath.Join(wt2, ".codex", "skills")
+	os.MkdirAll(wt2Skills, 0755)
+	os.Symlink(absVite, filepath.Join(wt2Skills, "vite"))
+
+	usage := FindCachedSkillUsage(dir, wtBase)
+
+	// "vite" should be used by both workers
+	if workers, ok := usage["vite"]; !ok {
+		t.Error("expected 'vite' to be in usage map")
+	} else if len(workers) != 2 {
+		t.Errorf("expected 2 workers using 'vite', got %d: %v", len(workers), workers)
+	}
+
+	// "vitest" should not be in use
+	if workers, ok := usage["vitest"]; ok && len(workers) > 0 {
+		t.Errorf("expected 'vitest' to not be in use, got workers: %v", workers)
+	}
+}
+
+func TestFindCachedSkillUsageEmpty(t *testing.T) {
+	dir := t.TempDir()
+
+	// No cache directory
+	usage := FindCachedSkillUsage(dir, ".worktrees")
+	if len(usage) != 0 {
+		t.Errorf("expected empty usage map, got %v", usage)
+	}
+}
+
+func TestFindCachedSkillUsageNonSymlink(t *testing.T) {
+	dir := t.TempDir()
+	wtBase := ".worktrees"
+
+	// Create cache
+	cacheDir := filepath.Join(dir, ".agents", ".cache", "skills")
+	os.MkdirAll(filepath.Join(cacheDir, "eslint"), 0755)
+
+	// Create worktree with a regular directory (not symlink) named "eslint"
+	wt := filepath.Join(dir, wtBase, "dev-001")
+	wtSkills := filepath.Join(wt, ".claude", "skills", "eslint")
+	os.MkdirAll(wtSkills, 0755)
+
+	usage := FindCachedSkillUsage(dir, wtBase)
+
+	// Should not count as in-use since it's not a symlink
+	if workers, ok := usage["eslint"]; ok && len(workers) > 0 {
+		t.Errorf("non-symlink skill should not be counted as in-use, got workers: %v", workers)
+	}
+}

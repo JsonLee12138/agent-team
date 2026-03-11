@@ -481,3 +481,87 @@ func isSymlink(path string) bool {
 	}
 	return fi.Mode()&os.ModeSymlink != 0
 }
+
+// CachedSkillUsage describes which workers are using a cached skill.
+type CachedSkillUsage struct {
+	SkillName string   // cache directory name
+	Workers   []string // worker IDs with symlinks pointing to this cache entry
+}
+
+// FindCachedSkillUsage scans all worktrees to find which cached skills are actively
+// symlinked from worker skill directories. Returns a map of skill name → worker IDs.
+func FindCachedSkillUsage(root, wtBase string) map[string][]string {
+	cacheDir := filepath.Join(root, ".agents", ".cache", "skills")
+	absCacheDir, err := filepath.Abs(cacheDir)
+	if err != nil {
+		return nil
+	}
+
+	// Collect all cached skill names
+	cacheEntries, err := os.ReadDir(cacheDir)
+	if err != nil {
+		return nil
+	}
+	cachedNames := make(map[string]bool, len(cacheEntries))
+	for _, e := range cacheEntries {
+		cachedNames[e.Name()] = true
+	}
+	if len(cachedNames) == 0 {
+		return nil
+	}
+
+	usage := make(map[string][]string)
+
+	// Scan all worktrees
+	wtDir := filepath.Join(root, wtBase)
+	workers, err := os.ReadDir(wtDir)
+	if err != nil {
+		return usage
+	}
+
+	providers := []string{"claude", "codex", "opencode", "gemini"}
+	for _, w := range workers {
+		if !w.IsDir() {
+			continue
+		}
+		workerID := w.Name()
+		wtPath := filepath.Join(wtDir, workerID)
+
+		for _, prov := range providers {
+			skillDir := skillTargetDir(wtPath, prov)
+			skills, err := os.ReadDir(skillDir)
+			if err != nil {
+				continue
+			}
+			for _, s := range skills {
+				linkPath := filepath.Join(skillDir, s.Name())
+				if !isSymlink(linkPath) {
+					continue
+				}
+				target, err := os.Readlink(linkPath)
+				if err != nil {
+					continue
+				}
+				// Check if symlink target points into the cache directory
+				if strings.HasPrefix(target, absCacheDir+string(os.PathSeparator)) {
+					skillName := s.Name()
+					if cachedNames[skillName] {
+						// Deduplicate worker IDs per skill
+						found := false
+						for _, id := range usage[skillName] {
+							if id == workerID {
+								found = true
+								break
+							}
+						}
+						if !found {
+							usage[skillName] = append(usage[skillName], workerID)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return usage
+}

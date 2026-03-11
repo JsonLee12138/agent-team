@@ -215,6 +215,22 @@ Messages appear in the controller's terminal as `[Worker: <worker-id>] <message>
 
 > **AI Behavior**: Surface worker questions to user immediately. Do NOT answer on behalf of user. Batch-present multiple blocked workers.
 
+## Skill Cache Management
+
+Remote skills installed via `npx skills add` are cached at `.agents/.cache/skills/` and symlinked into worktrees. Use the `skill` subcommands to manage this cache.
+
+```bash
+agent-team skill check                # Check installed skills for available updates
+agent-team skill update               # Update all cached skills to latest versions
+agent-team skill clean [--force]      # Remove cached skills
+```
+
+- `skill clean` checks whether cached skills are actively symlinked by existing worktrees before removing them.
+  - Unused skills are removed immediately.
+  - In-use skills are listed with their worker IDs and require user confirmation before removal.
+  - Use `--force` to skip the confirmation prompt and remove all cached skills (including those in use).
+- `worker create --fresh` forces re-installation of all skills, bypassing the project cache.
+
 ## Catalog (Role Hub)
 
 Query commands for browsing the role catalog:
