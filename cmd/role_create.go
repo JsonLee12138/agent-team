@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/JsonLee12138/agent-team/internal"
 	"github.com/spf13/cobra"
@@ -111,7 +110,6 @@ func newRoleCreateCmd() *cobra.Command {
 				config,
 				overwrite,
 				confirmFn,
-				time.Now,
 				targetDir,
 			)
 			if err != nil {
@@ -119,9 +117,6 @@ func newRoleCreateCmd() *cobra.Command {
 			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "Generated role skill at %s\n", result.TargetDir)
-			if result.BackupPath != "" {
-				fmt.Fprintf(cmd.OutOrStdout(), "Backup created at %s\n", result.BackupPath)
-			}
 			fmt.Fprintln(cmd.OutOrStdout(), "Managed files: SKILL.md, references/role.yaml, system.md")
 			return nil
 		},

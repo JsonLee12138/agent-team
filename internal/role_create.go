@@ -12,7 +12,6 @@ import (
 	"regexp"
 	"strings"
 	"text/template"
-	"time"
 )
 
 //go:embed templates/*.tmpl
@@ -45,8 +44,7 @@ type RoleConfig struct {
 
 // GenerationResult describes what was created.
 type GenerationResult struct {
-	TargetDir  string
-	BackupPath string // empty = no backup
+	TargetDir string
 }
 
 // IsKebabCase reports whether s is valid kebab-case.
@@ -322,42 +320,6 @@ func RenderFiles(config RoleConfig) (map[string]string, error) {
 	return rendered, nil
 }
 
-// BackupExistingRole copies targetDir to <parent>/.backup/<roleName>-<timestamp>/.
-func BackupExistingRole(targetDir, roleName string, nowFn func() time.Time) (string, error) {
-	backupRoot := filepath.Join(filepath.Dir(targetDir), ".backup")
-	if err := os.MkdirAll(backupRoot, 0755); err != nil {
-		return "", fmt.Errorf("create backup root: %w", err)
-	}
-	ts := nowFn().Format("20060102-150405")
-	backupPath := filepath.Join(backupRoot, roleName+"-"+ts)
-	if err := roleCopyDir(targetDir, backupPath); err != nil {
-		return "", fmt.Errorf("copy to backup: %w", err)
-	}
-	return backupPath, nil
-}
-
-// roleCopyDir recursively copies src to dst.
-func roleCopyDir(src, dst string) error {
-	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, _ := filepath.Rel(src, path)
-		target := filepath.Join(dst, rel)
-		if d.IsDir() {
-			return os.MkdirAll(target, 0755)
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-			return err
-		}
-		return os.WriteFile(target, data, 0644)
-	})
-}
-
 // CreateOrUpdateRole creates (or overwrites) a role skill package.
 //
 // confirmFn is called when overwriteMode == "ask". It receives the target
@@ -367,7 +329,6 @@ func CreateOrUpdateRole(
 	config RoleConfig,
 	overwriteMode string, // "ask" | "yes" | "no"
 	confirmFn func(targetDir string) (bool, error),
-	nowFn func() time.Time,
 	targetDirName string,
 ) (GenerationResult, error) {
 	if _, err := ValidateRoleName(config.RoleName); err != nil {
@@ -385,8 +346,6 @@ func CreateOrUpdateRole(
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
 		return GenerationResult{}, fmt.Errorf("create base dir: %w", err)
 	}
-
-	var backupPath string
 
 	if info, err := os.Stat(targetDir); err == nil {
 		if !info.IsDir() {
@@ -407,12 +366,6 @@ func CreateOrUpdateRole(
 		if overwriteMode == "no" || !shouldOverwrite {
 			return GenerationResult{}, fmt.Errorf("role directory already exists and overwrite not confirmed: %s", targetDir)
 		}
-
-		bp, err := BackupExistingRole(targetDir, config.RoleName, nowFn)
-		if err != nil {
-			return GenerationResult{}, err
-		}
-		backupPath = bp
 	} else if !os.IsNotExist(err) {
 		return GenerationResult{}, err
 	} else {
@@ -442,5 +395,5 @@ func CreateOrUpdateRole(
 		_ = os.Remove(legacyYAML)
 	}
 
-	return GenerationResult{TargetDir: targetDir, BackupPath: backupPath}, nil
+	return GenerationResult{TargetDir: targetDir}, nil
 }

@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 )
 
 var ErrRoleRepoInstallConflict = errors.New("role already exists")
@@ -32,35 +31,31 @@ func SelectRoleRepoRemotes(all []RoleRepoRemoteRole, roleNames []string) ([]Role
 	return selected, nil
 }
 
-func InstallRoleRepoRemoteRole(ctx context.Context, client *RoleRepoGitHubClient, remote RoleRepoRemoteRole, installRoot string, overwrite bool, nowFn func() time.Time) (string, string, error) {
+func InstallRoleRepoRemoteRole(ctx context.Context, client *RoleRepoGitHubClient, remote RoleRepoRemoteRole, installRoot string, overwrite bool) (string, error) {
 	targetDir := filepath.Join(installRoot, remote.Candidate.Name)
 	if st, err := os.Stat(targetDir); err == nil && st.IsDir() {
 		if !overwrite {
-			return "", "", fmt.Errorf("%w: %s", ErrRoleRepoInstallConflict, targetDir)
-		}
-		backupPath, err := BackupExistingRole(targetDir, remote.Candidate.Name, nowFn)
-		if err != nil {
-			return "", "", err
+			return "", fmt.Errorf("%w: %s", ErrRoleRepoInstallConflict, targetDir)
 		}
 		if err := os.RemoveAll(targetDir); err != nil {
-			return "", "", err
+			return "", err
 		}
 		if err := os.MkdirAll(targetDir, 0755); err != nil {
-			return "", "", err
+			return "", err
 		}
 		if err := writeRoleRepoFiles(ctx, client, remote, targetDir); err != nil {
-			return "", backupPath, err
+			return "", err
 		}
-		return targetDir, backupPath, nil
+		return targetDir, nil
 	}
 
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
-		return "", "", err
+		return "", err
 	}
 	if err := writeRoleRepoFiles(ctx, client, remote, targetDir); err != nil {
-		return "", "", err
+		return "", err
 	}
-	return targetDir, "", nil
+	return targetDir, nil
 }
 
 func writeRoleRepoFiles(ctx context.Context, client *RoleRepoGitHubClient, remote RoleRepoRemoteRole, targetDir string) error {

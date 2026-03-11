@@ -157,18 +157,15 @@ func TestInstallRoleRepoRemoteRoleAndCheckUpdate(t *testing.T) {
 	now := time.Date(2026, 3, 2, 12, 0, 0, 0, time.UTC)
 	nowFn := func() time.Time { return now }
 
-	targetDir, backupPath, err := InstallRoleRepoRemoteRole(context.Background(), client, roles[0], installRoot, false, nowFn)
+	targetDir, err := InstallRoleRepoRemoteRole(context.Background(), client, roles[0], installRoot, false)
 	if err != nil {
 		t.Fatalf("InstallRoleRepoRemoteRole: %v", err)
-	}
-	if backupPath != "" {
-		t.Fatalf("unexpected backup path: %s", backupPath)
 	}
 	if _, err := os.Stat(filepath.Join(targetDir, "references", "role.yaml")); err != nil {
 		t.Fatalf("expected installed role.yaml: %v", err)
 	}
 
-	if _, _, err := InstallRoleRepoRemoteRole(context.Background(), client, roles[0], installRoot, false, nowFn); err == nil {
+	if _, err := InstallRoleRepoRemoteRole(context.Background(), client, roles[0], installRoot, false); err == nil {
 		t.Fatal("expected conflict error on reinstall without overwrite")
 	}
 

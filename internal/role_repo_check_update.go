@@ -136,7 +136,7 @@ func UpdateRoleRepoFromLock(ctx context.Context, client *RoleRepoGitHubClient, i
 			continue
 		}
 
-		_, _, err := InstallRoleRepoRemoteRole(ctx, client, remoteRole, installRoot, true, nowFn)
+		_, err := InstallRoleRepoRemoteRole(ctx, client, remoteRole, installRoot, true)
 		if err != nil {
 			failed[entry.Name] = err
 			continue

@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 )
 
 // helpers
@@ -21,8 +20,6 @@ func newTestConfig(roleName string) RoleConfig {
 		Skills:      []string{"vitest", "ui-ux-pro-max"},
 	}
 }
-
-func fixedNow() time.Time { return time.Date(2026, 2, 25, 12, 0, 0, 0, time.UTC) }
 
 func mkdirAll(t *testing.T, path string) {
 	t.Helper()
@@ -156,9 +153,9 @@ func TestRenderFiles_SystemPromptIncludesSkillPolicy(t *testing.T) {
 	}
 }
 
-// --- Test #4: CreateOrUpdateRole overwrite creates backup ---
+// --- Test #4: CreateOrUpdateRole overwrite replaces files ---
 
-func TestCreateOrUpdateRole_OverwriteCreatesBackup(t *testing.T) {
+func TestCreateOrUpdateRole_OverwriteReplacesFiles(t *testing.T) {
 	repoRoot := t.TempDir()
 	target := filepath.Join(repoRoot, "skills", "frontend-dev")
 	refs := filepath.Join(target, "references")
@@ -178,23 +175,23 @@ func TestCreateOrUpdateRole_OverwriteCreatesBackup(t *testing.T) {
 		Skills:      []string{"vitest"},
 	}
 
-	result, err := CreateOrUpdateRole(repoRoot, config, "yes", nil, fixedNow, "skills")
+	result, err := CreateOrUpdateRole(repoRoot, config, "yes", nil, "skills")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	expectedBackup := filepath.Join(repoRoot, "skills", ".backup", "frontend-dev-20260225-120000")
-	if result.BackupPath != expectedBackup {
-		t.Errorf("BackupPath = %q, want %q", result.BackupPath, expectedBackup)
+	if result.TargetDir != target {
+		t.Errorf("TargetDir = %q, want %q", result.TargetDir, target)
 	}
-	assertFileExists(t, filepath.Join(expectedBackup, "SKILL.md"))
-	assertFileContent(t, filepath.Join(expectedBackup, "references", "role.yaml"), "old yaml\n")
-	assertFileContent(t, filepath.Join(expectedBackup, "role.yaml"), "legacy root yaml\n")
-	assertFileContent(t, filepath.Join(expectedBackup, "SKILL.md"), "old skill\n")
-	assertFileContent(t, filepath.Join(target, "keep.txt"), "keep me\n")
+	// Managed files should be updated with new content.
 	assertFileContains(t, filepath.Join(target, "SKILL.md"), "Frontend role for UI implementation")
 	assertFileContains(t, filepath.Join(target, "references", "role.yaml"), "Frontend role for UI implementation")
+	// Legacy root role.yaml should be removed.
 	assertFileNotExists(t, filepath.Join(target, "role.yaml"))
+	// Non-managed files should be preserved.
+	assertFileContent(t, filepath.Join(target, "keep.txt"), "keep me\n")
+	// No .backup directory should be created.
+	assertDirNotExists(t, filepath.Join(repoRoot, "skills", ".backup"))
 }
 
 // --- Test #5: ResolveFinalSkills manual fallback ---
@@ -310,12 +307,12 @@ func TestCreateOrUpdateRole_HappyPath(t *testing.T) {
 		OutOfScope:  []string{"Frontend work"},
 		Skills:      []string{"vitest"},
 	}
-	result, err := CreateOrUpdateRole(repoRoot, config, "ask", nil, fixedNow, "skills")
+	result, err := CreateOrUpdateRole(repoRoot, config, "ask", nil, "skills")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.BackupPath != "" {
-		t.Errorf("expected no backup, got %q", result.BackupPath)
+	if result.TargetDir == "" {
+		t.Error("expected non-empty TargetDir")
 	}
 	target := filepath.Join(repoRoot, "skills", "data-engineer")
 	assertFileExists(t, filepath.Join(target, "SKILL.md"))
@@ -343,7 +340,7 @@ func TestCreateOrUpdateRole_OverwriteModeNoError(t *testing.T) {
 		OutOfScope:  []string{"Task B"},
 		Skills:      []string{},
 	}
-	_, err := CreateOrUpdateRole(repoRoot, config, "no", nil, fixedNow, "skills")
+	_, err := CreateOrUpdateRole(repoRoot, config, "no", nil, "skills")
 	if err == nil {
 		t.Fatal("expected error for overwrite=no")
 	}
@@ -394,7 +391,7 @@ func TestCreateOrUpdateRole_TargetDirVariants(t *testing.T) {
 			OutOfScope:  []string{"Frontend work"},
 			Skills:      []string{"vitest"},
 		}
-		result, err := CreateOrUpdateRole(repoRoot, config, "ask", nil, fixedNow, ".agents/teams")
+		result, err := CreateOrUpdateRole(repoRoot, config, "ask", nil, ".agents/teams")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -418,7 +415,7 @@ func TestCreateOrUpdateRole_TargetDirVariants(t *testing.T) {
 			OutOfScope:  []string{"Other tasks"},
 			Skills:      []string{},
 		}
-		result, err := CreateOrUpdateRole(repoRoot, config, "ask", nil, fixedNow, "my-custom-dir")
+		result, err := CreateOrUpdateRole(repoRoot, config, "ask", nil, "my-custom-dir")
 		if err != nil {
 			t.Fatal(err)
 		}

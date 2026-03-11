@@ -137,7 +137,7 @@ func (a *App) RunRoleRepoAdd(in io.Reader, out io.Writer, sourceArg string, role
 	installed := make([]internal.RoleRepoRemoteRole, 0, len(selected))
 	overwritePolicy := &roleOverwritePolicy{}
 	for _, role := range selected {
-		_, backup, installErr := internal.InstallRoleRepoRemoteRole(context.Background(), client, role, installRoot, overwrite, time.Now)
+		_, installErr := internal.InstallRoleRepoRemoteRole(context.Background(), client, role, installRoot, overwrite)
 		if installErr != nil {
 			if errors.Is(installErr, internal.ErrRoleRepoInstallConflict) {
 				shouldOverwrite, decideErr := decideRoleOverwriteOnConflict(
@@ -156,7 +156,7 @@ func (a *App) RunRoleRepoAdd(in io.Reader, out io.Writer, sourceArg string, role
 					fmt.Fprintf(out, "- skipped %s (already exists)\n", role.Candidate.Name)
 					continue
 				}
-				_, backup, installErr = internal.InstallRoleRepoRemoteRole(context.Background(), client, role, installRoot, true, time.Now)
+				_, installErr = internal.InstallRoleRepoRemoteRole(context.Background(), client, role, installRoot, true)
 				if installErr != nil {
 					fmt.Fprintf(out, "- failed %s: %v\n", role.Candidate.Name, installErr)
 					failed++
@@ -182,11 +182,7 @@ func (a *App) RunRoleRepoAdd(in io.Reader, out io.Writer, sourceArg string, role
 			entry.InstalledAt = existing.InstalledAt
 		}
 		internal.UpsertRoleRepoLockEntry(&lock, entry)
-		if backup != "" {
-			fmt.Fprintf(out, "+ installed %s (backup: %s)\n", role.Candidate.Name, backup)
-		} else {
-			fmt.Fprintf(out, "+ installed %s\n", role.Candidate.Name)
-		}
+		fmt.Fprintf(out, "+ installed %s\n", role.Candidate.Name)
 		success++
 		installed = append(installed, role)
 	}
