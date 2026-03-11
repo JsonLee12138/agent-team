@@ -26,6 +26,8 @@ For directory layout details, see [references/details.md](references/details.md)
 
 See [references/install-upgrade.md](references/install-upgrade.md). If `agent-team` binary is not found, follow the install guide.
 
+> **Strategy**: Plugin platforms (Claude Code, Gemini CLI, OpenCode) install/update via their native plugin system only — do NOT use `npx skills add`. Codex uses `npx skills add -a codex -g -y` (global only). Other non-plugin platforms use `npx skills add -a <platform>`.
+
 ## Phase 1: Initialization
 
 ```bash
