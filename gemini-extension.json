@@ -1,6 +1,6 @@
 {
   "name": "agent-team",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "AI team role and worker manager for multi-agent development",
   "contextFileName": "GEMINI.md",
   "settings": [
