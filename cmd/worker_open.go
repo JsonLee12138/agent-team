@@ -62,7 +62,7 @@ func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow bool) er
 	if rolePath == "" {
 		rolePath = internal.RoleDir(root, cfg.Role)
 	}
-	if err := skillInstaller(wtPath, root, cfg.Role, rolePath, provider); err != nil {
+	if err := skillInstaller(wtPath, root, cfg.Role, rolePath, provider, false); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: skill sync had errors: %v\n", err)
 	}
 

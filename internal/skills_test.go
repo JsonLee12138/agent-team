@@ -16,6 +16,8 @@ func TestParseSkillName(t *testing.T) {
 		{"jsonlee12138/prompts@eslint-config", "eslint-config"},
 		{"design-patterns-principles", "design-patterns-principles"},
 		{"org/repo@sub@deep", "deep"},
+		{"better-auth/better-icons", "better-icons"},
+		{"org/skill-name", "skill-name"},
 	}
 	for _, tt := range tests {
 		got := parseSkillName(tt.input)
@@ -102,13 +104,13 @@ func TestFindSkillPath(t *testing.T) {
 		}
 	})
 
-	t.Run("finds in .claude/skills/", func(t *testing.T) {
-		skillDir := filepath.Join(dir, ".claude", "skills", "local-cached-skill")
+	t.Run("finds in .agents/.cache/skills/", func(t *testing.T) {
+		skillDir := filepath.Join(dir, ".agents", ".cache", "skills", "local-cached-skill")
 		os.MkdirAll(skillDir, 0755)
 
 		got := findSkillPath(dir, "local-cached-skill")
 		if got != skillDir {
-			t.Errorf("findSkillPath(.claude/skills) = %q, want %q", got, skillDir)
+			t.Errorf("findSkillPath(.agents/.cache) = %q, want %q", got, skillDir)
 		}
 	})
 
@@ -384,5 +386,208 @@ func TestInstallSkillsForWorkerCodexProvider(t *testing.T) {
 	codexRole := filepath.Join(wtPath, ".codex", "skills", "dev", "SKILL.md")
 	if _, err := os.Stat(codexRole); os.IsNotExist(err) {
 		t.Error("role skill not installed to .codex/skills/ for codex provider")
+	}
+}
+
+func TestSymlinkSkill(t *testing.T) {
+	dir := t.TempDir()
+	wtPath := filepath.Join(dir, "worktree")
+	os.MkdirAll(wtPath, 0755)
+
+	// Create a source skill directory
+	srcDir := filepath.Join(dir, "source-skill")
+	os.MkdirAll(srcDir, 0755)
+	os.WriteFile(filepath.Join(srcDir, "SKILL.md"), []byte("# test\n"), 0644)
+
+	t.Run("creates symlink", func(t *testing.T) {
+		err := symlinkSkill(wtPath, "claude", "test-skill", srcDir)
+		if err != nil {
+			t.Fatalf("symlinkSkill: %v", err)
+		}
+
+		linkPath := filepath.Join(wtPath, ".claude", "skills", "test-skill")
+
+		// Verify it's a symlink or a copy (fallback)
+		if isSymlink(linkPath) {
+			// Symlink: verify target
+			target, err := os.Readlink(linkPath)
+			if err != nil {
+				t.Fatalf("Readlink: %v", err)
+			}
+			absTarget, _ := filepath.Abs(srcDir)
+			if target != absTarget {
+				t.Errorf("symlink target = %q, want %q", target, absTarget)
+			}
+		}
+
+		// Either way, content should be accessible
+		content, err := os.ReadFile(filepath.Join(linkPath, "SKILL.md"))
+		if err != nil {
+			t.Fatalf("read through link: %v", err)
+		}
+		if string(content) != "# test\n" {
+			t.Errorf("content = %q", content)
+		}
+	})
+
+	t.Run("overwrites existing", func(t *testing.T) {
+		// Create a different source
+		src2 := filepath.Join(dir, "source-skill-v2")
+		os.MkdirAll(src2, 0755)
+		os.WriteFile(filepath.Join(src2, "SKILL.md"), []byte("# v2\n"), 0644)
+
+		err := symlinkSkill(wtPath, "claude", "test-skill", src2)
+		if err != nil {
+			t.Fatalf("symlinkSkill overwrite: %v", err)
+		}
+
+		linkPath := filepath.Join(wtPath, ".claude", "skills", "test-skill")
+		content, err := os.ReadFile(filepath.Join(linkPath, "SKILL.md"))
+		if err != nil {
+			t.Fatalf("read through link: %v", err)
+		}
+		if string(content) != "# v2\n" {
+			t.Errorf("content after overwrite = %q, want %q", content, "# v2\n")
+		}
+	})
+}
+
+func TestProjectSkillPath(t *testing.T) {
+	tests := []struct {
+		root, provider, skillName, wantSuffix string
+	}{
+		{"/project", "claude", "vite", filepath.Join(".agents", ".cache", "skills", "vite")},
+		{"/project", "codex", "vitest", filepath.Join(".agents", ".cache", "skills", "vitest")},
+		{"/project", "opencode", "eslint", filepath.Join(".agents", ".cache", "skills", "eslint")},
+		{"/project", "gemini", "prettier", filepath.Join(".agents", ".cache", "skills", "prettier")},
+	}
+	for _, tt := range tests {
+		got := projectSkillPath(tt.root, tt.provider, tt.skillName)
+		want := filepath.Join(tt.root, tt.wantSuffix)
+		if got != want {
+			t.Errorf("projectSkillPath(%q, %q, %q) = %q, want %q", tt.root, tt.provider, tt.skillName, got, want)
+		}
+	}
+}
+
+func TestIsSymlink(t *testing.T) {
+	dir := t.TempDir()
+
+	t.Run("regular dir is not symlink", func(t *testing.T) {
+		d := filepath.Join(dir, "regular")
+		os.MkdirAll(d, 0755)
+		if isSymlink(d) {
+			t.Error("regular dir should not be symlink")
+		}
+	})
+
+	t.Run("nonexistent is not symlink", func(t *testing.T) {
+		if isSymlink(filepath.Join(dir, "nope")) {
+			t.Error("nonexistent path should not be symlink")
+		}
+	})
+
+	t.Run("symlink is detected", func(t *testing.T) {
+		target := filepath.Join(dir, "target")
+		os.MkdirAll(target, 0755)
+		link := filepath.Join(dir, "link")
+		if err := os.Symlink(target, link); err != nil {
+			t.Skip("symlinks not supported on this platform")
+		}
+		if !isSymlink(link) {
+			t.Error("symlink should be detected")
+		}
+	})
+}
+
+func TestInstallSkillsForWorkerSymlink(t *testing.T) {
+	dir := t.TempDir()
+	wtPath := filepath.Join(dir, "worktree")
+	os.MkdirAll(wtPath, 0755)
+
+	// Create role skill
+	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	refDir := filepath.Join(roleDir, "references")
+	os.MkdirAll(refDir, 0755)
+	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# dev\n"), 0644)
+
+	// Create dependency skill in skills/
+	depDir := filepath.Join(dir, "skills", "vitest")
+	os.MkdirAll(depDir, 0755)
+	os.WriteFile(filepath.Join(depDir, "SKILL.md"), []byte("# vitest\n"), 0644)
+
+	roleYAML := "name: dev\nskills:\n  - vitest\n"
+	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte(roleYAML), 0644)
+
+	err := InstallSkillsForWorkerFromPath(wtPath, dir, "dev", roleDir, "claude", false)
+	if err != nil {
+		t.Fatalf("InstallSkillsForWorkerFromPath: %v", err)
+	}
+
+	// Verify role skill is a symlink (or copy fallback)
+	roleLinkPath := filepath.Join(wtPath, ".claude", "skills", "dev")
+	if _, err := os.Stat(filepath.Join(roleLinkPath, "SKILL.md")); os.IsNotExist(err) {
+		t.Error("role skill not accessible in worktree")
+	}
+
+	// Verify dependency skill is a symlink (or copy fallback)
+	depLinkPath := filepath.Join(wtPath, ".claude", "skills", "vitest")
+	if _, err := os.Stat(filepath.Join(depLinkPath, "SKILL.md")); os.IsNotExist(err) {
+		t.Error("dependency skill not accessible in worktree")
+	}
+
+	// If symlinks are supported, verify they are actual symlinks
+	if isSymlink(roleLinkPath) {
+		target, _ := os.Readlink(roleLinkPath)
+		absRole, _ := filepath.Abs(roleDir)
+		if target != absRole {
+			t.Errorf("role symlink target = %q, want %q", target, absRole)
+		}
+	}
+	if isSymlink(depLinkPath) {
+		target, _ := os.Readlink(depLinkPath)
+		absDep, _ := filepath.Abs(depDir)
+		if target != absDep {
+			t.Errorf("dep symlink target = %q, want %q", target, absDep)
+		}
+	}
+}
+
+func TestFreshFlag(t *testing.T) {
+	dir := t.TempDir()
+	wtPath := filepath.Join(dir, "worktree")
+	os.MkdirAll(wtPath, 0755)
+
+	// Create role skill (no dependencies, just test fresh on role itself)
+	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	refDir := filepath.Join(roleDir, "references")
+	os.MkdirAll(refDir, 0755)
+	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# v1\n"), 0644)
+
+	roleYAML := "name: dev\nskills: []\n"
+	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte(roleYAML), 0644)
+
+	// First install
+	err := InstallSkillsForWorkerFromPath(wtPath, dir, "dev", roleDir, "claude", false)
+	if err != nil {
+		t.Fatalf("first install: %v", err)
+	}
+
+	// Update source content
+	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# v2\n"), 0644)
+
+	// Re-install with fresh=true
+	err = InstallSkillsForWorkerFromPath(wtPath, dir, "dev", roleDir, "claude", true)
+	if err != nil {
+		t.Fatalf("fresh install: %v", err)
+	}
+
+	// Content should reflect v2 (symlink points to source, so always up-to-date)
+	content, err := os.ReadFile(filepath.Join(wtPath, ".claude", "skills", "dev", "SKILL.md"))
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if string(content) != "# v2\n" {
+		t.Errorf("content after fresh = %q, want %q", content, "# v2\n")
 	}
 }
