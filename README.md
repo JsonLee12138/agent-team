@@ -129,7 +129,8 @@ Available in `.agents/teams/`:
 - `agent-team role-repo add <owner/repo>`: Install roles from GitHub.
 
 ### Worker Operations
-- `agent-team worker create <role>`: Spin up a new worker.
+- `agent-team worker create <role> [--provider <provider>] [--model <model>]`: Spin up a new worker.
+- `agent-team worker open <worker-id> [--provider <provider>] [--model <model>] [--new-window]`: Reopen a worker session.
 - `agent-team worker status`: View active workers and tasks.
 - `agent-team worker assign <id> "<task>"`: Dispatch work.
 - `agent-team worker merge <id>`: Sync worker changes back.

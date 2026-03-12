@@ -23,22 +23,23 @@ var taskSetup = defaultTaskSetup
 // skillInstaller can be overridden in tests to skip npx skill installation.
 var skillInstaller = internal.InstallSkillsForWorkerFromPath
 
+// workerShellInitDelay is overridable in tests to avoid real-time sleeps.
+var workerShellInitDelay = 2 * time.Second
+
 func newWorkerCreateCmd() *cobra.Command {
+	var provider string
 	var model string
 	var newWindow bool
 	var fresh bool
 	cmd := &cobra.Command{
-		Use:   "create <role-name> [provider]",
+		Use:   "create <role-name> [--provider <provider>] [--model <model>]",
 		Short: "Create a new worker and open its session",
-		Args:  cobra.RangeArgs(1, 2),
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			provider := ""
-			if len(args) > 1 {
-				provider = args[1]
-			}
 			return GetApp(cmd).RunWorkerCreate(args[0], provider, model, newWindow, fresh)
 		},
 	}
+	cmd.Flags().StringVarP(&provider, "provider", "p", "", workerProviderFlagHelp)
 	cmd.Flags().StringVarP(&model, "model", "m", "", "AI model identifier")
 	cmd.Flags().BoolVarP(&newWindow, "new-window", "w", false, "Open in a new window instead of a tab")
 	cmd.Flags().BoolVar(&fresh, "fresh", false, "Force re-install all skills, ignoring project cache")
@@ -75,8 +76,8 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, newWindow, fresh
 	if provider == "" {
 		provider = "claude"
 	}
-	if !internal.SupportedProviders[provider] {
-		return fmt.Errorf("unsupported provider '%s' (supported: claude, codex, opencode)", provider)
+	if err := validateWorkerProvider(provider); err != nil {
+		return err
 	}
 
 	// 3. Compute next worker ID
@@ -157,7 +158,9 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, newWindow, fresh
 	} else if controllerPane := os.Getenv("TMUX_PANE"); controllerPane != "" {
 		cfg.ControllerPaneID = controllerPane
 	}
-	cfg.Save(configPath)
+	if err := cfg.Save(configPath); err != nil {
+		return fmt.Errorf("save worker config: %w", err)
+	}
 
 	// 13. Install skills
 	fmt.Printf("  Installing skills for role '%s'...\n", roleName)
@@ -167,7 +170,7 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, newWindow, fresh
 
 	// 14. Wait for shell init
 	fmt.Println("  Waiting for shell to initialize...")
-	time.Sleep(2 * time.Second)
+	time.Sleep(workerShellInitDelay)
 
 	// 15. Send AI launch command
 	launchCmd := internal.BuildLaunchCmd(provider, model)

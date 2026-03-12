@@ -15,7 +15,7 @@ This project uses [agent-team](https://github.com/JsonLee12138/agent-team) for m
 # Team management
 agent-team worker create <role> [--provider gemini]   # Create a worker
 agent-team worker list                                 # List all workers
-agent-team worker open <worker-id>                     # Open worker session
+agent-team worker open <worker-id> [--provider gemini] # Open worker session
 
 # Task management
 agent-team task create <worker-id> <name> <description>  # Create a change

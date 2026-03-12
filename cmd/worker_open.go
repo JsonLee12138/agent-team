@@ -11,26 +11,26 @@ import (
 )
 
 func newWorkerOpenCmd() *cobra.Command {
+	var provider string
 	var model string
 	var newWindow bool
 	cmd := &cobra.Command{
-		Use:   "open <worker-id> [provider]",
+		Use:   "open <worker-id> [--provider <provider>] [--model <model>] [--new-window]",
 		Short: "Reopen an existing worker session in a new terminal tab or window",
-		Args:  cobra.RangeArgs(1, 2),
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			provider := ""
-			if len(args) > 1 {
-				provider = args[1]
-			}
-			return GetApp(cmd).RunWorkerOpen(args[0], provider, model, newWindow)
+			providerChanged := cmd.Flags().Changed("provider")
+			modelChanged := cmd.Flags().Changed("model")
+			return GetApp(cmd).RunWorkerOpen(args[0], provider, model, newWindow, providerChanged, modelChanged)
 		},
 	}
+	cmd.Flags().StringVarP(&provider, "provider", "p", "", workerProviderFlagHelp)
 	cmd.Flags().StringVarP(&model, "model", "m", "", "AI model identifier")
 	cmd.Flags().BoolVarP(&newWindow, "new-window", "w", false, "Open in a new window instead of a tab")
 	return cmd
 }
 
-func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow bool) error {
+func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow, persistProvider, persistModel bool) error {
 	root := a.Git.Root()
 	wtPath := internal.WtPath(root, a.WtBase, workerID)
 	configPath := internal.WorkerYAMLPath(wtPath)
@@ -44,25 +44,61 @@ func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow bool) er
 		return fmt.Errorf("worker worktree '%s' not found at %s", workerID, wtPath)
 	}
 
-	if provider == "" {
-		provider = cfg.Provider
-		if provider == "" {
-			provider = "claude"
+	if provider != "" {
+		if err := validateWorkerProvider(provider); err != nil {
+			return err
+		}
+	}
+
+	sessionProvider := cfg.Provider
+	if provider != "" {
+		sessionProvider = provider
+	}
+	usedCompatProviderFallback := false
+	if sessionProvider == "" {
+		sessionProvider = "claude"
+		usedCompatProviderFallback = true
+	}
+
+	sessionModel := cfg.DefaultModel
+	if persistModel || model != "" {
+		sessionModel = model
+	}
+
+	configChanged := false
+	if persistProvider {
+		cfg.Provider = provider
+		configChanged = true
+	}
+	if persistModel {
+		cfg.DefaultModel = model
+		configChanged = true
+	}
+	if configChanged {
+		if err := cfg.Save(configPath); err != nil {
+			return fmt.Errorf("save worker config: %w", err)
 		}
 	}
 
 	if a.Session.PaneAlive(cfg.PaneID) {
-		fmt.Printf("Worker '%s' is already running (pane %s)\n", workerID, cfg.PaneID)
+		if configChanged {
+			fmt.Printf("Worker '%s' is already running (pane %s); saved provider/model overrides for future launches\n", workerID, cfg.PaneID)
+		} else {
+			fmt.Printf("Worker '%s' is already running (pane %s)\n", workerID, cfg.PaneID)
+		}
 		return nil
 	}
 
 	// Re-sync skills
+	if usedCompatProviderFallback {
+		fmt.Println("  worker.yaml has no provider; using claude for this launch only")
+	}
 	fmt.Printf("  Syncing skills for role '%s'...\n", cfg.Role)
 	rolePath := cfg.RolePath
 	if rolePath == "" {
 		rolePath = internal.RoleDir(root, cfg.Role)
 	}
-	if err := skillInstaller(wtPath, root, cfg.Role, rolePath, provider, false); err != nil {
+	if err := skillInstaller(wtPath, root, cfg.Role, rolePath, sessionProvider, false); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: skill sync had errors: %v\n", err)
 	}
 
@@ -93,15 +129,17 @@ func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow bool) er
 	} else if controllerPane := os.Getenv("TMUX_PANE"); controllerPane != "" {
 		cfg.ControllerPaneID = controllerPane
 	}
-	cfg.Save(configPath)
+	if err := cfg.Save(configPath); err != nil {
+		return fmt.Errorf("save worker config: %w", err)
+	}
 
 	// Wait for shell init, then launch AI
 	fmt.Println("  Waiting for shell to initialize...")
-	time.Sleep(2 * time.Second)
+	time.Sleep(workerShellInitDelay)
 
-	launchCmd := internal.BuildLaunchCmd(provider, model)
+	launchCmd := internal.BuildLaunchCmd(sessionProvider, sessionModel)
 	a.Session.PaneSend(paneID, launchCmd)
 
-	fmt.Printf("✓ Opened worker '%s' (role: %s, provider: %s) [pane %s]\n", workerID, cfg.Role, provider, paneID)
+	fmt.Printf("✓ Opened worker '%s' (role: %s, provider: %s) [pane %s]\n", workerID, cfg.Role, sessionProvider, paneID)
 	return nil
 }

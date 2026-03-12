@@ -47,8 +47,8 @@ worker_id: frontend-dev-001
 role: frontend-dev
 role_scope: ""                     # "project" | "global", omitted when empty
 role_path: ""                      # absolute path for global roles, omitted when empty
-provider: claude
-default_model: ""
+provider: claude                   # worker create defaults to claude when --provider is omitted
+default_model: ""                  # persisted model reused by worker open when --model is omitted
 main_session_id: ""
 pane_id: ""
 controller_pane_id: ""
@@ -98,6 +98,14 @@ Reply appears in the worker's terminal as `[Main Controller Reply]`.
 The worker AI must NOT proceed on blocked tasks until it receives a reply.
 
 The controller's pane ID is saved in `worker.yaml` (`controller_pane_id`) when `agent-team worker open` runs.
+
+`agent-team worker open <worker-id> [--provider <provider>] [--model <model>] [--new-window]`
+
+- `--provider` updates `worker.yaml.provider` only when explicitly passed.
+- `--model` updates `worker.yaml.default_model` only when explicitly passed.
+- Omitting either flag reuses the persisted value already stored in `worker.yaml`.
+- If `worker.yaml.provider` is missing, `open` uses `claude` for that launch only and does not write it back.
+- `--new-window` is optional; the default behavior is to open in the current terminal workspace.
 
 ## Skills Copying
 

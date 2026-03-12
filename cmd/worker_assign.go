@@ -88,7 +88,7 @@ func (a *App) RunWorkerAssign(workerID, desc, provider, model, proposalPath, des
 	// Ensure session is running
 	if !a.Session.PaneAlive(cfg.PaneID) {
 		fmt.Printf("Worker '%s' is not running, opening session first...\n", workerID)
-		if err := a.RunWorkerOpen(workerID, provider, model, newWindow); err != nil {
+		if err := a.RunWorkerOpen(workerID, provider, model, newWindow, false, false); err != nil {
 			return err
 		}
 		cfg, err = internal.LoadWorkerConfig(configPath)

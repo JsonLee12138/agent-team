@@ -105,18 +105,18 @@ agent-team role list
 ### Create a worker
 
 ```bash
-agent-team worker create <role-name>
+agent-team worker create <role-name> [--provider <provider>] [--model <model>]
 ```
 
-Creates worktree `.worktrees/<worker-id>/` with branch `team/<worker-id>`, generates config, initializes `.tasks/` directory, and automatically opens a session window.
+Creates worktree `.worktrees/<worker-id>/` with branch `team/<worker-id>`, writes `worker.yaml`, initializes `.tasks/` directory, and opens a worker session. If `--provider` is omitted, `worker.yaml.provider` defaults to `claude`.
 
 ### Open a worker session
 
 ```bash
-agent-team worker open <worker-id> [claude|codex|opencode] [--model <model>] [--new-window]
+agent-team worker open <worker-id> [--provider <provider>] [--model <model>] [--new-window]
 ```
 
-Copies role + dependency skills into the worktree, generates CLAUDE.md/AGENTS.md from role's system.md, and opens a terminal tab with the chosen AI provider. See [references/platforms.md](references/platforms.md).
+Copies role + dependency skills into the worktree, generates CLAUDE.md/AGENTS.md from role's system.md, and opens a terminal tab with the chosen AI provider. `worker.yaml` remains the persisted source of `provider` and `default_model`: `--provider` / `--model` update config when passed; omitted flags reuse existing config. `--new-window` is optional. See [references/platforms.md](references/platforms.md).
 
 > **AI Behavior (Session Start)**: Ensure worker loads role context and is aware of pending tasks.
 
