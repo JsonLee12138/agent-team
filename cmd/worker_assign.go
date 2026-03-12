@@ -100,8 +100,8 @@ func (a *App) RunWorkerAssign(workerID, desc, provider, model, proposalPath, des
 	}
 
 	// Notify worker
-	msg := fmt.Sprintf("[New Change Assigned] %s\nChange: %s\nProposal ready. Run: agent-team task verify %s %s",
-		desc, changeName, cfg.WorkerID, changeName)
+	msg := fmt.Sprintf("[New Change Assigned] %s\nChange: %s\nProposal ready. Run: agent-team task verify %s %s\n\nCompletion protocol reminder:\n1. If you made code changes, commit them first\n2. Run: agent-team task archive %s %s\n3. Run: agent-team reply-main \"Task completed: <summary>; change archived: %s\"",
+		desc, changeName, cfg.WorkerID, changeName, cfg.WorkerID, changeName, changeName)
 	a.Session.PaneSend(cfg.PaneID, msg)
 
 	fmt.Printf("✓ Assigned to worker '%s': %s\n", workerID, desc)
