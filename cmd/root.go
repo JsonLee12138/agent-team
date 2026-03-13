@@ -27,9 +27,9 @@ func NewRootCmd() *cobra.Command {
 	}
 
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		// Skip init for help/version/completion/migrate/_inject-role-prompt/init
-		switch cmd.Name() {
-		case "help", "version", "completion", "_inject-role-prompt", "init":
+		// Skip app bootstrap only for root-level utility commands.
+		switch cmd.CommandPath() {
+		case "agent-team help", "agent-team version", "agent-team completion", "agent-team _inject-role-prompt", "agent-team init":
 			return nil
 		}
 		cwd, err := os.Getwd()
@@ -77,4 +77,5 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newCatalogCmd())
 	rootCmd.AddCommand(newSkillCmd())
+	rootCmd.AddCommand(newWorkflowCmd())
 }

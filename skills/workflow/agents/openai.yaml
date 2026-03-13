@@ -1,0 +1,4 @@
+interface:
+  display_name: "Workflow"
+  short_description: "Create and run delivery workflows"
+  default_prompt: "Use $workflow to create, validate, and run a controller workflow with agent-team workflow helpers and .agents/workflow state tracking."
