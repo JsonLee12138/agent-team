@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "AI team role and worker manager for multi-agent development workflows. Uses Role (skill package) + Worker (instance) model with git worktrees.",
-    "version": "1.3.1"
+    "version": "1.4.0"
   },
   "plugins": [
     {
       "name": "agent-team",
       "source": "./",
       "description": "AI team role and worker manager for multi-agent development workflows. Includes role creation, worker management, task assignment, and git worktree integration with WezTerm/Tmux support.",
-      "version": "1.3.1",
+      "version": "1.4.0",
       "author": {
         "name": "JsonLee"
       },
