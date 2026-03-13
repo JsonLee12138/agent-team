@@ -12,6 +12,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// workerShellInitDelay is overridable in tests to avoid real-time sleeps.
+var workerShellInitDelay = 3 * time.Second
+
 // defaultTaskSetup is the real task initialization function.
 var defaultTaskSetup = func(wtPath string) error {
 	return internal.InitTasksDir(wtPath)
@@ -23,30 +26,25 @@ var taskSetup = defaultTaskSetup
 // skillInstaller can be overridden in tests to skip npx skill installation.
 var skillInstaller = internal.InstallSkillsForWorkerFromPath
 
-// workerShellInitDelay is overridable in tests to avoid real-time sleeps.
-var workerShellInitDelay = 2 * time.Second
-
 func newWorkerCreateCmd() *cobra.Command {
 	var provider string
 	var model string
-	var newWindow bool
 	var fresh bool
 	cmd := &cobra.Command{
 		Use:   "create <role-name> [--provider <provider>] [--model <model>]",
-		Short: "Create a new worker and open its session",
+		Short: "Create a new worker (use 'worker open' to start its session)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return GetApp(cmd).RunWorkerCreate(args[0], provider, model, newWindow, fresh)
+			return GetApp(cmd).RunWorkerCreate(args[0], provider, model, fresh)
 		},
 	}
 	cmd.Flags().StringVarP(&provider, "provider", "p", "", workerProviderFlagHelp)
 	cmd.Flags().StringVarP(&model, "model", "m", "", "AI model identifier")
-	cmd.Flags().BoolVarP(&newWindow, "new-window", "w", false, "Open in a new window instead of a tab")
 	cmd.Flags().BoolVar(&fresh, "fresh", false, "Force re-install all skills, ignoring project cache")
 	return cmd
 }
 
-func (a *App) RunWorkerCreate(roleName, provider, model string, newWindow, fresh bool) error {
+func (a *App) RunWorkerCreate(roleName, provider, model string, fresh bool) error {
 	root := a.Git.Root()
 
 	// 1. Resolve role (project → global priority)
@@ -101,22 +99,15 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, newWindow, fresh
 		return fmt.Errorf("write .gitignore: %w", err)
 	}
 
-	// 6. Get mainSessionID
-	mainSessionID := os.Getenv("WEZTERM_PANE")
-	if mainSessionID == "" {
-		mainSessionID = os.Getenv("TMUX_PANE")
-	}
-
-	// 7. Create and save worker.yaml to worktree root
+	// 6. Create and save worker.yaml to worktree root
 	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
 	cfg := &internal.WorkerConfig{
-		WorkerID:      workerID,
-		Role:          roleName,
-		Provider:      provider,
-		DefaultModel:  model,
-		MainSessionID: mainSessionID,
-		PaneID:        "",
-		CreatedAt:     now,
+		WorkerID:     workerID,
+		Role:         roleName,
+		Provider:     provider,
+		DefaultModel: model,
+		PaneID:       "",
+		CreatedAt:    now,
 	}
 	if roleScope == "global" {
 		cfg.RoleScope = roleScope
@@ -127,62 +118,29 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, newWindow, fresh
 		return fmt.Errorf("save worker config: %w", err)
 	}
 
-	// 8. Initialize tasks in worktree
+	// 7. Initialize tasks in worktree
 	if err := taskSetup(wtPath); err != nil {
 		return fmt.Errorf("task setup: %w", err)
 	}
 
-	// 9. Inject role prompt into CLAUDE.md and AGENTS.md
+	// 8. Inject role prompt into CLAUDE.md and AGENTS.md
 	if err := internal.InjectRolePromptWithPath(wtPath, workerID, roleName, rolePath, root); err != nil {
 		return fmt.Errorf("inject role prompt: %w", err)
 	}
 
-	// 10. Open window — SpawnPane
-	paneID, err := a.Session.SpawnPane(wtPath, newWindow)
-	if err != nil || paneID == "" {
-		return fmt.Errorf("failed to open session for '%s': %w", workerID, err)
-	}
-
-	// 11. Set pane title, return focus to controller
-	a.Session.SetTitle(paneID, workerID)
-	if !newWindow {
-		if currentPane := os.Getenv("WEZTERM_PANE"); currentPane != "" {
-			a.Session.ActivatePane(currentPane)
-		}
-	}
-
-	// 12. Save paneID + controllerPaneID to worker.yaml
-	cfg.PaneID = paneID
-	if controllerPane := os.Getenv("WEZTERM_PANE"); controllerPane != "" {
-		cfg.ControllerPaneID = controllerPane
-	} else if controllerPane := os.Getenv("TMUX_PANE"); controllerPane != "" {
-		cfg.ControllerPaneID = controllerPane
-	}
-	if err := cfg.Save(configPath); err != nil {
-		return fmt.Errorf("save worker config: %w", err)
-	}
-
-	// 13. Install skills
+	// 9. Install skills
 	fmt.Printf("  Installing skills for role '%s'...\n", roleName)
 	if err := skillInstaller(wtPath, root, roleName, rolePath, provider, fresh); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: skill installation had errors: %v\n", err)
 	}
 
-	// 14. Wait for shell init
-	fmt.Println("  Waiting for shell to initialize...")
-	time.Sleep(workerShellInitDelay)
-
-	// 15. Send AI launch command
-	launchCmd := internal.BuildLaunchCmd(provider, model)
-	a.Session.PaneSend(paneID, launchCmd)
-
-	fmt.Printf("✓ Created and opened worker '%s' at %s\n", workerID, wtPath)
+	fmt.Printf("✓ Created worker '%s' at %s\n", workerID, wtPath)
 	fmt.Printf("  → Role: %s\n", roleName)
 	if roleScope == "global" {
 		fmt.Printf("  → Role source: global (%s)\n", rolePath)
 	}
 	fmt.Printf("  → Provider: %s\n", provider)
 	fmt.Printf("  → Branch: %s\n", branch)
-	fmt.Printf("  → Pane: %s\n", paneID)
+	fmt.Printf("  → Run 'agent-team worker open %s' to start the session\n", workerID)
 	return nil
 }

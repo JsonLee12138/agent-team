@@ -108,7 +108,9 @@ agent-team role list
 agent-team worker create <role-name> [--provider <provider>] [--model <model>]
 ```
 
-Creates worktree `.worktrees/<worker-id>/` with branch `team/<worker-id>`, writes `worker.yaml`, initializes `.tasks/` directory, and opens a worker session. If `--provider` is omitted, `worker.yaml.provider` defaults to `claude`.
+Creates worktree `.worktrees/<worker-id>/` with branch `team/<worker-id>`, writes `worker.yaml`, initializes `.tasks/` directory, syncs skills, and injects role prompt. Does **not** open a terminal session — use `worker open` to start the session. If `--provider` is omitted, `worker.yaml.provider` defaults to `claude`.
+
+> **AI Behavior (Skill Sync Warning)**: If skill installation emits a warning during `worker create`, surface the warning to the user and ask whether role skill bindings need adjustment. Do NOT auto-fix bindings.
 
 ### Open a worker session
 
@@ -148,11 +150,15 @@ Shows all workers, their roles, session status, and active changes.
 agent-team worker merge <worker-id>
 ```
 
-Merges `team/<worker-id>` into the current branch with `--no-ff`.
+Merges `team/<worker-id>` into the current branch with `--no-ff`. Does **not** close the worker session — use `worker close` explicitly if needed before or after merge.
 
 ### Close a session
 
-Close the terminal without deleting the worktree/branch. Can reopen later with `worker open`.
+```bash
+agent-team worker close <worker-id>
+```
+
+Closes the terminal pane without deleting the worktree or branch. Idempotent — succeeds if the session is already closed. Can reopen later with `worker open`.
 
 ### Delete a worker
 
@@ -160,7 +166,7 @@ Close the terminal without deleting the worktree/branch. Can reopen later with `
 agent-team worker delete <worker-id>
 ```
 
-Closes the running session, removes the worktree, deletes the branch, and cleans up config. **Irreversible.**
+Closes the running session, removes the worktree, deletes the branch, and cleans up config. Stops if the session close fails (will not delete a worktree with a live session). **Irreversible.**
 
 ### AI Behavior -- Worker Cleanup Rules
 

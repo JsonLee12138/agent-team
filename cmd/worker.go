@@ -10,6 +10,7 @@ func newWorkerCmd() *cobra.Command {
 	}
 	cmd.AddCommand(newWorkerCreateCmd())
 	cmd.AddCommand(newWorkerOpenCmd())
+	cmd.AddCommand(newWorkerCloseCmd())
 	cmd.AddCommand(newWorkerAssignCmd())
 	cmd.AddCommand(newWorkerStatusCmd())
 	cmd.AddCommand(newWorkerMergeCmd())

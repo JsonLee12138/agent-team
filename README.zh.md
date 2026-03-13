@@ -129,11 +129,13 @@ agent-team role-repo add JsonLee12138/agent-team
 - `agent-team role-repo add <owner/repo>`: 从 GitHub 安装角色。
 
 ### Worker 操作
-- `agent-team worker create <role> [--provider <provider>] [--model <model>]`: 启动新的 worker。
-- `agent-team worker open <worker-id> [--provider <provider>] [--model <model>] [--new-window]`: 重新打开 worker 会话。
+- `agent-team worker create <role> [--provider <provider>] [--model <model>]`: 创建新的 worker（不启动会话）。
+- `agent-team worker open <worker-id> [--provider <provider>] [--model <model>] [--new-window]`: 启动或重新打开 worker 会话。
+- `agent-team worker close <worker-id>`: 关闭 worker 会话（不删除 worker）。
 - `agent-team worker status`: 查看活跃的 worker 和任务。
 - `agent-team worker assign <id> "<task>"`: 分配工作。
-- `agent-team worker merge <id>`: 合并 worker 变更。
+- `agent-team worker merge <id>`: 合并 worker 变更（不关闭会话）。
+- `agent-team worker delete <id>`: 删除 worker 及其工作树。
 
 ### 通信
 - `agent-team reply <id> "<msg>"`: 向 worker 发送消息。

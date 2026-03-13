@@ -1,11 +1,11 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/JsonLee12138/agent-team/internal"
 )
@@ -26,11 +26,9 @@ func TestWorkerCreateCmdRejectsPositionalProviderSyntax(t *testing.T) {
 func TestRunWorkerCreateDefaultsProviderAndPersistsModel(t *testing.T) {
 	taskSetup = func(string) error { return nil }
 	skillInstaller = func(_, _, _, _, _ string, _ bool) error { return nil }
-	workerShellInitDelay = 0
 	t.Cleanup(func() {
 		taskSetup = defaultTaskSetup
 		skillInstaller = internal.InstallSkillsForWorkerFromPath
-		workerShellInitDelay = 2 * time.Second
 	})
 
 	app, dir := initTestApp(t)
@@ -48,7 +46,7 @@ func TestRunWorkerCreateDefaultsProviderAndPersistsModel(t *testing.T) {
 		t.Fatalf("write SKILL.md: %v", err)
 	}
 
-	if err := app.RunWorkerCreate("backend", "", "gpt-5", false, false); err != nil {
+	if err := app.RunWorkerCreate("backend", "", "gpt-5", false); err != nil {
 		t.Fatalf("RunWorkerCreate: %v", err)
 	}
 
@@ -62,22 +60,21 @@ func TestRunWorkerCreateDefaultsProviderAndPersistsModel(t *testing.T) {
 	if cfg.DefaultModel != "gpt-5" {
 		t.Fatalf("DefaultModel = %q, want gpt-5", cfg.DefaultModel)
 	}
-	if len(mock.SentTexts) == 0 {
-		t.Fatal("expected launch command to be sent")
+	// create no longer spawns a pane or sends launch commands
+	if cfg.PaneID != "" {
+		t.Fatalf("PaneID = %q, want empty (create should not open session)", cfg.PaneID)
 	}
-	if got := mock.SentTexts[0]; got != "claude --dangerously-skip-permissions --model gpt-5" {
-		t.Fatalf("launch command = %q", got)
+	if len(mock.SentTexts) != 0 {
+		t.Fatalf("SentTexts = %v, want none (create should not launch provider)", mock.SentTexts)
 	}
 }
 
 func TestRunWorkerCreatePersistsExplicitProvider(t *testing.T) {
 	taskSetup = func(string) error { return nil }
 	skillInstaller = func(_, _, _, _, _ string, _ bool) error { return nil }
-	workerShellInitDelay = 0
 	t.Cleanup(func() {
 		taskSetup = defaultTaskSetup
 		skillInstaller = internal.InstallSkillsForWorkerFromPath
-		workerShellInitDelay = 2 * time.Second
 	})
 
 	app, dir := initTestApp(t)
@@ -95,7 +92,7 @@ func TestRunWorkerCreatePersistsExplicitProvider(t *testing.T) {
 		t.Fatalf("write SKILL.md: %v", err)
 	}
 
-	if err := app.RunWorkerCreate("backend", "codex", "", false, false); err != nil {
+	if err := app.RunWorkerCreate("backend", "codex", "", false); err != nil {
 		t.Fatalf("RunWorkerCreate: %v", err)
 	}
 
@@ -105,5 +102,31 @@ func TestRunWorkerCreatePersistsExplicitProvider(t *testing.T) {
 	}
 	if cfg.Provider != "codex" {
 		t.Fatalf("Provider = %q, want codex", cfg.Provider)
+	}
+	if cfg.PaneID != "" {
+		t.Fatalf("PaneID = %q, want empty", cfg.PaneID)
+	}
+}
+
+func TestRunWorkerCreateSkillsSyncWarningDoesNotFail(t *testing.T) {
+	taskSetup = func(string) error { return nil }
+	skillInstaller = func(_, _, _, _, _ string, _ bool) error {
+		return fmt.Errorf("npm install failed")
+	}
+	t.Cleanup(func() {
+		taskSetup = defaultTaskSetup
+		skillInstaller = internal.InstallSkillsForWorkerFromPath
+	})
+
+	app, dir := initTestApp(t)
+	app.Session = &MockBackend{AlivePanes: map[string]bool{}}
+
+	roleDir := filepath.Join(dir, ".agents", "teams", "backend")
+	os.MkdirAll(roleDir, 0755)
+	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# backend\n"), 0644)
+
+	// create should succeed despite skill sync failure
+	if err := app.RunWorkerCreate("backend", "", "", false); err != nil {
+		t.Fatalf("RunWorkerCreate should succeed on skill sync failure: %v", err)
 	}
 }

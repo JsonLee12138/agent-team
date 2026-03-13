@@ -31,11 +31,11 @@ func (a *App) RunWorkerDelete(workerID string) error {
 
 	fmt.Printf("Deleting worker '%s'...\n", workerID)
 
-	// Kill running pane if any
+	// Close running session via shared helper
 	cfg, err := internal.LoadWorkerConfig(configPath)
-	if err == nil && a.Session.PaneAlive(cfg.PaneID) {
-		if killErr := a.Session.KillPane(cfg.PaneID); killErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to close pane %s; continuing delete\n", cfg.PaneID)
+	if err == nil {
+		if err := closeWorkerSession(a.Session, cfg, configPath); err != nil {
+			return fmt.Errorf("failed to close session before delete: %w", err)
 		}
 	}
 

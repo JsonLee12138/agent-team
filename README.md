@@ -129,11 +129,13 @@ Available in `.agents/teams/`:
 - `agent-team role-repo add <owner/repo>`: Install roles from GitHub.
 
 ### Worker Operations
-- `agent-team worker create <role> [--provider <provider>] [--model <model>]`: Spin up a new worker.
-- `agent-team worker open <worker-id> [--provider <provider>] [--model <model>] [--new-window]`: Reopen a worker session.
+- `agent-team worker create <role> [--provider <provider>] [--model <model>]`: Prepare a new worker (does not start a session).
+- `agent-team worker open <worker-id> [--provider <provider>] [--model <model>] [--new-window]`: Start or reopen a worker session.
+- `agent-team worker close <worker-id>`: Close a worker session without deleting the worker.
 - `agent-team worker status`: View active workers and tasks.
 - `agent-team worker assign <id> "<task>"`: Dispatch work.
-- `agent-team worker merge <id>`: Sync worker changes back.
+- `agent-team worker merge <id>`: Sync worker changes back (does not close the session).
+- `agent-team worker delete <id>`: Remove a worker and its worktree.
 
 ### Communication
 - `agent-team reply <id> "<msg>"`: Send message to worker.
