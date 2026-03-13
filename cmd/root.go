@@ -32,11 +32,6 @@ func NewRootCmd() *cobra.Command {
 		case "help", "version", "completion", "_inject-role-prompt", "init":
 			return nil
 		}
-		// Skip init for all hook subcommands
-		if hasAncestorNamed(cmd, "hook") {
-			return nil
-		}
-
 		cwd, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("get working directory: %w", err)
@@ -70,16 +65,6 @@ func GetApp(cmd *cobra.Command) *App {
 	return cmd.Context().Value(appKey{}).(*App)
 }
 
-// hasAncestorNamed checks if any ancestor command has the given name.
-func hasAncestorNamed(cmd *cobra.Command, name string) bool {
-	for p := cmd.Parent(); p != nil; p = p.Parent() {
-		if p.Name() == name {
-			return true
-		}
-	}
-	return false
-}
-
 func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(newWorkerCmd())
 	rootCmd.AddCommand(newRoleCmd())
@@ -90,7 +75,6 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(newMigrateCmd())
 	rootCmd.AddCommand(newInjectRolePromptCmd())
 	rootCmd.AddCommand(newInitCmd())
-	rootCmd.AddCommand(newHookCmd())
 	rootCmd.AddCommand(newCatalogCmd())
 	rootCmd.AddCommand(newSkillCmd())
 }

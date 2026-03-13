@@ -109,12 +109,12 @@ agent-team role-repo add JsonLee12138/agent-team
 
 ## 🤖 支持的 Provider
 
-| Provider | CLI 值 | Hook 支持 |
+| Provider | CLI 值 | 集成方式 |
 | :--- | :--- | :--- |
-| **Claude Code** | `claude` | ✅ 完整 (Plugin) |
-| **Gemini CLI** | `gemini` | ✅ 完整 (Extension) |
-| **OpenCode** | `opencode` | ✅ 完整 (NPM Plugin) |
-| **OpenAI Codex** | `codex` | ⚠️ 仅 Prompt |
+| **Claude Code** | `claude` | Plugin |
+| **Gemini CLI** | `gemini` | Extension |
+| **OpenCode** | `opencode` | NPM Plugin |
+| **OpenAI Codex** | `codex` | 仅 Prompt |
 
 ---
 
@@ -151,8 +151,7 @@ agent-team role-repo add JsonLee12138/agent-team
 ├── .agents/teams/        <- 项目专属角色
 ├── .worktrees/           <- 隔离的 worker 工作区
 ├── roles-lock.json       <- 远程角色版本锁
-├── gemini-extension.json <- 扩展清单
-└── hooks/                <- 共享生命周期钩子
+└── gemini-extension.json <- 扩展清单
 ```
 
 </details>

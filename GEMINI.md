@@ -26,14 +26,4 @@ agent-team task archive <worker-id> <change-name>         # Archive completed ch
 agent-team reply-main "<message>"                      # Send message to main controller
 ```
 
-## Hooks
-
-The `agent-team hook` subcommands handle lifecycle events automatically:
-
-- **session-start**: Injects role prompt into context files
-- **pre-tool-use**: Checks for design documents before coding
-- **post-tool-use**: Runs quality checks after edits
-- **stop**: Warns about unarchived changes
-- **task-completed**: Archives changes and notifies main controller
-
-<!-- Dynamic role content is injected below by the session-start hook -->
+<!-- Dynamic role content is injected below by worker open -->

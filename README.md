@@ -109,12 +109,12 @@ Available in `.agents/teams/`:
 
 ## 🤖 Supported Providers
 
-| Provider | CLI Value | Hook Support |
+| Provider | CLI Value | Integration |
 | :--- | :--- | :--- |
-| **Claude Code** | `claude` | ✅ Full (Plugin) |
-| **Gemini CLI** | `gemini` | ✅ Full (Extension) |
-| **OpenCode** | `opencode` | ✅ Full (NPM Plugin) |
-| **OpenAI Codex** | `codex` | ⚠️ Prompt-only |
+| **Claude Code** | `claude` | Plugin |
+| **Gemini CLI** | `gemini` | Extension |
+| **OpenCode** | `opencode` | NPM Plugin |
+| **OpenAI Codex** | `codex` | Prompt-only |
 
 ---
 
@@ -151,8 +151,7 @@ project-root/
 ├── .agents/teams/        <- Project-specific roles
 ├── .worktrees/           <- Isolated worker workspaces
 ├── roles-lock.json       <- Remote role version locking
-├── gemini-extension.json <- Extension manifest
-└── hooks/                <- Shared lifecycle hooks
+└── gemini-extension.json <- Extension manifest
 ```
 
 </details>

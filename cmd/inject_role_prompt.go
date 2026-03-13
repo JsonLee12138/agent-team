@@ -8,14 +8,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// newInjectRolePromptCmd 返回隐藏子命令，供 session-init.sh Hook 调用。
+// newInjectRolePromptCmd 返回隐藏子命令，供 worker open 流程调用。
 func newInjectRolePromptCmd() *cobra.Command {
 	var worktree, workerID, role, root string
 
 	cmd := &cobra.Command{
 		Use:    "_inject-role-prompt",
 		Hidden: true,
-		Short:  "Inject role prompt into worktree CLAUDE.md (internal, used by hooks)",
+		Short:  "Inject role prompt into worktree CLAUDE.md (internal)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if worktree == "" || workerID == "" || role == "" || root == "" {
 				return fmt.Errorf("--worktree, --worker-id, --role, and --root are all required")

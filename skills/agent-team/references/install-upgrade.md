@@ -3,8 +3,8 @@
 Per-provider instructions for installing and upgrading agent-team. AI agents can use these steps to self-install or self-upgrade when needed.
 
 > **IMPORTANT — Installation Strategy**
-> - **Plugin platforms** (Claude Code, Gemini CLI, OpenCode): Install and update **exclusively** through each platform's native plugin/extension system. Do **NOT** use `npx skills add` on these platforms — the plugin already bundles all skill files and hooks.
-> - **Codex**: No plugin/hook support. Use `npx skills add` to install skills **globally only** (`-a codex -g`).
+> - **Plugin platforms** (Claude Code, Gemini CLI, OpenCode): Install and update **exclusively** through each platform's native plugin/extension system. Do **NOT** use `npx skills add` on these platforms — the plugin already bundles all skill files.
+> - **Codex**: No plugin support. Use `npx skills add` to install skills **globally only** (`-a codex -g`).
 > - **Other platforms** (no plugin support): Use `npx skills add` with the specific platform flag. See [Agent Skill (Non-Plugin Platforms)](#agent-skill-non-plugin-platforms).
 > - **NEVER** use `-a '*'` (all-platform wildcard) — it pollutes the project with config directories for providers the user does not use.
 
@@ -21,7 +21,7 @@ If `agent-team` is not found, follow the installation steps for your provider be
 
 ## Claude Code (Plugin Marketplace)
 
-> **Plugin handles everything.** Do NOT use `npx skills add` for Claude Code — the plugin bundles all skills and hooks.
+> **Plugin handles everything.** Do NOT use `npx skills add` for Claude Code — the plugin bundles all skills.
 
 ### Install
 
@@ -51,7 +51,7 @@ After upgrading the plugin, run `agent-team init` to sync bundled roles to globa
 
 ## Gemini CLI (Extension)
 
-> **Extension handles everything.** Do NOT use `npx skills add` for Gemini CLI — the extension bundles all skills and hooks.
+> **Extension handles everything.** Do NOT use `npx skills add` for Gemini CLI — the extension bundles all skills.
 
 ### Install
 
@@ -59,7 +59,7 @@ After upgrading the plugin, run `agent-team init` to sync bundled roles to globa
 gemini extensions install https://github.com/JsonLee12138/agent-team
 ```
 
-This installs the `gemini-extension.json` manifest and hooks. The `GEMINI.md` context file is loaded automatically in worktrees.
+This installs the `gemini-extension.json` manifest. The `GEMINI.md` context file is loaded automatically in worktrees.
 
 Requires `agent-team` binary in PATH (see [Homebrew](#homebrew-macos) or [From Source](#from-source) below).
 
@@ -75,7 +75,7 @@ Also upgrade the CLI binary separately (Homebrew or Source).
 
 ## OpenCode (npm Plugin)
 
-> **Plugin handles everything.** Do NOT use `npx skills add` for OpenCode — the plugin bundles all skills and hooks.
+> **Plugin handles everything.** Do NOT use `npx skills add` for OpenCode — the plugin bundles all skills.
 
 ### Install
 
@@ -106,7 +106,7 @@ Also upgrade the CLI binary separately (Homebrew or Source).
 
 ## Codex (Agent Skill — Global Only)
 
-Codex has no plugin or hook system. Hook behaviors (brainstorming gate, quality checks) are enforced via prompt conventions in the role's `system.md`.
+Codex has no plugin system. Behaviors like brainstorming gate and quality checks are enforced via prompt conventions in the role's `system.md`.
 
 > **Global install only.** Codex skills are installed globally so they're available across all projects.
 
