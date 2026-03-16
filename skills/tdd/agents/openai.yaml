@@ -1,0 +1,4 @@
+interface:
+  display_name: "TDD"
+  short_description: "Acceptance-first TDD workflow for solo work"
+  default_prompt: "Use $tdd to handle this task with an acceptance-first TDD workflow: read context, define acceptance, write failing tests when feasible, implement, verify, and conclude with passed, failed, or skipped with reason."
