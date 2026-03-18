@@ -78,4 +78,5 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(newCatalogCmd())
 	rootCmd.AddCommand(newSkillCmd())
 	rootCmd.AddCommand(newWorkflowCmd())
+	rootCmd.AddCommand(newReqCmd())
 }
