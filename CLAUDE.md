@@ -14,7 +14,6 @@ Use this file when working in Claude Code on this repository.
 Load `.agents/rules/index.md` first, then load only the matching rule files:
 
 - `.agents/rules/debugging.md` for bugs, flaky tests, runtime errors, or unexpected behavior
-- `.agents/rules/build-verification.md` before `go build`, `go vet`, `go test`, commit, or PR handoff
 - `.agents/rules/communication.md` for `reply-main`, blocker escalation, and progress updates
 - `.agents/rules/context-management.md` for `/compact` decisions, handoff summaries, and provider-specific context control
 - `.agents/rules/task-protocol.md` for task execution, verify, commit, archive, and completion reporting

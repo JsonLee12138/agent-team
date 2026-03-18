@@ -136,6 +136,12 @@ Creates a task change at `.tasks/changes/<timestamp>-<slug>/` and sends a `[New 
 2. Pass the Assign Readiness Gate -> [references/readiness.md](references/readiness.md)
 3. **Sync worktree with main**: If worker exists with no uncommitted changes, rebase/merge latest main. If uncommitted changes exist, ask user first.
 
+After a successful assign, the controller's default next state is `waiting for worker reply`.
+
+- Do NOT enter a routine `worker status` polling loop.
+- Wait for the worker to report back with `agent-team reply-main "<message>"`.
+- Use `worker status` only for assign failure diagnosis, timeout or no-reply investigation, or when the user explicitly asks for current status.
+
 ### Check status
 
 ```bash
@@ -143,6 +149,8 @@ agent-team worker status
 ```
 
 Shows all workers, their roles, session status, and active changes.
+
+> **AI Behavior (Status Usage)**: `worker status` is an exception and inspection tool. It is not the default next step after `worker assign`.
 
 ### Merge completed work
 
@@ -184,11 +192,12 @@ Closes the running session, removes the worktree, deletes the branch, and cleans
 ### Task Commands
 
 ```bash
-agent-team task list                  # List all task changes
-agent-team task show <id>             # Show task details
-agent-team task done <id>             # Mark task as done
-agent-team task verify <id>           # Run verification
-agent-team task archive <id>          # Archive a task change
+agent-team task create <worker-id> "<description>" [--proposal <file>] [--design <file>] [--verify-cmd <cmd>] [--skip-verify]
+agent-team task list [--worker <worker-id>] [--status <status>]
+agent-team task show <worker-id> <change-name>
+agent-team task done <worker-id> <change-name> <task-id>
+agent-team task verify <worker-id> <change-name>
+agent-team task archive <worker-id> <change-name>
 ```
 
 ### Worker TDD Cycle
@@ -200,12 +209,11 @@ Full worker workflow details: [references/worker-workflow.md](references/worker-
 ### Worker Notification Formats
 
 Workers notify the controller using `reply-main` with one of:
-- `"Task completed: <summary>; verify: passed"`
-- `"Task completed: <summary>; verify: failed -- <reason>"`
-- `"Task completed: <summary>; verify: skipped"`
+- `"Task completed: <summary>; change archived: <change-name>"`
+- `"Task completed: <summary>; archive failed for <change-name>: <error>"`
 - `"Need decision: <problem or options>"` (when blocked)
 
-> **AI Behavior (Task Completion)**: Check verify result, surface to user, ask how to proceed. Do NOT auto-merge.
+> **AI Behavior (Task Completion)**: Treat worker `reply-main` as the default completion signal after assignment, surface the outcome to the user, and ask how to proceed. Do NOT auto-merge.
 
 ## Phase 5: Communication
 

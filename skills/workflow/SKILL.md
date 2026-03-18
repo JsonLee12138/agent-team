@@ -70,7 +70,7 @@ Use this flow when the user asks to run `workflow.yaml`, resume a run, or inspec
 3. Resolve each workflow role alias to a concrete worker at runtime.
 4. Create or reuse workers with `agent-team worker create` and `agent-team worker open`.
 5. Execute the current node, then persist state with `agent-team workflow state ...`.
-6. Pause on worker wait states, ambiguous outcomes, or controller confirmations.
+6. Pause on worker wait states, proactive worker replies, ambiguous outcomes, or controller confirmations.
 7. Resume by reading the run-state file and continuing from `current_node`.
 
 Example bootstrap:
@@ -88,8 +88,8 @@ Follow this controller loop for every run:
 2. Start the current node with `agent-team workflow state start`.
 3. Execute the node action:
    - `controller_task`: do the task directly, then complete or confirm it.
-   - `assign_role_task`: assign work to the mapped worker with `agent-team worker assign`.
-   - `wait_for_completion`: inspect worker status or wait for worker feedback.
+   - `assign_role_task`: assign work to the mapped worker with `agent-team worker assign`, then move the run into a waiting state for worker feedback.
+   - `wait_for_completion`: wait for the worker's `reply-main` message as the default completion signal.
    - `decision`: choose an explicit branch outcome and record it.
    - `handoff`: assign the follow-up task to the next role and capture the transfer in state.
    - `verify_or_test`: run verification or dispatch QA verification, then branch on outcome.
@@ -100,6 +100,13 @@ Follow this controller loop for every run:
    - `complete` when the node finishes and can auto-advance
    - `confirm` when a confirmation gate is satisfied and a branch is selected
 5. Stop when the run state becomes `completed` or `blocked`.
+
+## Default Wait Protocol
+
+- After `assign_role_task`, persist the run as waiting and stop active status polling.
+- The normal next signal is the worker's proactive `agent-team reply-main "<message>"`.
+- Do not treat `agent-team worker status` as the default driver for `wait_for_completion`.
+- Use `agent-team worker status` only for assign failure diagnosis, timeout or no-reply investigation, or when the user explicitly asks for a status snapshot.
 
 ## Worker Preparation
 
@@ -116,7 +123,7 @@ Before the first role-backed node executes:
 agent-team worker create <role-name>
 agent-team worker open <worker-id>
 agent-team worker assign <worker-id> "<task>"
-agent-team worker status
+agent-team worker status   # exception-only inspection, not routine polling
 agent-team reply <worker-id> "<answer>"
 agent-team worker merge <worker-id>
 ```
@@ -139,4 +146,4 @@ Use `agent-team workflow state confirm` to resolve confirmation nodes determinis
 
 - `agent-team workflow create`: generate a starter workflow template from a supported preset.
 - `agent-team workflow validate`: fail-fast validation for workflow structure and node references.
-- `agent-team workflow state ...`: initialize, inspect, and update run-state files during execution.
+- `agent-team workflow state init|show|start|wait|block|complete|confirm`: initialize, inspect, and update run-state files during execution.
