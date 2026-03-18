@@ -3,6 +3,7 @@ package internal
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -289,5 +290,208 @@ func TestRebuildRequirementIndex(t *testing.T) {
 				t.Errorf("req-b: SubTaskCount=%d DoneCount=%d", e.SubTaskCount, e.DoneCount)
 			}
 		}
+	}
+}
+
+func TestSaveRequirementOverwrite(t *testing.T) {
+	wtPath := t.TempDir()
+
+	req := &Requirement{
+		Name:        "overwrite-me",
+		Description: "Original",
+		Status:      RequirementStatusOpen,
+		CreatedAt:   "2026-03-18T00:00:00Z",
+	}
+	if err := SaveRequirement(wtPath, req); err != nil {
+		t.Fatalf("first save: %v", err)
+	}
+
+	// Overwrite with updated fields
+	req.Description = "Updated"
+	req.Status = RequirementStatusDone
+	if err := SaveRequirement(wtPath, req); err != nil {
+		t.Fatalf("second save: %v", err)
+	}
+
+	loaded, err := LoadRequirement(wtPath, "overwrite-me")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if loaded.Description != "Updated" {
+		t.Errorf("Description = %q, want Updated", loaded.Description)
+	}
+	if loaded.Status != RequirementStatusDone {
+		t.Errorf("Status = %q, want done", loaded.Status)
+	}
+}
+
+func TestLoadRequirementCorruptedYAML(t *testing.T) {
+	wtPath := t.TempDir()
+
+	// Create requirement dir with corrupted YAML
+	reqDir := filepath.Join(wtPath, ".tasks", "requirements", "broken")
+	os.MkdirAll(reqDir, 0755)
+	os.WriteFile(filepath.Join(reqDir, "requirement.yaml"), []byte("{{invalid yaml:::"), 0644)
+
+	_, err := LoadRequirement(wtPath, "broken")
+	if err == nil {
+		t.Fatal("LoadRequirement should fail on corrupted YAML")
+	}
+}
+
+func TestListRequirementsSkipsBroken(t *testing.T) {
+	wtPath := t.TempDir()
+
+	// Create one valid and one broken requirement
+	validReq := &Requirement{
+		Name:      "valid-one",
+		Status:    RequirementStatusOpen,
+		CreatedAt: "2026-03-18T00:00:00Z",
+	}
+	if err := SaveRequirement(wtPath, validReq); err != nil {
+		t.Fatalf("save valid: %v", err)
+	}
+
+	// Create broken requirement dir
+	brokenDir := filepath.Join(wtPath, ".tasks", "requirements", "broken-one")
+	os.MkdirAll(brokenDir, 0755)
+	os.WriteFile(filepath.Join(brokenDir, "requirement.yaml"), []byte("not: [valid: yaml"), 0644)
+
+	reqs, err := ListRequirements(wtPath)
+	if err != nil {
+		t.Fatalf("ListRequirements: %v", err)
+	}
+	if len(reqs) != 1 {
+		t.Fatalf("Expected 1 valid requirement, got %d", len(reqs))
+	}
+	if reqs[0].Name != "valid-one" {
+		t.Errorf("Name = %q, want valid-one", reqs[0].Name)
+	}
+}
+
+func TestListRequirementsSkipsFiles(t *testing.T) {
+	wtPath := t.TempDir()
+
+	// Create the requirements dir with a regular file (not a directory)
+	reqsDir := RequirementsDir(wtPath)
+	os.MkdirAll(reqsDir, 0755)
+	os.WriteFile(filepath.Join(reqsDir, "index.yaml"), []byte("requirements: []\n"), 0644)
+
+	reqs, err := ListRequirements(wtPath)
+	if err != nil {
+		t.Fatalf("ListRequirements: %v", err)
+	}
+	if len(reqs) != 0 {
+		t.Errorf("Expected 0 requirements (files should be skipped), got %d", len(reqs))
+	}
+}
+
+func TestCreateRequirementNoSubTasks(t *testing.T) {
+	wtPath := t.TempDir()
+
+	req, err := CreateRequirement(wtPath, "empty-req", "No subtasks", nil)
+	if err != nil {
+		t.Fatalf("CreateRequirement: %v", err)
+	}
+	if req.Status != RequirementStatusOpen {
+		t.Errorf("Status = %q, want open", req.Status)
+	}
+	if len(req.SubTasks) != 0 {
+		t.Errorf("SubTasks count = %d, want 0", len(req.SubTasks))
+	}
+
+	// Verify it can be loaded back
+	loaded, err := LoadRequirement(wtPath, "empty-req")
+	if err != nil {
+		t.Fatalf("LoadRequirement: %v", err)
+	}
+	if len(loaded.SubTasks) != 0 {
+		t.Errorf("Loaded SubTasks count = %d, want 0", len(loaded.SubTasks))
+	}
+}
+
+func TestUpdateIndexEntryMultipleRequirements(t *testing.T) {
+	wtPath := t.TempDir()
+
+	// Add first requirement to index
+	req1 := &Requirement{
+		Name: "req-1", Status: RequirementStatusOpen,
+		SubTasks: []SubTask{{ID: 1, Status: SubTaskStatusPending}},
+	}
+	if err := UpdateIndexEntry(wtPath, req1); err != nil {
+		t.Fatalf("UpdateIndexEntry req-1: %v", err)
+	}
+
+	// Add second requirement to index
+	req2 := &Requirement{
+		Name: "req-2", Status: RequirementStatusDone,
+		SubTasks: []SubTask{{ID: 1, Status: SubTaskStatusDone}},
+	}
+	if err := UpdateIndexEntry(wtPath, req2); err != nil {
+		t.Fatalf("UpdateIndexEntry req-2: %v", err)
+	}
+
+	idx, err := LoadRequirementIndex(wtPath)
+	if err != nil {
+		t.Fatalf("LoadRequirementIndex: %v", err)
+	}
+	if len(idx.Requirements) != 2 {
+		t.Fatalf("Expected 2 entries, got %d", len(idx.Requirements))
+	}
+
+	// Update first — should replace, not add 3rd entry
+	req1.Status = RequirementStatusInProgress
+	if err := UpdateIndexEntry(wtPath, req1); err != nil {
+		t.Fatalf("UpdateIndexEntry req-1 again: %v", err)
+	}
+
+	idx, err = LoadRequirementIndex(wtPath)
+	if err != nil {
+		t.Fatalf("LoadRequirementIndex: %v", err)
+	}
+	if len(idx.Requirements) != 2 {
+		t.Errorf("Expected 2 entries after update, got %d", len(idx.Requirements))
+	}
+}
+
+func TestBuildIndexEntrySkippedCountsAsDone(t *testing.T) {
+	req := &Requirement{
+		Name:   "req-skip",
+		Status: RequirementStatusInProgress,
+		SubTasks: []SubTask{
+			{ID: 1, Status: SubTaskStatusDone},
+			{ID: 2, Status: SubTaskStatusSkipped},
+			{ID: 3, Status: SubTaskStatusAssigned},
+		},
+	}
+
+	entry := buildIndexEntry(req)
+	if entry.SubTaskCount != 3 {
+		t.Errorf("SubTaskCount = %d, want 3", entry.SubTaskCount)
+	}
+	// Done + Skipped = 2
+	if entry.DoneCount != 2 {
+		t.Errorf("DoneCount = %d, want 2 (done+skipped)", entry.DoneCount)
+	}
+}
+
+func TestRebuildRequirementIndexEmpty(t *testing.T) {
+	wtPath := t.TempDir()
+
+	idx, err := RebuildRequirementIndex(wtPath)
+	if err != nil {
+		t.Fatalf("RebuildRequirementIndex: %v", err)
+	}
+	if len(idx.Requirements) != 0 {
+		t.Errorf("Expected 0 entries, got %d", len(idx.Requirements))
+	}
+
+	// Verify file was written
+	loaded, err := LoadRequirementIndex(wtPath)
+	if err != nil {
+		t.Fatalf("LoadRequirementIndex: %v", err)
+	}
+	if len(loaded.Requirements) != 0 {
+		t.Errorf("Saved index should have 0 entries, got %d", len(loaded.Requirements))
 	}
 }

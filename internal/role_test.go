@@ -646,3 +646,288 @@ func TestListGlobalRoles_DirNotExists(t *testing.T) {
 		t.Errorf("got %d roles, want 0", len(roles))
 	}
 }
+
+func TestHasRulesDir(t *testing.T) {
+	t.Run("returns true when .agents/rules/ exists", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
+		if !HasRulesDir(dir) {
+			t.Error("HasRulesDir should return true")
+		}
+	})
+
+	t.Run("returns false when .agents/rules/ missing", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
+		if HasRulesDir(dir) {
+			t.Error("HasRulesDir should return false")
+		}
+	})
+
+	t.Run("returns false when rules is a file not dir", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
+		os.WriteFile(filepath.Join(dir, ".agents", "rules"), []byte("not a dir"), 0644)
+		if HasRulesDir(dir) {
+			t.Error("HasRulesDir should return false when rules is a file")
+		}
+	})
+}
+
+func TestBuildRoleIdentity(t *testing.T) {
+	dir := t.TempDir()
+	roleDir := filepath.Join(dir, ".agents", "teams", "qa-tester")
+	refDir := filepath.Join(roleDir, "references")
+	os.MkdirAll(refDir, 0755)
+
+	// With description in role.yaml
+	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte("description: \"Write tests and verify quality\"\n"), 0644)
+
+	identity := buildRoleIdentity("qa-tester", roleDir)
+	if !strings.Contains(identity, "You are the qa-tester role") {
+		t.Error("identity should contain role name")
+	}
+	if !strings.Contains(identity, "Write tests and verify quality") {
+		t.Error("identity should contain description from role.yaml")
+	}
+}
+
+func TestBuildRoleIdentityNoDescription(t *testing.T) {
+	dir := t.TempDir()
+	roleDir := filepath.Join(dir, ".agents", "teams", "minimal")
+	os.MkdirAll(roleDir, 0755)
+	// No references/role.yaml
+
+	identity := buildRoleIdentity("minimal", roleDir)
+	if !strings.Contains(identity, "You are the minimal role") {
+		t.Error("identity should contain role name")
+	}
+	if strings.Contains(identity, "Primary objective") {
+		t.Error("identity should NOT contain 'Primary objective' when no description")
+	}
+}
+
+func TestBuildRulesIndexSection(t *testing.T) {
+	t.Run("returns content when index.md exists", func(t *testing.T) {
+		dir := t.TempDir()
+		rulesDir := filepath.Join(dir, ".agents", "rules")
+		os.MkdirAll(rulesDir, 0755)
+		os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("- `debugging.md`: bugs\n- `task-protocol.md`: tasks\n"), 0644)
+
+		section := buildRulesIndexSection(dir)
+		if !strings.Contains(section, "Rules Reference") {
+			t.Error("should contain 'Rules Reference' header")
+		}
+		if !strings.Contains(section, "debugging.md") {
+			t.Error("should contain rule file reference")
+		}
+		if !strings.Contains(section, "task-protocol.md") {
+			t.Error("should contain task-protocol reference")
+		}
+	})
+
+	t.Run("returns empty when index.md missing", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
+		// No index.md
+
+		section := buildRulesIndexSection(dir)
+		if section != "" {
+			t.Errorf("should return empty string, got %q", section)
+		}
+	})
+
+	t.Run("returns empty when rules dir missing", func(t *testing.T) {
+		dir := t.TempDir()
+		section := buildRulesIndexSection(dir)
+		if section != "" {
+			t.Errorf("should return empty string, got %q", section)
+		}
+	})
+}
+
+func TestExtractSkillTrigger(t *testing.T) {
+	t.Run("extracts description from frontmatter", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("---\nname: test\ndescription: >\n  My test skill.\n  Use for testing.\n---\n# test\n"), 0644)
+
+		trigger := extractSkillTrigger(dir)
+		if trigger == "" {
+			t.Fatal("trigger should not be empty")
+		}
+		if !strings.Contains(trigger, "My test skill") {
+			t.Errorf("trigger = %q, should contain 'My test skill'", trigger)
+		}
+	})
+
+	t.Run("returns empty without frontmatter", func(t *testing.T) {
+		dir := t.TempDir()
+		os.WriteFile(filepath.Join(dir, "SKILL.md"), []byte("# test\nNo frontmatter here.\n"), 0644)
+
+		trigger := extractSkillTrigger(dir)
+		if trigger != "" {
+			t.Errorf("trigger should be empty, got %q", trigger)
+		}
+	})
+
+	t.Run("returns empty when SKILL.md missing", func(t *testing.T) {
+		dir := t.TempDir()
+		trigger := extractSkillTrigger(dir)
+		if trigger != "" {
+			t.Errorf("trigger should be empty, got %q", trigger)
+		}
+	})
+}
+
+func TestInjectRolePromptSlimNoGitRulesOrTaskProtocol(t *testing.T) {
+	// Explicitly verify slim mode excludes Git Rules and Task Completion Protocol content
+	dir := t.TempDir()
+	wtPath := filepath.Join(dir, ".worktrees", "test-001")
+	os.MkdirAll(wtPath, 0755)
+
+	roleDir := filepath.Join(dir, ".agents", "teams", "test")
+	refDir := filepath.Join(roleDir, "references")
+	os.MkdirAll(refDir, 0755)
+	os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# System Prompt: test\n"), 0644)
+	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte("name: test\ndescription: Test role\n"), 0644)
+
+	// Create rules dir → triggers slim mode
+	rulesDir := filepath.Join(dir, ".agents", "rules")
+	os.MkdirAll(rulesDir, 0755)
+	os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("- `task-protocol.md`: tasks\n"), 0644)
+
+	if err := InjectRolePrompt(wtPath, "test-001", "test", dir); err != nil {
+		t.Fatalf("InjectRolePrompt: %v", err)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(wtPath, "CLAUDE.md"))
+	content := string(data)
+
+	// Should NOT contain legacy inline sections
+	forbiddenPhrases := []string{
+		"### Git Rules",
+		"### Task Completion Protocol",
+		"git add -A",
+		"agent-team task archive",
+		"Reply to main controller",
+		"Need decision: <problem or options>",
+	}
+	for _, phrase := range forbiddenPhrases {
+		if strings.Contains(content, phrase) {
+			t.Errorf("slim mode should NOT contain %q", phrase)
+		}
+	}
+
+	// Should contain slim-mode sections
+	requiredPhrases := []string{
+		"You are the test role",
+		"Development Environment",
+		"Rules Reference",
+		"task-protocol.md",
+	}
+	for _, phrase := range requiredPhrases {
+		if !strings.Contains(content, phrase) {
+			t.Errorf("slim mode should contain %q", phrase)
+		}
+	}
+}
+
+func TestInjectRolePromptLegacyContainsFullContent(t *testing.T) {
+	// Verify legacy mode (no rules dir) contains full inline Git Rules and Task Completion Protocol
+	dir := t.TempDir()
+	wtPath := filepath.Join(dir, ".worktrees", "legacy-001")
+	os.MkdirAll(wtPath, 0755)
+
+	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	os.MkdirAll(roleDir, 0755)
+	os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# System Prompt: dev\nA developer.\n"), 0644)
+
+	// No .agents/rules/ → legacy mode
+	if err := InjectRolePrompt(wtPath, "legacy-001", "dev", dir); err != nil {
+		t.Fatalf("InjectRolePrompt: %v", err)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(wtPath, "CLAUDE.md"))
+	content := string(data)
+
+	requiredPhrases := []string{
+		"# System Prompt: dev",
+		"### Git Rules",
+		"### Task Completion Protocol",
+		"agent-team task archive",
+		"Reply to main controller",
+		"git add -A",
+		"Need decision: <problem or options>",
+	}
+	for _, phrase := range requiredPhrases {
+		if !strings.Contains(content, phrase) {
+			t.Errorf("legacy mode should contain %q", phrase)
+		}
+	}
+
+	// Legacy should NOT contain Rules Reference section
+	if strings.Contains(content, "Rules Reference") {
+		t.Error("legacy mode should NOT contain 'Rules Reference'")
+	}
+}
+
+func TestInjectRolePromptWithPathExplicit(t *testing.T) {
+	// Test InjectRolePromptWithPath using an explicit role path
+	dir := t.TempDir()
+	wtPath := filepath.Join(dir, ".worktrees", "wp-001")
+	os.MkdirAll(wtPath, 0755)
+
+	// Place role outside the standard .agents/teams/ location
+	customRolePath := filepath.Join(dir, "custom-roles", "my-role")
+	os.MkdirAll(customRolePath, 0755)
+	os.WriteFile(filepath.Join(customRolePath, "system.md"), []byte("# System Prompt: my-role\nCustom location.\n"), 0644)
+
+	err := InjectRolePromptWithPath(wtPath, "wp-001", "my-role", customRolePath, dir)
+	if err != nil {
+		t.Fatalf("InjectRolePromptWithPath: %v", err)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(wtPath, "CLAUDE.md"))
+	content := string(data)
+	if !strings.Contains(content, "# System Prompt: my-role") {
+		t.Error("should inject content from explicit role path")
+	}
+	if !strings.Contains(content, "Custom location") {
+		t.Error("should include system.md content from explicit path")
+	}
+}
+
+func TestInjectRolePromptAllThreeProviderFiles(t *testing.T) {
+	// Verify all three provider files are created with consistent content
+	dir := t.TempDir()
+	wtPath := filepath.Join(dir, ".worktrees", "multi-001")
+	os.MkdirAll(wtPath, 0755)
+
+	roleDir := filepath.Join(dir, ".agents", "teams", "multi")
+	os.MkdirAll(roleDir, 0755)
+	os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# System Prompt: multi\n"), 0644)
+
+	if err := InjectRolePrompt(wtPath, "multi-001", "multi", dir); err != nil {
+		t.Fatalf("InjectRolePrompt: %v", err)
+	}
+
+	var contents [3]string
+	for i, name := range []string{"CLAUDE.md", "AGENTS.md", "GEMINI.md"} {
+		data, err := os.ReadFile(filepath.Join(wtPath, name))
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		contents[i] = string(data)
+		if !strings.Contains(contents[i], "AGENT_TEAM:START") {
+			t.Errorf("%s missing AGENT_TEAM markers", name)
+		}
+	}
+
+	// All three files should have identical content
+	if contents[0] != contents[1] {
+		t.Error("CLAUDE.md and AGENTS.md should have identical content")
+	}
+	if contents[0] != contents[2] {
+		t.Error("CLAUDE.md and GEMINI.md should have identical content")
+	}
+}

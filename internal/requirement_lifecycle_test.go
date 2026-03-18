@@ -241,3 +241,153 @@ func TestAssignSubTask(t *testing.T) {
 		}
 	})
 }
+
+func TestAutoPromoteRequirementWithAssigned(t *testing.T) {
+	// Has an assigned sub-task — should NOT promote
+	req := &Requirement{
+		Status: RequirementStatusInProgress,
+		SubTasks: []SubTask{
+			{ID: 1, Status: SubTaskStatusDone},
+			{ID: 2, Status: SubTaskStatusAssigned},
+		},
+	}
+	if AutoPromoteRequirement(req) {
+		t.Error("Should not promote when a sub-task is still assigned")
+	}
+	if req.Status != RequirementStatusInProgress {
+		t.Errorf("Status = %q, want in_progress", req.Status)
+	}
+}
+
+func TestMarkSubTaskDoneSequentialAutoPromote(t *testing.T) {
+	// Three sub-tasks: mark them done one by one, verify promote happens on last
+	req := &Requirement{
+		Status: RequirementStatusInProgress,
+		SubTasks: []SubTask{
+			{ID: 1, Status: SubTaskStatusAssigned},
+			{ID: 2, Status: SubTaskStatusAssigned},
+			{ID: 3, Status: SubTaskStatusAssigned},
+		},
+	}
+
+	// Mark first two — should remain in_progress
+	for _, id := range []int{1, 2} {
+		if err := MarkSubTaskDone(req, id); err != nil {
+			t.Fatalf("MarkSubTaskDone(%d): %v", id, err)
+		}
+		if req.Status != RequirementStatusInProgress {
+			t.Errorf("After marking %d done, status = %q, want in_progress", id, req.Status)
+		}
+	}
+
+	// Mark last — should auto-promote to done
+	if err := MarkSubTaskDone(req, 3); err != nil {
+		t.Fatalf("MarkSubTaskDone(3): %v", err)
+	}
+	if req.Status != RequirementStatusDone {
+		t.Errorf("After marking all done, status = %q, want done", req.Status)
+	}
+}
+
+func TestMarkSubTaskDoneSkippedAndDoneMix(t *testing.T) {
+	// Mix of done and skipped — should auto-promote when last assigned is marked done
+	req := &Requirement{
+		Status: RequirementStatusInProgress,
+		SubTasks: []SubTask{
+			{ID: 1, Status: SubTaskStatusSkipped},
+			{ID: 2, Status: SubTaskStatusAssigned},
+		},
+	}
+
+	if err := MarkSubTaskDone(req, 2); err != nil {
+		t.Fatalf("MarkSubTaskDone: %v", err)
+	}
+	if req.Status != RequirementStatusDone {
+		t.Errorf("Status = %q, want done (skipped+done should promote)", req.Status)
+	}
+}
+
+func TestAssignSubTaskMultipleAssignments(t *testing.T) {
+	// Assign multiple sub-tasks — requirement stays in_progress
+	req := &Requirement{
+		Status: RequirementStatusOpen,
+		SubTasks: []SubTask{
+			{ID: 1, Status: SubTaskStatusPending},
+			{ID: 2, Status: SubTaskStatusPending},
+			{ID: 3, Status: SubTaskStatusPending},
+		},
+	}
+
+	if err := AssignSubTask(req, 1, "w1", "c1"); err != nil {
+		t.Fatalf("assign 1: %v", err)
+	}
+	if req.Status != RequirementStatusInProgress {
+		t.Errorf("After first assign, status = %q", req.Status)
+	}
+
+	if err := AssignSubTask(req, 2, "w2", "c2"); err != nil {
+		t.Fatalf("assign 2: %v", err)
+	}
+	if req.Status != RequirementStatusInProgress {
+		t.Errorf("After second assign, status = %q", req.Status)
+	}
+
+	// Verify fields
+	if req.SubTasks[0].AssignedTo != "w1" || req.SubTasks[0].ChangeName != "c1" {
+		t.Errorf("SubTask 1: AssignedTo=%q ChangeName=%q", req.SubTasks[0].AssignedTo, req.SubTasks[0].ChangeName)
+	}
+	if req.SubTasks[1].AssignedTo != "w2" || req.SubTasks[1].ChangeName != "c2" {
+		t.Errorf("SubTask 2: AssignedTo=%q ChangeName=%q", req.SubTasks[1].AssignedTo, req.SubTasks[1].ChangeName)
+	}
+}
+
+func TestAssignSubTaskThenDoneLifecycle(t *testing.T) {
+	// Full lifecycle: open → assign → done → auto-promote
+	req := &Requirement{
+		Status: RequirementStatusOpen,
+		SubTasks: []SubTask{
+			{ID: 1, Status: SubTaskStatusPending},
+		},
+	}
+
+	// Assign
+	if err := AssignSubTask(req, 1, "worker-1", "change-1"); err != nil {
+		t.Fatalf("assign: %v", err)
+	}
+	if req.Status != RequirementStatusInProgress {
+		t.Errorf("After assign: status = %q, want in_progress", req.Status)
+	}
+	if req.SubTasks[0].Status != SubTaskStatusAssigned {
+		t.Errorf("SubTask status = %q, want assigned", req.SubTasks[0].Status)
+	}
+
+	// Mark done
+	if err := MarkSubTaskDone(req, 1); err != nil {
+		t.Fatalf("mark done: %v", err)
+	}
+	if req.Status != RequirementStatusDone {
+		t.Errorf("After done: status = %q, want done (auto-promote)", req.Status)
+	}
+}
+
+func TestValidateSubTaskTransitionSameStatus(t *testing.T) {
+	// Transitioning to the same status should fail (not in allowed list)
+	statuses := []SubTaskStatus{SubTaskStatusPending, SubTaskStatusAssigned, SubTaskStatusDone, SubTaskStatusSkipped}
+	for _, s := range statuses {
+		if err := ValidateSubTaskTransition(s, s); err == nil {
+			t.Errorf("ValidateSubTaskTransition(%q, %q) should fail (same status)", s, s)
+		}
+	}
+}
+
+func TestMarkSubTaskDoneAlreadyDone(t *testing.T) {
+	req := &Requirement{
+		Status:   RequirementStatusInProgress,
+		SubTasks: []SubTask{{ID: 1, Status: SubTaskStatusDone}},
+	}
+
+	err := MarkSubTaskDone(req, 1)
+	if err == nil {
+		t.Error("MarkSubTaskDone on already-done sub-task should fail")
+	}
+}
