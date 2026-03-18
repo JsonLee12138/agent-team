@@ -2,11 +2,13 @@ package internal
 
 import (
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -185,6 +187,394 @@ func FormatProviderList(providers []DetectedProvider) string {
 	return strings.Join(names, ", ")
 }
 
+const buildHashFileName = ".build-hash"
+
+type BuildCommand struct {
+	Name    string
+	Command string
+}
+
+type BuildPackage struct {
+	Path    string
+	Name    string
+	Scripts []BuildCommand
+}
+
+type BuildModule struct {
+	Path      string
+	Module    string
+	GoVersion string
+}
+
+type BuildScriptScan struct {
+	Files        []string
+	Hash         string
+	MakeTargets  []string
+	GoModules    []BuildModule
+	NodePackages []BuildPackage
+}
+
+type packageJSONBuildInfo struct {
+	Name    string            `json:"name"`
+	Scripts map[string]string `json:"scripts"`
+}
+
+var makeTargetPattern = regexp.MustCompile(`^([A-Za-z0-9_.-]+):(?:\s|$)`)
+
+// BuildHashPath returns the repository-level build hash file path.
+func BuildHashPath(root string) string {
+	return filepath.Join(root, buildHashFileName)
+}
+
+// DetectProjectBuildScripts scans known build-script files and generates a deterministic summary.
+func DetectProjectBuildScripts(root string) (*BuildScriptScan, error) {
+	files, err := collectBuildScriptFiles(root)
+	if err != nil {
+		return nil, err
+	}
+
+	hash, err := hashFiles(root, files)
+	if err != nil {
+		return nil, err
+	}
+
+	scan := &BuildScriptScan{
+		Files: files,
+		Hash:  hash,
+	}
+
+	for _, rel := range files {
+		abs := filepath.Join(root, rel)
+		switch filepath.Base(rel) {
+		case "Makefile", "makefile", "GNUmakefile":
+			targets, err := parseMakefileTargets(abs)
+			if err != nil {
+				return nil, err
+			}
+			scan.MakeTargets = append(scan.MakeTargets, targets...)
+		case "go.mod":
+			mod, err := parseGoModFile(abs, rel)
+			if err != nil {
+				return nil, err
+			}
+			scan.GoModules = append(scan.GoModules, mod)
+		case "package.json":
+			pkg, err := parsePackageJSONFile(abs, rel)
+			if err != nil {
+				return nil, err
+			}
+			scan.NodePackages = append(scan.NodePackages, pkg)
+		}
+	}
+
+	scan.MakeTargets = uniqueStrings(scan.MakeTargets)
+	sort.Strings(scan.MakeTargets)
+	sort.Slice(scan.GoModules, func(i, j int) bool { return scan.GoModules[i].Path < scan.GoModules[j].Path })
+	sort.Slice(scan.NodePackages, func(i, j int) bool { return scan.NodePackages[i].Path < scan.NodePackages[j].Path })
+
+	return scan, nil
+}
+
+// BuildRulesNeedRebuild compares the current build-script hash against the stored record.
+func BuildRulesNeedRebuild(root string) (needsRebuild bool, currentHash, storedHash string, err error) {
+	scan, err := DetectProjectBuildScripts(root)
+	if err != nil {
+		return false, "", "", err
+	}
+
+	storedHash, err = ReadBuildHash(root)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return true, scan.Hash, "", nil
+		}
+		return false, "", "", err
+	}
+
+	return storedHash != scan.Hash, scan.Hash, storedHash, nil
+}
+
+// ReadBuildHash reads the stored build-script hash from the repository root.
+func ReadBuildHash(root string) (string, error) {
+	data, err := os.ReadFile(BuildHashPath(root))
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(data)), nil
+}
+
+// EnsureBuildHashFile writes the hash file if it does not already exist.
+func EnsureBuildHashFile(root string) error {
+	if _, err := os.Stat(BuildHashPath(root)); err == nil {
+		return nil
+	}
+
+	scan, err := DetectProjectBuildScripts(root)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(BuildHashPath(root), []byte(scan.Hash+"\n"), 0644)
+}
+
+// RebuildBuildRules regenerates build-verification.md and refreshes the build hash file.
+func RebuildBuildRules(root string) (*BuildScriptScan, error) {
+	rulesDir := filepath.Join(ResolveAgentsDir(root), "rules")
+	if err := os.MkdirAll(rulesDir, 0755); err != nil {
+		return nil, fmt.Errorf("create .agents/rules/: %w", err)
+	}
+
+	scan, err := DetectProjectBuildScripts(root)
+	if err != nil {
+		return nil, err
+	}
+
+	buildRulesPath := filepath.Join(rulesDir, "build-verification.md")
+	if err := os.WriteFile(buildRulesPath, []byte(scan.RenderBuildVerificationRules()), 0644); err != nil {
+		return nil, fmt.Errorf("write build-verification.md: %w", err)
+	}
+	if err := os.WriteFile(BuildHashPath(root), []byte(scan.Hash+"\n"), 0644); err != nil {
+		return nil, fmt.Errorf("write %s: %w", buildHashFileName, err)
+	}
+
+	return scan, nil
+}
+
+// RenderBuildVerificationRules returns the generated markdown for build-verification.md.
+func (s *BuildScriptScan) RenderBuildVerificationRules() string {
+	var b strings.Builder
+	b.WriteString("# Build Verification Rules\n\n")
+	b.WriteString("## Trigger\n\n")
+	b.WriteString("Apply this rule before `go build`, before commit, before review handoff, and before reporting task completion.\n\n")
+	b.WriteString("## Project Build Scan\n\n")
+	if len(s.Files) == 0 {
+		b.WriteString("No supported build-script files were detected. Refresh with `agent-team rules sync --rebuild` after adding `Makefile`, `go.mod`, or `package.json` files.\n\n")
+	} else {
+		b.WriteString("Detected build-script inputs:\n")
+		for _, file := range s.Files {
+			b.WriteString("- `" + file + "`\n")
+		}
+		b.WriteString("\nCurrent build-script hash: `" + s.Hash + "`\n")
+		b.WriteString("Refresh this file after build-script changes with `agent-team rules sync --rebuild`.\n\n")
+	}
+
+	b.WriteString("## Recommended Verification Commands\n\n")
+	if len(s.MakeTargets) > 0 {
+		b.WriteString("Primary make targets:\n")
+		for _, target := range s.MakeTargets {
+			b.WriteString("- `make " + target + "`\n")
+		}
+		b.WriteString("\n")
+	}
+	if len(s.GoModules) > 0 {
+		b.WriteString("Go module checks:\n")
+		for _, mod := range s.GoModules {
+			label := mod.Path
+			if label == "go.mod" {
+				label = "repo root"
+			}
+			if mod.Module != "" || mod.GoVersion != "" {
+				var meta []string
+				if mod.Module != "" {
+					meta = append(meta, "module `"+mod.Module+"`")
+				}
+				if mod.GoVersion != "" {
+					meta = append(meta, "go `"+mod.GoVersion+"`")
+				}
+				b.WriteString("- `" + label + "`: " + strings.Join(meta, ", ") + "\n")
+			} else {
+				b.WriteString("- `" + label + "`\n")
+			}
+		}
+		b.WriteString("- `go build ./...`\n")
+		b.WriteString("- `go vet ./...`\n")
+		b.WriteString("- `go test ./...`\n\n")
+	}
+	if len(s.NodePackages) > 0 {
+		b.WriteString("Node package scripts:\n")
+		for _, pkg := range s.NodePackages {
+			label := pkg.Path
+			if pkg.Name != "" {
+				label += " (" + pkg.Name + ")"
+			}
+			b.WriteString("- `" + label + "`\n")
+			for _, script := range pkg.Scripts {
+				prefix := "npm"
+				if pkg.Path != "package.json" {
+					prefix = "npm --prefix " + filepath.Dir(pkg.Path)
+				}
+				b.WriteString("  - `" + prefix + " run " + script.Name + "`")
+				if script.Command != "" {
+					b.WriteString(" -> `" + script.Command + "`")
+				}
+				b.WriteString("\n")
+			}
+		}
+		b.WriteString("\n")
+	}
+	if len(s.MakeTargets) == 0 && len(s.GoModules) == 0 && len(s.NodePackages) == 0 {
+		b.WriteString("- Inspect the repository for missing build scripts before assuming generic commands.\n\n")
+	}
+
+	b.WriteString("## Pre-Build Checks\n\n")
+	b.WriteString("- MUST confirm the target package list and working directory before running build commands.\n")
+	b.WriteString("- MUST ensure required environment variables, generated files, and module metadata are present.\n")
+	b.WriteString("- MUST avoid building from a dirty or partial state when unrelated edits would invalidate results.\n\n")
+	b.WriteString("## Required Verification Commands\n\n")
+	b.WriteString("- MUST run `go build ./...` for repository-wide Go changes unless the task scope clearly limits the package set.\n")
+	b.WriteString("- MUST run `go vet ./...` for the affected scope before commit.\n")
+	b.WriteString("- MUST run `go test ./...` for the affected scope; use `./...` for shared or cross-package changes.\n")
+	b.WriteString("- MUST rerun the exact failing build or test command when the task is a fix.\n\n")
+	b.WriteString("## Pre-Commit Checklist\n\n")
+	b.WriteString("- ALWAYS confirm the changed files match the task scope.\n")
+	b.WriteString("- ALWAYS review command failures before retrying; NEVER loop without reading output.\n")
+	b.WriteString("- MUST verify that build, vet, and test results are current for the final diff.\n")
+	b.WriteString("- MUST mention any skipped verification explicitly in the completion message with the reason.\n")
+	return b.String()
+}
+
+func collectBuildScriptFiles(root string) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == root {
+			return nil
+		}
+
+		rel, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			return relErr
+		}
+
+		if d.IsDir() {
+			switch d.Name() {
+			case ".git", ".worktrees", "worktrees", "node_modules", "vendor":
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		switch filepath.Base(path) {
+		case "Makefile", "makefile", "GNUmakefile", "go.mod", "package.json":
+			files = append(files, rel)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("scan build scripts: %w", err)
+	}
+
+	sort.Strings(files)
+	return files, nil
+}
+
+func hashFiles(root string, relPaths []string) (string, error) {
+	h := sha256.New()
+	for _, rel := range relPaths {
+		data, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			return "", fmt.Errorf("read %s: %w", rel, err)
+		}
+		fmt.Fprintf(h, "%s\n%d\n", rel, len(data))
+		h.Write(data)
+	}
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+func parseMakefileTargets(path string) ([]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", path, err)
+	}
+
+	var targets []string
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, ".") {
+			continue
+		}
+		match := makeTargetPattern.FindStringSubmatch(line)
+		if match == nil {
+			continue
+		}
+		target := match[1]
+		if strings.Contains(target, "%") {
+			continue
+		}
+		targets = append(targets, target)
+	}
+	return uniqueStrings(targets), nil
+}
+
+func parseGoModFile(path, rel string) (BuildModule, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return BuildModule{}, fmt.Errorf("read %s: %w", path, err)
+	}
+
+	mod := BuildModule{Path: rel}
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, "module "):
+			mod.Module = strings.TrimSpace(strings.TrimPrefix(line, "module "))
+		case strings.HasPrefix(line, "go "):
+			mod.GoVersion = strings.TrimSpace(strings.TrimPrefix(line, "go "))
+		}
+	}
+	return mod, nil
+}
+
+func parsePackageJSONFile(path, rel string) (BuildPackage, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return BuildPackage{}, fmt.Errorf("read %s: %w", path, err)
+	}
+
+	var meta packageJSONBuildInfo
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return BuildPackage{}, fmt.Errorf("parse %s: %w", rel, err)
+	}
+
+	pkg := BuildPackage{
+		Path: rel,
+		Name: meta.Name,
+	}
+
+	if len(meta.Scripts) == 0 {
+		return pkg, nil
+	}
+
+	names := make([]string, 0, len(meta.Scripts))
+	for name := range meta.Scripts {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		pkg.Scripts = append(pkg.Scripts, BuildCommand{
+			Name:    name,
+			Command: strings.TrimSpace(meta.Scripts[name]),
+		})
+	}
+	return pkg, nil
+}
+
+func uniqueStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(values))
+	var result []string
+	for _, value := range values {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
+}
+
 // --- Rules directory initialization ---
 
 // defaultRuleFiles maps filename to default content for .agents/rules/.
@@ -345,10 +735,23 @@ func InitRulesDir(root string) (created int, err error) {
 		if _, err := os.Stat(fp); err == nil {
 			continue // already exists, skip
 		}
+		if name == "build-verification.md" {
+			scan, rebuildErr := RebuildBuildRules(root)
+			if rebuildErr != nil {
+				return created, rebuildErr
+			}
+			if scan != nil {
+				created++
+				continue
+			}
+		}
 		if err := os.WriteFile(fp, []byte(content), 0644); err != nil {
 			return created, fmt.Errorf("write %s: %w", name, err)
 		}
 		created++
+	}
+	if err := EnsureBuildHashFile(root); err != nil {
+		return created, err
 	}
 	return created, nil
 }

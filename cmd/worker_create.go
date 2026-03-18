@@ -47,6 +47,16 @@ func newWorkerCreateCmd() *cobra.Command {
 func (a *App) RunWorkerCreate(roleName, provider, model string, fresh bool) error {
 	root := a.Git.Root()
 
+	if needsRebuild, currentHash, storedHash, err := internal.BuildRulesNeedRebuild(root); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: could not verify build rule hash: %v\n", err)
+	} else if needsRebuild {
+		if storedHash == "" {
+			fmt.Fprintf(os.Stderr, "Warning: build rules hash is missing (current: %s). Run 'agent-team rules sync --rebuild' to refresh dynamic build rules.\n", currentHash)
+		} else {
+			fmt.Fprintf(os.Stderr, "Warning: build scripts changed since the last rules rebuild (stored: %s, current: %s). Run 'agent-team rules sync --rebuild' to refresh dynamic build rules.\n", storedHash, currentHash)
+		}
+	}
+
 	// 1. Resolve role (project → global priority)
 	match, err := internal.ResolveRole(root, roleName)
 	if err != nil {

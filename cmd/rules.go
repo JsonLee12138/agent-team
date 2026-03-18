@@ -17,7 +17,9 @@ func newRulesCmd() *cobra.Command {
 }
 
 func newRulesSyncCmd() *cobra.Command {
-	return &cobra.Command{
+	var rebuild bool
+
+	cmd := &cobra.Command{
 		Use:   "sync",
 		Short: "Sync .agents/rules/ references into root provider files",
 		Long: `Re-injects the rules reference section into CLAUDE.md, AGENTS.md, and GEMINI.md
@@ -32,6 +34,14 @@ user-written content is preserved.`,
 				return fmt.Errorf(".agents/rules/ not found. Run 'agent-team init' first")
 			}
 
+			if rebuild {
+				scan, err := internal.RebuildBuildRules(root)
+				if err != nil {
+					return err
+				}
+				fmt.Printf("✓ Build verification rules rebuilt (%d inputs, hash: %s)\n", len(scan.Files), scan.Hash)
+			}
+
 			if err := internal.InitProviderFiles(root); err != nil {
 				return err
 			}
@@ -39,4 +49,7 @@ user-written content is preserved.`,
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&rebuild, "rebuild", false, "Re-scan build scripts and regenerate build-verification.md before syncing")
+	return cmd
 }
