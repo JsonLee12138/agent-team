@@ -367,3 +367,208 @@ func containsImpl(s, substr string) bool {
 	}
 	return false
 }
+
+// TestRequirementFullLifecycle is an integration test covering:
+// req create → req split → req assign → MarkSubTaskDone → auto-promote
+// while verifying index.yaml stays in sync at every step.
+func TestRequirementFullLifecycle(t *testing.T) {
+	dir := t.TempDir()
+
+	// Step 1: Create requirement
+	req, err := CreateRequirement(dir, "user-auth", "Implement user authentication", nil)
+	if err != nil {
+		t.Fatalf("CreateRequirement: %v", err)
+	}
+	if err := UpdateIndexEntry(dir, req); err != nil {
+		t.Fatalf("UpdateIndexEntry(create): %v", err)
+	}
+
+	// Verify initial state
+	if req.Status != RequirementStatusOpen {
+		t.Errorf("initial status = %q, want open", req.Status)
+	}
+	assertIndexSync(t, dir, "user-auth", RequirementStatusOpen, 0, 0)
+
+	// Step 2: Split into sub-tasks
+	req.SubTasks = append(req.SubTasks,
+		SubTask{ID: 1, Title: "Design login API", Status: SubTaskStatusPending},
+		SubTask{ID: 2, Title: "Build frontend", Status: SubTaskStatusPending},
+		SubTask{ID: 3, Title: "Write tests", Status: SubTaskStatusPending},
+	)
+	if err := SaveRequirement(dir, req); err != nil {
+		t.Fatalf("SaveRequirement(split): %v", err)
+	}
+	if err := UpdateIndexEntry(dir, req); err != nil {
+		t.Fatalf("UpdateIndexEntry(split): %v", err)
+	}
+	assertIndexSync(t, dir, "user-auth", RequirementStatusOpen, 3, 0)
+
+	// Step 3: Assign sub-task 1 → requirement moves to in_progress
+	if err := AssignSubTask(req, 1, "backend-001", "change-login-api"); err != nil {
+		t.Fatalf("AssignSubTask(1): %v", err)
+	}
+	if err := SaveRequirement(dir, req); err != nil {
+		t.Fatalf("SaveRequirement(assign1): %v", err)
+	}
+	if err := UpdateIndexEntry(dir, req); err != nil {
+		t.Fatalf("UpdateIndexEntry(assign1): %v", err)
+	}
+
+	if req.Status != RequirementStatusInProgress {
+		t.Errorf("status after first assign = %q, want in_progress", req.Status)
+	}
+	assertIndexSync(t, dir, "user-auth", RequirementStatusInProgress, 3, 0)
+
+	// Verify sub-task state
+	if req.SubTasks[0].AssignedTo != "backend-001" {
+		t.Errorf("SubTask[0].AssignedTo = %q, want backend-001", req.SubTasks[0].AssignedTo)
+	}
+	if req.SubTasks[0].ChangeName != "change-login-api" {
+		t.Errorf("SubTask[0].ChangeName = %q, want change-login-api", req.SubTasks[0].ChangeName)
+	}
+
+	// Step 4: Assign sub-task 2
+	if err := AssignSubTask(req, 2, "frontend-001", "change-frontend"); err != nil {
+		t.Fatalf("AssignSubTask(2): %v", err)
+	}
+	if err := SaveRequirement(dir, req); err != nil {
+		t.Fatalf("SaveRequirement(assign2): %v", err)
+	}
+	if err := UpdateIndexEntry(dir, req); err != nil {
+		t.Fatalf("UpdateIndexEntry(assign2): %v", err)
+	}
+	assertIndexSync(t, dir, "user-auth", RequirementStatusInProgress, 3, 0)
+
+	// Step 5: Mark sub-task 1 done
+	if err := MarkSubTaskDone(req, 1); err != nil {
+		t.Fatalf("MarkSubTaskDone(1): %v", err)
+	}
+	if err := SaveRequirement(dir, req); err != nil {
+		t.Fatalf("SaveRequirement(done1): %v", err)
+	}
+	if err := UpdateIndexEntry(dir, req); err != nil {
+		t.Fatalf("UpdateIndexEntry(done1): %v", err)
+	}
+
+	// Requirement should still be in_progress (task 2 assigned, task 3 pending)
+	if req.Status != RequirementStatusInProgress {
+		t.Errorf("status after 1 done = %q, want in_progress", req.Status)
+	}
+	assertIndexSync(t, dir, "user-auth", RequirementStatusInProgress, 3, 1)
+
+	// Step 6: Mark sub-task 2 done
+	if err := MarkSubTaskDone(req, 2); err != nil {
+		t.Fatalf("MarkSubTaskDone(2): %v", err)
+	}
+	if err := SaveRequirement(dir, req); err != nil {
+		t.Fatalf("SaveRequirement(done2): %v", err)
+	}
+	if err := UpdateIndexEntry(dir, req); err != nil {
+		t.Fatalf("UpdateIndexEntry(done2): %v", err)
+	}
+
+	// Still in_progress (task 3 pending)
+	if req.Status != RequirementStatusInProgress {
+		t.Errorf("status after 2 done = %q, want in_progress", req.Status)
+	}
+	assertIndexSync(t, dir, "user-auth", RequirementStatusInProgress, 3, 2)
+
+	// Step 7: Assign and complete sub-task 3 → auto-promote to done
+	if err := AssignSubTask(req, 3, "qa-001", "change-tests"); err != nil {
+		t.Fatalf("AssignSubTask(3): %v", err)
+	}
+	if err := MarkSubTaskDone(req, 3); err != nil {
+		t.Fatalf("MarkSubTaskDone(3): %v", err)
+	}
+	if err := SaveRequirement(dir, req); err != nil {
+		t.Fatalf("SaveRequirement(done3): %v", err)
+	}
+	if err := UpdateIndexEntry(dir, req); err != nil {
+		t.Fatalf("UpdateIndexEntry(done3): %v", err)
+	}
+
+	// All sub-tasks done → auto-promote to done
+	if req.Status != RequirementStatusDone {
+		t.Errorf("status after all done = %q, want done (auto-promote)", req.Status)
+	}
+	assertIndexSync(t, dir, "user-auth", RequirementStatusDone, 3, 3)
+
+	// Step 8: Verify reload from disk produces the same state
+	reloaded, err := LoadRequirement(dir, "user-auth")
+	if err != nil {
+		t.Fatalf("LoadRequirement: %v", err)
+	}
+	if reloaded.Status != RequirementStatusDone {
+		t.Errorf("reloaded status = %q, want done", reloaded.Status)
+	}
+	for _, st := range reloaded.SubTasks {
+		if st.Status != SubTaskStatusDone {
+			t.Errorf("reloaded SubTask[%d].Status = %q, want done", st.ID, st.Status)
+		}
+	}
+}
+
+// TestRequirementMultipleReqsIndexSync verifies index.yaml tracks multiple requirements correctly.
+func TestRequirementMultipleReqsIndexSync(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create three requirements
+	names := []string{"alpha", "beta", "gamma"}
+	for _, name := range names {
+		req, err := CreateRequirement(dir, name, "desc-"+name, nil)
+		if err != nil {
+			t.Fatalf("CreateRequirement(%s): %v", name, err)
+		}
+		if err := UpdateIndexEntry(dir, req); err != nil {
+			t.Fatalf("UpdateIndexEntry(%s): %v", name, err)
+		}
+	}
+
+	idx, err := LoadRequirementIndex(dir)
+	if err != nil {
+		t.Fatalf("LoadRequirementIndex: %v", err)
+	}
+	if len(idx.Requirements) != 3 {
+		t.Fatalf("index has %d entries, want 3", len(idx.Requirements))
+	}
+
+	// Mark beta as done via direct manipulation
+	req, _ := LoadRequirement(dir, "beta")
+	req.Status = RequirementStatusDone
+	SaveRequirement(dir, req)
+	UpdateIndexEntry(dir, req)
+
+	idx, _ = LoadRequirementIndex(dir)
+	for _, e := range idx.Requirements {
+		if e.Name == "beta" && e.Status != RequirementStatusDone {
+			t.Errorf("beta index status = %q, want done", e.Status)
+		}
+		if e.Name == "alpha" && e.Status != RequirementStatusOpen {
+			t.Errorf("alpha index status = %q, want open", e.Status)
+		}
+	}
+}
+
+// assertIndexSync verifies the index.yaml matches expected values for a requirement.
+func assertIndexSync(t *testing.T, dir, name string, wantStatus RequirementStatus, wantSubCount, wantDone int) {
+	t.Helper()
+	idx, err := LoadRequirementIndex(dir)
+	if err != nil {
+		t.Fatalf("LoadRequirementIndex: %v", err)
+	}
+	for _, e := range idx.Requirements {
+		if e.Name == name {
+			if e.Status != wantStatus {
+				t.Errorf("index[%s].Status = %q, want %q", name, e.Status, wantStatus)
+			}
+			if e.SubTaskCount != wantSubCount {
+				t.Errorf("index[%s].SubTaskCount = %d, want %d", name, e.SubTaskCount, wantSubCount)
+			}
+			if e.DoneCount != wantDone {
+				t.Errorf("index[%s].DoneCount = %d, want %d", name, e.DoneCount, wantDone)
+			}
+			return
+		}
+	}
+	t.Errorf("requirement %q not found in index", name)
+}
