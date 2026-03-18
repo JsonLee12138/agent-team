@@ -3,6 +3,7 @@ package internal
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -242,4 +243,146 @@ func TestFormatProviderList(t *testing.T) {
 	if result != "claude, gemini" {
 		t.Errorf("expected 'claude, gemini', got %q", result)
 	}
+}
+
+func TestInitRulesDir(t *testing.T) {
+	t.Run("creates all default rule files", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
+
+		created, err := InitRulesDir(dir)
+		if err != nil {
+			t.Fatalf("InitRulesDir: %v", err)
+		}
+		if created != len(defaultRuleFiles) {
+			t.Errorf("created %d files, want %d", created, len(defaultRuleFiles))
+		}
+
+		// Check all files exist
+		rulesDir := filepath.Join(dir, ".agents", "rules")
+		for name := range defaultRuleFiles {
+			fp := filepath.Join(rulesDir, name)
+			if _, err := os.Stat(fp); os.IsNotExist(err) {
+				t.Errorf("expected %s to exist", name)
+			}
+		}
+	})
+
+	t.Run("idempotent - does not overwrite existing files", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
+
+		// Write a custom index.md
+		customContent := "# Custom rules\n"
+		os.WriteFile(filepath.Join(dir, ".agents", "rules", "index.md"), []byte(customContent), 0644)
+
+		created, err := InitRulesDir(dir)
+		if err != nil {
+			t.Fatalf("InitRulesDir: %v", err)
+		}
+		// Should create all files except index.md
+		if created != len(defaultRuleFiles)-1 {
+			t.Errorf("created %d files, want %d", created, len(defaultRuleFiles)-1)
+		}
+
+		// Verify custom content is preserved
+		data, _ := os.ReadFile(filepath.Join(dir, ".agents", "rules", "index.md"))
+		if string(data) != customContent {
+			t.Errorf("custom content should be preserved, got %q", string(data))
+		}
+	})
+
+	t.Run("second run creates zero files", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
+
+		InitRulesDir(dir)
+		created, err := InitRulesDir(dir)
+		if err != nil {
+			t.Fatalf("second InitRulesDir: %v", err)
+		}
+		if created != 0 {
+			t.Errorf("second run should create 0 files, created %d", created)
+		}
+	})
+}
+
+func TestInitProviderFiles(t *testing.T) {
+	t.Run("creates new provider files", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
+
+		err := InitProviderFiles(dir)
+		if err != nil {
+			t.Fatalf("InitProviderFiles: %v", err)
+		}
+
+		for _, name := range []string{"CLAUDE.md", "AGENTS.md", "GEMINI.md"} {
+			data, err := os.ReadFile(filepath.Join(dir, name))
+			if err != nil {
+				t.Fatalf("read %s: %v", name, err)
+			}
+			content := string(data)
+			if !strings.Contains(content, "<!-- AGENT_TEAM:START -->") {
+				t.Errorf("%s should contain AGENT_TEAM start marker", name)
+			}
+			if !strings.Contains(content, "Rules Reference") {
+				t.Errorf("%s should contain Rules Reference", name)
+			}
+			if !strings.Contains(content, ".agents/rules/index.md") {
+				t.Errorf("%s should reference rules/index.md", name)
+			}
+		}
+	})
+
+	t.Run("preserves user content when updating", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
+
+		// Write custom CLAUDE.md with user content
+		userContent := "# My Custom Project\n\nThis is my project.\n"
+		os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte(userContent), 0644)
+
+		err := InitProviderFiles(dir)
+		if err != nil {
+			t.Fatalf("InitProviderFiles: %v", err)
+		}
+
+		data, _ := os.ReadFile(filepath.Join(dir, "CLAUDE.md"))
+		content := string(data)
+		if !strings.Contains(content, "My Custom Project") {
+			t.Error("user content should be preserved")
+		}
+		if !strings.Contains(content, "<!-- AGENT_TEAM:START -->") {
+			t.Error("tag section should be injected")
+		}
+	})
+
+	t.Run("updates only tag section on re-run", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
+
+		// First run
+		InitProviderFiles(dir)
+
+		// Add user content after the tag section
+		fp := filepath.Join(dir, "CLAUDE.md")
+		existing, _ := os.ReadFile(fp)
+		os.WriteFile(fp, append(existing, []byte("\n## My Custom Section\n\nUser notes.\n")...), 0644)
+
+		// Second run
+		err := InitProviderFiles(dir)
+		if err != nil {
+			t.Fatalf("InitProviderFiles second run: %v", err)
+		}
+
+		data, _ := os.ReadFile(fp)
+		content := string(data)
+		if !strings.Contains(content, "My Custom Section") {
+			t.Error("user-added section should be preserved")
+		}
+		if strings.Count(content, "<!-- AGENT_TEAM:START -->") != 1 {
+			t.Error("should have exactly one start marker")
+		}
+	})
 }

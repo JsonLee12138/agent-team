@@ -553,8 +553,8 @@ You are working in an **isolated git worktree**. All development MUST happen her
 The main controller will merge your branch back to main when ready.
 `))
 
-// hasRulesDir checks if .agents/rules/ directory exists at the project root.
-func hasRulesDir(root string) bool {
+// HasRulesDir checks if .agents/rules/ directory exists at the project root.
+func HasRulesDir(root string) bool {
 	rulesDir := filepath.Join(ResolveAgentsDir(root), "rules")
 	info, err := os.Stat(rulesDir)
 	return err == nil && info.IsDir()
@@ -686,7 +686,7 @@ func buildRoleSectionFromPath(wtPath, workerID, roleName, rolePath, root string)
 
 	var b strings.Builder
 
-	if hasRulesDir(root) {
+	if HasRulesDir(root) {
 		// Slim mode: minimal identity + slim template + rules index + skill index
 		b.WriteString(buildRoleIdentity(roleName, rolePath))
 		if err := slimRoleSectionTmpl.Execute(&b, data); err != nil {
