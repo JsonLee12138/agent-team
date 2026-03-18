@@ -6,9 +6,27 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/JsonLee12138/agent-team/internal"
 )
 
 // --- 3B-3: init + setup command separation ---
+
+func stubInitProjectCommands(t *testing.T, content string) {
+	t.Helper()
+	prev := rebuildProjectCommands
+	rebuildProjectCommands = func(root string) (*internal.BuildScriptScan, error) {
+		rulesDir := filepath.Join(root, ".agents", "rules")
+		if err := os.MkdirAll(rulesDir, 0755); err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(filepath.Join(rulesDir, "project-commands.md"), []byte(content), 0644); err != nil {
+			return nil, err
+		}
+		return &internal.BuildScriptScan{}, nil
+	}
+	t.Cleanup(func() { rebuildProjectCommands = prev })
+}
 
 func TestInitCmd_Exists(t *testing.T) {
 	root := NewRootCmd()
@@ -51,6 +69,7 @@ func TestSetupCmd_HasSkipDetectFlag(t *testing.T) {
 func TestInitCmd_ProjectLevelInit(t *testing.T) {
 	// init should create .agents/teams/, .agents/rules/, and provider files
 	dir := t.TempDir()
+	stubInitProjectCommands(t, "# Project Commands Rules\n\nGenerated during init tests.\n")
 
 	origWd, _ := os.Getwd()
 	os.Chdir(dir)
@@ -80,6 +99,9 @@ func TestInitCmd_ProjectLevelInit(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(rulesDir, "index.md")); os.IsNotExist(err) {
 		t.Error("index.md should be created in rules dir")
 	}
+	if _, err := os.Stat(filepath.Join(rulesDir, "project-commands.md")); os.IsNotExist(err) {
+		t.Error("project-commands.md should be created by init")
+	}
 
 	// Verify provider files
 	for _, name := range []string{"CLAUDE.md", "AGENTS.md", "GEMINI.md"} {
@@ -91,11 +113,15 @@ func TestInitCmd_ProjectLevelInit(t *testing.T) {
 		if !strings.Contains(string(data), "AGENT_TEAM:START") {
 			t.Errorf("%s should contain AGENT_TEAM tag", name)
 		}
+		if !strings.Contains(string(data), ".agents/rules/project-commands.md") {
+			t.Errorf("%s should reference project-commands.md", name)
+		}
 	}
 }
 
 func TestInitCmd_Idempotent(t *testing.T) {
 	dir := t.TempDir()
+	stubInitProjectCommands(t, "# Project Commands Rules\n\nGenerated during idempotent init tests.\n")
 
 	origWd, _ := os.Getwd()
 	os.Chdir(dir)
@@ -154,6 +180,7 @@ func TestInitCmd_DoesNotSkipGitCheck(t *testing.T) {
 	// init is in the skip list for PersistentPreRunE, so it doesn't need a git repo
 	root := NewRootCmd()
 	RegisterCommands(root)
+	stubInitProjectCommands(t, "# Project Commands Rules\n\nGenerated during git check tests.\n")
 
 	dir := t.TempDir()
 	origWd, _ := os.Getwd()

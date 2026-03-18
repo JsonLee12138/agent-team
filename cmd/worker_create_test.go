@@ -157,7 +157,7 @@ func TestRunWorkerCreateSkillsSyncWarningDoesNotFail(t *testing.T) {
 	}
 }
 
-func TestRunWorkerCreateWarnsWhenBuildRulesHashIsStale(t *testing.T) {
+func TestRunWorkerCreateWarnsWhenProjectCommandsAreMissing(t *testing.T) {
 	taskSetup = func(string) error { return nil }
 	skillInstaller = func(_, _, _, _, _ string, _ bool) error { return nil }
 	t.Cleanup(func() {
@@ -175,16 +175,6 @@ func TestRunWorkerCreateWarnsWhenBuildRulesHashIsStale(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# backend\n"), 0644); err != nil {
 		t.Fatalf("write SKILL.md: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "Makefile"), []byte("build:\n\tgo build ./...\n"), 0644); err != nil {
-		t.Fatalf("write Makefile: %v", err)
-	}
-
-	if _, err := internal.RebuildBuildRules(dir); err != nil {
-		t.Fatalf("RebuildBuildRules: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "Makefile"), []byte("build:\n\tgo build ./...\n\ntest:\n\tgo test ./...\n"), 0644); err != nil {
-		t.Fatalf("update Makefile: %v", err)
-	}
 
 	stderr := captureStderr(t, func() {
 		if err := app.RunWorkerCreate("backend", "", "", false); err != nil {
@@ -192,10 +182,10 @@ func TestRunWorkerCreateWarnsWhenBuildRulesHashIsStale(t *testing.T) {
 		}
 	})
 
-	if !strings.Contains(stderr, "build scripts changed since the last rules rebuild") {
-		t.Fatalf("stderr = %q, want stale build rules warning", stderr)
+	if !strings.Contains(stderr, "project command rules are missing") {
+		t.Fatalf("stderr = %q, want missing project command rules warning", stderr)
 	}
-	if !strings.Contains(stderr, "agent-team rules sync --rebuild") {
-		t.Fatalf("stderr = %q, want rebuild hint", stderr)
+	if !strings.Contains(stderr, "agent-team rules sync") {
+		t.Fatalf("stderr = %q, want rules sync hint", stderr)
 	}
 }

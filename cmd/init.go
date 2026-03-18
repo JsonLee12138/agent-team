@@ -8,14 +8,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var rebuildProjectCommands = internal.RebuildProjectCommands
+
 func newInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize agent-team for this project",
-		Long: `Creates project-level structure: .agents/teams/, .agents/rules/ (with default rule files),
-and root provider files (CLAUDE.md, AGENTS.md, GEMINI.md).
+		Long: `Creates project-level structure: .agents/teams/, .agents/rules/ (with built-in rule files),
+regenerates .agents/rules/project-commands.md, and updates root provider files
+(CLAUDE.md, AGENTS.md, GEMINI.md).
 
-Idempotent: existing files are not overwritten; provider files only update the tagged section.
+Built-in rule files are created if missing. project-commands.md is regenerated on each run.
+Provider files only update the tagged section.
 
 For global environment setup (provider detection, plugin role installation),
 use 'agent-team setup' instead.`,
@@ -42,24 +46,35 @@ func runInit() error {
 	}
 	fmt.Println("✓ .agents/teams/ ready")
 
-	// Step 2: Initialize rules directory (.agents/rules/)
+	// Step 2: Initialize built-in rules directory (.agents/rules/)
 	created, err := internal.InitRulesDir(cwd)
 	if err != nil {
 		return err
 	}
 	if created > 0 {
-		fmt.Printf("✓ .agents/rules/ created (%d rule files)\n", created)
+		fmt.Printf("✓ .agents/rules/ ready (%d built-in rule files created)\n", created)
 	} else {
-		fmt.Println("✓ .agents/rules/ already exists (no files overwritten)")
+		fmt.Println("✓ .agents/rules/ already exists (built-in files preserved)")
 	}
 
-	// Step 3: Generate/update provider files
+	// Step 3: Generate/update project command rules
+	scan, err := rebuildProjectCommands(cwd)
+	if err != nil {
+		return err
+	}
+	if len(scan.Files) > 0 {
+		fmt.Printf("✓ %s regenerated from %d detected command file(s)\n", "project-commands.md", len(scan.Files))
+	} else {
+		fmt.Printf("✓ %s regenerated (no known command files detected)\n", "project-commands.md")
+	}
+
+	// Step 4: Generate/update provider files
 	if err := internal.InitProviderFiles(cwd); err != nil {
 		return err
 	}
 	fmt.Println("✓ Provider files updated (CLAUDE.md, AGENTS.md, GEMINI.md)")
 
-	// Step 4: Hint about setup if plugin roles might be needed
+	// Step 5: Hint about setup if plugin roles might be needed
 	fmt.Println()
 	fmt.Println("Next steps:")
 	fmt.Println("  1. Run 'agent-team setup' to detect providers and install bundled roles")

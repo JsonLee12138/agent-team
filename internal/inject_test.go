@@ -19,7 +19,7 @@ func TestInjectRolePromptWithPath_SlimMode(t *testing.T) {
 	rulesDir := filepath.Join(root, ".agents", "rules")
 	os.MkdirAll(rulesDir, 0755)
 	os.WriteFile(filepath.Join(rulesDir, "index.md"),
-		[]byte("# Rules Index\n\n- `debugging.md`: bugs\n- `build-verification.md`: builds\n"), 0644)
+		[]byte("# Rules Index\n\n- `debugging.md`: bugs\n- `project-commands.md`: repo commands\n"), 0644)
 
 	// Create role with system.md
 	rolePath := filepath.Join(root, ".agents", "teams", "test-dev")

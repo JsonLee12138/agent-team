@@ -187,7 +187,19 @@ func FormatProviderList(providers []DetectedProvider) string {
 	return strings.Join(names, ", ")
 }
 
-const buildHashFileName = ".build-hash"
+const projectCommandsFileName = "project-commands.md"
+
+type ProjectCommandsGenerator func(root string, scan *BuildScriptScan) (string, error)
+
+var projectCommandsGenerator ProjectCommandsGenerator = generateProjectCommandsWithCodex
+
+func SetProjectCommandsGenerator(fn ProjectCommandsGenerator) func() {
+	prev := projectCommandsGenerator
+	projectCommandsGenerator = fn
+	return func() {
+		projectCommandsGenerator = prev
+	}
+}
 
 type BuildCommand struct {
 	Name    string
@@ -220,11 +232,6 @@ type packageJSONBuildInfo struct {
 }
 
 var makeTargetPattern = regexp.MustCompile(`^([A-Za-z0-9_.-]+):(?:\s|$)`)
-
-// BuildHashPath returns the repository-level build hash file path.
-func BuildHashPath(root string) string {
-	return filepath.Join(root, buildHashFileName)
-}
 
 // DetectProjectBuildScripts scans known build-script files and generates a deterministic summary.
 func DetectProjectBuildScripts(root string) (*BuildScriptScan, error) {
@@ -275,51 +282,14 @@ func DetectProjectBuildScripts(root string) (*BuildScriptScan, error) {
 	return scan, nil
 }
 
-// BuildRulesNeedRebuild compares the current build-script hash against the stored record.
-func BuildRulesNeedRebuild(root string) (needsRebuild bool, currentHash, storedHash string, err error) {
-	scan, err := DetectProjectBuildScripts(root)
-	if err != nil {
-		return false, "", "", err
-	}
-
-	storedHash, err = ReadBuildHash(root)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return true, scan.Hash, "", nil
-		}
-		return false, "", "", err
-	}
-
-	return storedHash != scan.Hash, scan.Hash, storedHash, nil
-}
-
-// ReadBuildHash reads the stored build-script hash from the repository root.
-func ReadBuildHash(root string) (string, error) {
-	data, err := os.ReadFile(BuildHashPath(root))
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(data)), nil
-}
-
-// EnsureBuildHashFile writes the hash file if it does not already exist.
-func EnsureBuildHashFile(root string) error {
-	if _, err := os.Stat(BuildHashPath(root)); err == nil {
-		return nil
-	}
-
-	scan, err := DetectProjectBuildScripts(root)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(BuildHashPath(root), []byte(scan.Hash+"\n"), 0644)
-}
-
-// RebuildBuildRules regenerates build-verification.md and refreshes the build hash file.
-func RebuildBuildRules(root string) (*BuildScriptScan, error) {
+// RebuildProjectCommands regenerates project-commands.md using the configured AI generator.
+func RebuildProjectCommands(root string) (*BuildScriptScan, error) {
 	rulesDir := filepath.Join(ResolveAgentsDir(root), "rules")
 	if err := os.MkdirAll(rulesDir, 0755); err != nil {
 		return nil, fmt.Errorf("create .agents/rules/: %w", err)
+	}
+	if projectCommandsGenerator == nil {
+		return nil, fmt.Errorf("generate %s: no generator configured", projectCommandsFileName)
 	}
 
 	scan, err := DetectProjectBuildScripts(root)
@@ -327,46 +297,120 @@ func RebuildBuildRules(root string) (*BuildScriptScan, error) {
 		return nil, err
 	}
 
-	buildRulesPath := filepath.Join(rulesDir, "build-verification.md")
-	if err := os.WriteFile(buildRulesPath, []byte(scan.RenderBuildVerificationRules()), 0644); err != nil {
-		return nil, fmt.Errorf("write build-verification.md: %w", err)
+	content, err := projectCommandsGenerator(root, scan)
+	if err != nil {
+		return nil, err
 	}
-	if err := os.WriteFile(BuildHashPath(root), []byte(scan.Hash+"\n"), 0644); err != nil {
-		return nil, fmt.Errorf("write %s: %w", buildHashFileName, err)
+
+	normalized, err := normalizeProjectCommandsContent(content)
+	if err != nil {
+		return nil, err
+	}
+
+	projectCommandsPath := filepath.Join(rulesDir, projectCommandsFileName)
+	if err := os.WriteFile(projectCommandsPath, []byte(normalized), 0644); err != nil {
+		return nil, fmt.Errorf("write %s: %w", projectCommandsFileName, err)
+	}
+	if err := cleanupLegacyRuleArtifacts(root); err != nil {
+		return nil, err
 	}
 
 	return scan, nil
 }
 
-// RenderBuildVerificationRules returns the generated markdown for build-verification.md.
-func (s *BuildScriptScan) RenderBuildVerificationRules() string {
-	var b strings.Builder
-	b.WriteString("# Build Verification Rules\n\n")
-	b.WriteString("## Trigger\n\n")
-	b.WriteString("Apply this rule before `go build`, before commit, before review handoff, and before reporting task completion.\n\n")
-	b.WriteString("## Project Build Scan\n\n")
-	if len(s.Files) == 0 {
-		b.WriteString("No supported build-script files were detected. Refresh with `agent-team rules sync --rebuild` after adding `Makefile`, `go.mod`, or `package.json` files.\n\n")
-	} else {
-		b.WriteString("Detected build-script inputs:\n")
-		for _, file := range s.Files {
-			b.WriteString("- `" + file + "`\n")
-		}
-		b.WriteString("\nCurrent build-script hash: `" + s.Hash + "`\n")
-		b.WriteString("Refresh this file after build-script changes with `agent-team rules sync --rebuild`.\n\n")
+func normalizeProjectCommandsContent(content string) (string, error) {
+	trimmed := strings.TrimSpace(content)
+	if trimmed == "" {
+		return "", fmt.Errorf("generate %s: empty response", projectCommandsFileName)
 	}
 
-	b.WriteString("## Recommended Verification Commands\n\n")
-	if len(s.MakeTargets) > 0 {
-		b.WriteString("Primary make targets:\n")
-		for _, target := range s.MakeTargets {
-			b.WriteString("- `make " + target + "`\n")
+	if strings.HasPrefix(trimmed, "```") {
+		lines := strings.Split(trimmed, "\n")
+		if len(lines) >= 3 && strings.HasPrefix(lines[len(lines)-1], "```") {
+			trimmed = strings.TrimSpace(strings.Join(lines[1:len(lines)-1], "\n"))
+			trimmed = strings.TrimPrefix(trimmed, "markdown\n")
+			trimmed = strings.TrimPrefix(trimmed, "md\n")
+			trimmed = strings.TrimSpace(trimmed)
 		}
-		b.WriteString("\n")
 	}
-	if len(s.GoModules) > 0 {
-		b.WriteString("Go module checks:\n")
-		for _, mod := range s.GoModules {
+
+	if idx := strings.Index(trimmed, "# Project Commands Rules"); idx >= 0 {
+		trimmed = strings.TrimSpace(trimmed[idx:])
+	}
+	if !strings.HasPrefix(trimmed, "# Project Commands Rules") {
+		return "", fmt.Errorf("generate %s: response missing '# Project Commands Rules' header", projectCommandsFileName)
+	}
+	if !strings.HasSuffix(trimmed, "\n") {
+		trimmed += "\n"
+	}
+	return trimmed, nil
+}
+
+func generateProjectCommandsWithCodex(root string, scan *BuildScriptScan) (string, error) {
+	outputFile, err := os.CreateTemp("", "agent-team-project-commands-*.md")
+	if err != nil {
+		return "", fmt.Errorf("create temp output for %s: %w", projectCommandsFileName, err)
+	}
+	outputPath := outputFile.Name()
+	if err := outputFile.Close(); err != nil {
+		return "", fmt.Errorf("close temp output for %s: %w", projectCommandsFileName, err)
+	}
+	defer os.Remove(outputPath)
+
+	prompt := buildProjectCommandsPrompt(scan)
+	cmd := exec.Command(
+		"codex", "exec",
+		"--full-auto",
+		"--ephemeral",
+		"--sandbox", "read-only",
+		"--skip-git-repo-check",
+		"-C", root,
+		"-o", outputPath,
+		prompt,
+	)
+	cmd.Env = os.Environ()
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("generate %s with codex exec: %w\n%s", projectCommandsFileName, err, strings.TrimSpace(string(output)))
+	}
+
+	data, err := os.ReadFile(outputPath)
+	if err != nil {
+		return "", fmt.Errorf("read generated %s: %w", projectCommandsFileName, err)
+	}
+	return string(data), nil
+}
+
+func buildProjectCommandsPrompt(scan *BuildScriptScan) string {
+	var b strings.Builder
+	b.WriteString("Generate the full markdown content for `.agents/rules/project-commands.md` for the current repository.\n\n")
+	b.WriteString("Output requirements:\n")
+	b.WriteString("- Return markdown only. Do not wrap the answer in code fences.\n")
+	b.WriteString("- The title must be exactly `# Project Commands Rules`.\n")
+	b.WriteString("- State clearly near the top that this file is AI-generated for the current project and is regenerated by `agent-team init` and `agent-team rules sync`.\n")
+	b.WriteString("- This file must tell AI workers to read it before running any project command.\n")
+	b.WriteString("- Cover the current project's real command entry points for build, test, lint, dev, format, codegen, and any other detected workflows.\n")
+	b.WriteString("- If a command fails, require the AI to inspect the repository and determine the correct command, working directory, prerequisites, or alternative entry point before retrying.\n")
+	b.WriteString("- If rule drift is confirmed, require the AI to ask the user whether to update `project-commands.md`.\n")
+	b.WriteString("- Do not invent commands that are not grounded in the repository. If something is unclear, say how to inspect it instead of guessing.\n\n")
+	b.WriteString("Repository command signals already detected:\n")
+	if len(scan.Files) == 0 {
+		b.WriteString("- No Makefile, go.mod, or package.json files were detected by the CLI scan.\n")
+	} else {
+		for _, file := range scan.Files {
+			b.WriteString("- `" + file + "`\n")
+		}
+	}
+	if len(scan.MakeTargets) > 0 {
+		b.WriteString("- Make targets:\n")
+		for _, target := range scan.MakeTargets {
+			b.WriteString("  - `make " + target + "`\n")
+		}
+	}
+	if len(scan.GoModules) > 0 {
+		b.WriteString("- Go modules:\n")
+		for _, mod := range scan.GoModules {
 			label := mod.Path
 			if label == "go.mod" {
 				label = "repo root"
@@ -379,55 +423,34 @@ func (s *BuildScriptScan) RenderBuildVerificationRules() string {
 				if mod.GoVersion != "" {
 					meta = append(meta, "go `"+mod.GoVersion+"`")
 				}
-				b.WriteString("- `" + label + "`: " + strings.Join(meta, ", ") + "\n")
+				b.WriteString("  - `" + label + "`: " + strings.Join(meta, ", ") + "\n")
 			} else {
-				b.WriteString("- `" + label + "`\n")
+				b.WriteString("  - `" + label + "`\n")
 			}
 		}
-		b.WriteString("- `go build ./...`\n")
-		b.WriteString("- `go vet ./...`\n")
-		b.WriteString("- `go test ./...`\n\n")
 	}
-	if len(s.NodePackages) > 0 {
-		b.WriteString("Node package scripts:\n")
-		for _, pkg := range s.NodePackages {
+	if len(scan.NodePackages) > 0 {
+		b.WriteString("- Node package scripts:\n")
+		for _, pkg := range scan.NodePackages {
 			label := pkg.Path
 			if pkg.Name != "" {
 				label += " (" + pkg.Name + ")"
 			}
-			b.WriteString("- `" + label + "`\n")
+			b.WriteString("  - `" + label + "`\n")
 			for _, script := range pkg.Scripts {
 				prefix := "npm"
 				if pkg.Path != "package.json" {
 					prefix = "npm --prefix " + filepath.Dir(pkg.Path)
 				}
-				b.WriteString("  - `" + prefix + " run " + script.Name + "`")
+				b.WriteString("    - `" + prefix + " run " + script.Name + "`")
 				if script.Command != "" {
 					b.WriteString(" -> `" + script.Command + "`")
 				}
 				b.WriteString("\n")
 			}
 		}
-		b.WriteString("\n")
 	}
-	if len(s.MakeTargets) == 0 && len(s.GoModules) == 0 && len(s.NodePackages) == 0 {
-		b.WriteString("- Inspect the repository for missing build scripts before assuming generic commands.\n\n")
-	}
-
-	b.WriteString("## Pre-Build Checks\n\n")
-	b.WriteString("- MUST confirm the target package list and working directory before running build commands.\n")
-	b.WriteString("- MUST ensure required environment variables, generated files, and module metadata are present.\n")
-	b.WriteString("- MUST avoid building from a dirty or partial state when unrelated edits would invalidate results.\n\n")
-	b.WriteString("## Required Verification Commands\n\n")
-	b.WriteString("- MUST run `go build ./...` for repository-wide Go changes unless the task scope clearly limits the package set.\n")
-	b.WriteString("- MUST run `go vet ./...` for the affected scope before commit.\n")
-	b.WriteString("- MUST run `go test ./...` for the affected scope; use `./...` for shared or cross-package changes.\n")
-	b.WriteString("- MUST rerun the exact failing build or test command when the task is a fix.\n\n")
-	b.WriteString("## Pre-Commit Checklist\n\n")
-	b.WriteString("- ALWAYS confirm the changed files match the task scope.\n")
-	b.WriteString("- ALWAYS review command failures before retrying; NEVER loop without reading output.\n")
-	b.WriteString("- MUST verify that build, vet, and test results are current for the final diff.\n")
-	b.WriteString("- MUST mention any skipped verification explicitly in the completion message with the reason.\n")
+	b.WriteString("\nInspect the repository directly before finalizing the rule file. Ground the document in the current repo only.\n")
 	return b.String()
 }
 
@@ -583,7 +606,7 @@ var defaultRuleFiles = map[string]string{
 
 Read the matching rule first:
 - ` + "`debugging.md`" + `: bug, flaky test, runtime error
-- ` + "`build-verification.md`" + `: before build, test, commit, PR
+- ` + "`project-commands.md`" + `: before running any project command
 - ` + "`communication.md`" + `: ` + "`reply-main`" + `, blocker escalation, progress update
 - ` + "`context-management.md`" + `: context pressure, handoff, provider switch, compact
 - ` + "`task-protocol.md`" + `: task start, verify, completion, archive
@@ -620,25 +643,6 @@ MUST follow the ` + "`systematic-debugging`" + ` workflow in order. ALWAYS repro
 
 - MUST rerun the original reproduction steps after the fix.
 - MUST run the targeted verification commands for the affected scope.
-`,
-	"build-verification.md": `# Build Verification Rules
-
-## Trigger
-
-Apply this rule before build, before commit, before review handoff, and before reporting task completion.
-
-## Required Verification Commands
-
-- MUST run build for repository-wide changes unless the task scope clearly limits the package set.
-- MUST run lint/vet for the affected scope before commit.
-- MUST run tests for the affected scope.
-- MUST rerun the exact failing build or test command when the task is a fix.
-
-## Pre-Commit Checklist
-
-- ALWAYS confirm the changed files match the task scope.
-- ALWAYS review command failures before retrying; NEVER loop without reading output.
-- MUST verify that build, lint, and test results are current for the final diff.
 `,
 	"communication.md": `# Communication Rules
 
@@ -735,25 +739,49 @@ func InitRulesDir(root string) (created int, err error) {
 		if _, err := os.Stat(fp); err == nil {
 			continue // already exists, skip
 		}
-		if name == "build-verification.md" {
-			scan, rebuildErr := RebuildBuildRules(root)
-			if rebuildErr != nil {
-				return created, rebuildErr
-			}
-			if scan != nil {
-				created++
-				continue
-			}
-		}
 		if err := os.WriteFile(fp, []byte(content), 0644); err != nil {
 			return created, fmt.Errorf("write %s: %w", name, err)
 		}
 		created++
 	}
-	if err := EnsureBuildHashFile(root); err != nil {
+	if err := cleanupLegacyRuleArtifacts(root); err != nil {
 		return created, err
 	}
 	return created, nil
+}
+
+// SyncRulesDir overwrites the built-in static rule files with the current templates.
+func SyncRulesDir(root string) (written int, err error) {
+	rulesDir := filepath.Join(ResolveAgentsDir(root), "rules")
+	if err := os.MkdirAll(rulesDir, 0755); err != nil {
+		return 0, fmt.Errorf("create .agents/rules/: %w", err)
+	}
+
+	for name, content := range defaultRuleFiles {
+		fp := filepath.Join(rulesDir, name)
+		if err := os.WriteFile(fp, []byte(content), 0644); err != nil {
+			return written, fmt.Errorf("write %s: %w", name, err)
+		}
+		written++
+	}
+	if err := cleanupLegacyRuleArtifacts(root); err != nil {
+		return written, err
+	}
+	return written, nil
+}
+
+func cleanupLegacyRuleArtifacts(root string) error {
+	rulesDir := filepath.Join(ResolveAgentsDir(root), "rules")
+	legacyPaths := []string{
+		filepath.Join(rulesDir, "build-verification.md"),
+		filepath.Join(root, ".build-hash"),
+	}
+	for _, path := range legacyPaths {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove legacy rule artifact %s: %w", path, err)
+		}
+	}
+	return nil
 }
 
 // providerFileTag is the tag used for injecting rules references into provider files.
@@ -777,10 +805,11 @@ func defaultProviderInstructions(root string) string {
 	b.WriteString("- MUST keep status updates concise and use `agent-team reply-main` formats from `" + rulesRel + "/communication.md`.\n")
 	b.WriteString("- MUST follow `" + rulesRel + "/task-protocol.md` before reporting completion.\n")
 	b.WriteString("- MUST obey `" + rulesRel + "/worktree.md` for branch and git safety.\n")
+	b.WriteString("- MUST read `" + rulesRel + "/project-commands.md` before running any project command.\n")
 	b.WriteString("\n## Rules Reference\n\n")
 	b.WriteString("Load `" + rulesRel + "/index.md` first, then load only the matching rule files:\n\n")
 	b.WriteString("- `" + rulesRel + "/debugging.md` for bugs, flaky tests, runtime errors, or unexpected behavior\n")
-	b.WriteString("- `" + rulesRel + "/build-verification.md` before `go build`, `go vet`, `go test`, commit, or PR handoff\n")
+	b.WriteString("- `" + rulesRel + "/project-commands.md` before running any project command\n")
 	b.WriteString("- `" + rulesRel + "/communication.md` for `reply-main`, blocker escalation, and progress updates\n")
 	b.WriteString("- `" + rulesRel + "/context-management.md` for `/compact` decisions, handoff summaries, and provider-specific context control\n")
 	b.WriteString("- `" + rulesRel + "/task-protocol.md` for task execution, verify, commit, archive, and completion reporting\n")

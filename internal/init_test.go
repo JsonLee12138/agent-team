@@ -7,6 +7,14 @@ import (
 	"testing"
 )
 
+func stubProjectCommandsGenerator(t *testing.T, content string) {
+	t.Helper()
+	restore := SetProjectCommandsGenerator(func(root string, scan *BuildScriptScan) (string, error) {
+		return content, nil
+	})
+	t.Cleanup(restore)
+}
+
 func TestDetectInstalledProviders(t *testing.T) {
 	// This test just verifies the function runs without error.
 	// Results depend on the host environment.
@@ -285,8 +293,9 @@ func TestDetectProjectBuildScripts(t *testing.T) {
 	}
 }
 
-func TestRebuildBuildRules(t *testing.T) {
+func TestRebuildProjectCommands(t *testing.T) {
 	dir := t.TempDir()
+	stubProjectCommandsGenerator(t, "# Project Commands Rules\n\nGenerated for tests.\n")
 
 	if err := os.MkdirAll(filepath.Join(dir, ".agents"), 0755); err != nil {
 		t.Fatalf("mkdir .agents: %v", err)
@@ -303,37 +312,42 @@ func TestRebuildBuildRules(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "role-hub", "package.json"), []byte(`{"name":"role-hub","scripts":{"build":"remix build","test":"vitest run"}}`), 0644); err != nil {
 		t.Fatalf("write role-hub/package.json: %v", err)
 	}
-
-	scan, err := RebuildBuildRules(dir)
-	if err != nil {
-		t.Fatalf("RebuildBuildRules: %v", err)
+	if err := os.WriteFile(filepath.Join(dir, ".build-hash"), []byte("legacy\n"), 0644); err != nil {
+		t.Fatalf("write .build-hash: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755); err != nil {
+		t.Fatalf("mkdir .agents/rules: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".agents", "rules", "build-verification.md"), []byte("legacy\n"), 0644); err != nil {
+		t.Fatalf("write build-verification.md: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, ".agents", "rules", "build-verification.md"))
+	scan, err := RebuildProjectCommands(dir)
 	if err != nil {
-		t.Fatalf("read build-verification.md: %v", err)
+		t.Fatalf("RebuildProjectCommands: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, ".agents", "rules", projectCommandsFileName))
+	if err != nil {
+		t.Fatalf("read %s: %v", projectCommandsFileName, err)
 	}
 	content := string(data)
 	for _, needle := range []string{
-		"Current build-script hash: `" + scan.Hash + "`",
-		"`Makefile`",
-		"`go.mod`",
-		"`role-hub/package.json`",
-		"`make build`",
-		"`go test ./...`",
-		"`npm --prefix role-hub run build`",
+		"# Project Commands Rules",
+		"Generated for tests.",
 	} {
 		if !strings.Contains(content, needle) {
-			t.Fatalf("build-verification.md missing %q\n%s", needle, content)
+			t.Fatalf("%s missing %q\n%s", projectCommandsFileName, needle, content)
 		}
 	}
-
-	hashData, err := os.ReadFile(BuildHashPath(dir))
-	if err != nil {
-		t.Fatalf("read .build-hash: %v", err)
+	if len(scan.Files) != 3 {
+		t.Fatalf("Files = %v, want 3 entries", scan.Files)
 	}
-	if got := strings.TrimSpace(string(hashData)); got != scan.Hash {
-		t.Fatalf(".build-hash = %q, want %q", got, scan.Hash)
+	if _, err := os.Stat(filepath.Join(dir, ".build-hash")); !os.IsNotExist(err) {
+		t.Fatalf(".build-hash should be removed, err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".agents", "rules", "build-verification.md")); !os.IsNotExist(err) {
+		t.Fatalf("legacy build-verification.md should be removed, err=%v", err)
 	}
 }
 
@@ -358,8 +372,11 @@ func TestInitRulesDir(t *testing.T) {
 				t.Errorf("expected %s to exist", name)
 			}
 		}
-		if _, err := os.Stat(BuildHashPath(dir)); os.IsNotExist(err) {
-			t.Error(".build-hash should be created")
+		if _, err := os.Stat(filepath.Join(rulesDir, projectCommandsFileName)); !os.IsNotExist(err) {
+			t.Error("project-commands.md should not be created by InitRulesDir")
+		}
+		if _, err := os.Stat(filepath.Join(dir, ".build-hash")); !os.IsNotExist(err) {
+			t.Error(".build-hash should not exist after InitRulesDir")
 		}
 	})
 
@@ -402,6 +419,45 @@ func TestInitRulesDir(t *testing.T) {
 	})
 }
 
+func TestSyncRulesDir(t *testing.T) {
+	dir := t.TempDir()
+	rulesDir := filepath.Join(dir, ".agents", "rules")
+	if err := os.MkdirAll(rulesDir, 0755); err != nil {
+		t.Fatalf("mkdir rules dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("# stale\n"), 0644); err != nil {
+		t.Fatalf("write stale index: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(rulesDir, "build-verification.md"), []byte("legacy\n"), 0644); err != nil {
+		t.Fatalf("write legacy build-verification.md: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".build-hash"), []byte("legacy\n"), 0644); err != nil {
+		t.Fatalf("write .build-hash: %v", err)
+	}
+
+	written, err := SyncRulesDir(dir)
+	if err != nil {
+		t.Fatalf("SyncRulesDir: %v", err)
+	}
+	if written != len(defaultRuleFiles) {
+		t.Fatalf("written %d files, want %d", written, len(defaultRuleFiles))
+	}
+
+	indexData, err := os.ReadFile(filepath.Join(rulesDir, "index.md"))
+	if err != nil {
+		t.Fatalf("read index.md: %v", err)
+	}
+	if !strings.Contains(string(indexData), "project-commands.md") {
+		t.Fatalf("index.md should reference project-commands.md, got:\n%s", string(indexData))
+	}
+	if _, err := os.Stat(filepath.Join(rulesDir, "build-verification.md")); !os.IsNotExist(err) {
+		t.Fatalf("legacy build-verification.md should be removed, err=%v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".build-hash")); !os.IsNotExist(err) {
+		t.Fatalf(".build-hash should be removed, err=%v", err)
+	}
+}
+
 func TestInitProviderFiles(t *testing.T) {
 	t.Run("creates new provider files", func(t *testing.T) {
 		dir := t.TempDir()
@@ -426,6 +482,9 @@ func TestInitProviderFiles(t *testing.T) {
 			}
 			if !strings.Contains(content, ".agents/rules/index.md") {
 				t.Errorf("%s should reference rules/index.md", name)
+			}
+			if !strings.Contains(content, ".agents/rules/project-commands.md") {
+				t.Errorf("%s should reference rules/project-commands.md", name)
 			}
 		}
 	})

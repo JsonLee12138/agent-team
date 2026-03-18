@@ -11,28 +11,34 @@ import (
 
 func TestRulesSyncCmdHasRebuildFlag(t *testing.T) {
 	cmd := newRulesSyncCmd()
-	if flag := cmd.Flags().Lookup("rebuild"); flag == nil {
-		t.Fatal("sync command should expose --rebuild")
+	if flag := cmd.Flags().Lookup("rebuild"); flag != nil {
+		t.Fatal("sync command should not expose --rebuild")
 	}
 }
 
-func TestRulesSyncRebuildRefreshesBuildVerification(t *testing.T) {
+func TestRulesSyncRefreshesStaticRulesAndProjectCommands(t *testing.T) {
 	_, dir := initTestApp(t)
-
-	if err := os.WriteFile(filepath.Join(dir, "Makefile"), []byte("build:\n\tgo build ./...\n"), 0644); err != nil {
-		t.Fatalf("write Makefile: %v", err)
+	prevRebuild := rebuildProjectCommands
+	rebuildProjectCommands = func(root string) (*internal.BuildScriptScan, error) {
+		path := filepath.Join(root, ".agents", "rules", "project-commands.md")
+		if err := os.WriteFile(path, []byte("# Project Commands Rules\n\nSynced from tests.\n"), 0644); err != nil {
+			return nil, err
+		}
+		return &internal.BuildScriptScan{}, nil
 	}
-	if _, err := internal.RebuildBuildRules(dir); err != nil {
-		t.Fatalf("RebuildBuildRules: %v", err)
-	}
+	t.Cleanup(func() { rebuildProjectCommands = prevRebuild })
 
-	oldHash, err := internal.ReadBuildHash(dir)
-	if err != nil {
-		t.Fatalf("ReadBuildHash: %v", err)
+	if err := os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755); err != nil {
+		t.Fatalf("mkdir rules dir: %v", err)
 	}
-
+	if err := os.WriteFile(filepath.Join(dir, ".agents", "rules", "index.md"), []byte("# stale\n"), 0644); err != nil {
+		t.Fatalf("write stale index: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".agents", "rules", "build-verification.md"), []byte("legacy\n"), 0644); err != nil {
+		t.Fatalf("write legacy build-verification.md: %v", err)
+	}
 	if err := os.WriteFile(filepath.Join(dir, "Makefile"), []byte("build:\n\tgo build ./...\n\ntest:\n\tgo test ./...\n"), 0644); err != nil {
-		t.Fatalf("update Makefile: %v", err)
+		t.Fatalf("write Makefile: %v", err)
 	}
 
 	origWd, err := os.Getwd()
@@ -46,28 +52,36 @@ func TestRulesSyncRebuildRefreshesBuildVerification(t *testing.T) {
 
 	root := NewRootCmd()
 	RegisterCommands(root)
-	root.SetArgs([]string{"rules", "sync", "--rebuild"})
+	root.SetArgs([]string{"rules", "sync"})
 	if err := root.Execute(); err != nil {
-		t.Fatalf("rules sync --rebuild: %v", err)
+		t.Fatalf("rules sync: %v", err)
 	}
 
-	newHash, err := internal.ReadBuildHash(dir)
+	indexData, err := os.ReadFile(filepath.Join(dir, ".agents", "rules", "index.md"))
 	if err != nil {
-		t.Fatalf("ReadBuildHash after rebuild: %v", err)
+		t.Fatalf("read index.md: %v", err)
 	}
-	if newHash == oldHash {
-		t.Fatalf("hash should change after Makefile update, old=%q new=%q", oldHash, newHash)
+	if !strings.Contains(string(indexData), "project-commands.md") {
+		t.Fatalf("index.md = %q, want project-commands reference", string(indexData))
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, ".agents", "rules", "build-verification.md"))
+	data, err := os.ReadFile(filepath.Join(dir, ".agents", "rules", "project-commands.md"))
 	if err != nil {
-		t.Fatalf("read build-verification.md: %v", err)
+		t.Fatalf("read project-commands.md: %v", err)
 	}
 	content := string(data)
-	if !strings.Contains(content, "`make test`") {
-		t.Fatalf("build-verification.md = %q, want rebuilt make test target", content)
+	if !strings.Contains(content, "Synced from tests.") {
+		t.Fatalf("project-commands.md = %q, want regenerated content", content)
 	}
-	if !strings.Contains(content, "Current build-script hash: `"+newHash+"`") {
-		t.Fatalf("build-verification.md should contain refreshed hash %q", newHash)
+	if _, err := os.Stat(filepath.Join(dir, ".agents", "rules", "build-verification.md")); !os.IsNotExist(err) {
+		t.Fatalf("legacy build-verification.md should be removed, err=%v", err)
+	}
+
+	agentData, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("read AGENTS.md: %v", err)
+	}
+	if !strings.Contains(string(agentData), ".agents/rules/project-commands.md") {
+		t.Fatalf("AGENTS.md should reference project-commands.md, got:\n%s", string(agentData))
 	}
 }

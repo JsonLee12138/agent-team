@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -47,13 +48,12 @@ func newWorkerCreateCmd() *cobra.Command {
 func (a *App) RunWorkerCreate(roleName, provider, model string, fresh bool) error {
 	root := a.Git.Root()
 
-	if needsRebuild, currentHash, storedHash, err := internal.BuildRulesNeedRebuild(root); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not verify build rule hash: %v\n", err)
-	} else if needsRebuild {
-		if storedHash == "" {
-			fmt.Fprintf(os.Stderr, "Warning: build rules hash is missing (current: %s). Run 'agent-team rules sync --rebuild' to refresh dynamic build rules.\n", currentHash)
+	projectCommandsPath := filepath.Join(internal.ResolveAgentsDir(root), "rules", "project-commands.md")
+	if _, err := os.Stat(projectCommandsPath); err != nil {
+		if os.IsNotExist(err) {
+			fmt.Fprintln(os.Stderr, "Warning: project command rules are missing. Run 'agent-team rules sync' to generate .agents/rules/project-commands.md before assigning command-heavy work.")
 		} else {
-			fmt.Fprintf(os.Stderr, "Warning: build scripts changed since the last rules rebuild (stored: %s, current: %s). Run 'agent-team rules sync --rebuild' to refresh dynamic build rules.\n", storedHash, currentHash)
+			fmt.Fprintf(os.Stderr, "Warning: could not inspect %s: %v\n", projectCommandsPath, err)
 		}
 	}
 
