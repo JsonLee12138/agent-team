@@ -449,7 +449,8 @@ type roleSectionData struct {
 	Skills   []string
 }
 
-var roleSectionTmpl = template.Must(template.New("roleSection").Parse(`
+// legacyRoleSectionTmpl is the full template used when .agents/rules/ does not exist (backward compatible).
+var legacyRoleSectionTmpl = template.Must(template.New("legacyRoleSection").Parse(`
 ## Skill-First Workflow
 
 **Role skill (MUST use):** ` + "`{{.RoleName}}`" + `
@@ -519,21 +520,159 @@ When any task is done:
 6. Do not start the next task until the completion summary has been sent.
 `))
 
+// slimRoleSectionTmpl is the slim template used when .agents/rules/ exists.
+// Git Rules and Task Completion Protocol are delegated to external rule files.
+var slimRoleSectionTmpl = template.Must(template.New("slimRoleSection").Parse(`
+## Skill-First Workflow
+
+**Role skill (MUST use):** ` + "`{{.RoleName}}`" + `
+
+When you receive ANY task, you MUST first invoke the ` + "`{{.RoleName}}`" + ` skill (via ` + "`/{{.RoleName}}`" + ` or the Skill tool). This is your primary skill that defines how you approach work. Never skip it.
+{{if .Skills}}
+**Dependency skills:**
+{{range .Skills}}
+- ` + "`{{.}}`" + `
+{{- end}}
+{{end}}
+**Workflow:**
+
+1. **Match skills first** — Check which of your available skills are relevant to the task before doing any direct work.
+2. **Invoke matched skills** — For each relevant skill, invoke it (via ` + "`/skill-name`" + ` or the Skill tool). Let the skill guide execution.
+3. **Combine skill outputs** — If a task spans multiple skills, invoke them in logical order and integrate their outputs.
+4. **Direct work only as fallback** — Only work directly when no available skill covers the requirement.
+5. **Dynamic skill discovery** — If no current skill matches, invoke ` + "`find-skills`" + ` to search for one. If found, use it and suggest adding it to the role for future sessions.
+
+## Development Environment
+
+You are working in an **isolated git worktree**. All development MUST happen here:
+
+- **Working directory**: ` + "`{{.WtPath}}`" + `
+- **Git branch**: ` + "`team/{{.WorkerID}}`" + ` (your dedicated branch)
+- **Main project root**: ` + "`{{.Root}}`" + `
+
+The main controller will merge your branch back to main when ready.
+`))
+
+// hasRulesDir checks if .agents/rules/ directory exists at the project root.
+func hasRulesDir(root string) bool {
+	rulesDir := filepath.Join(ResolveAgentsDir(root), "rules")
+	info, err := os.Stat(rulesDir)
+	return err == nil && info.IsDir()
+}
+
+// buildRoleIdentity returns a minimal role identity string (role name + description).
+func buildRoleIdentity(roleName, rolePath string) string {
+	ry := readRoleYAMLFull(rolePath)
+	var b strings.Builder
+	b.WriteString("# System Prompt: " + roleName + "\n\nYou are the " + roleName + " role.\n")
+	if ry.Description != "" {
+		b.WriteString("\nPrimary objective:\n" + ry.Description + "\n")
+	}
+	return b.String()
+}
+
+// buildRulesIndexSection reads .agents/rules/index.md and returns its content.
+// Returns empty string if the file does not exist.
+func buildRulesIndexSection(root string) string {
+	indexPath := filepath.Join(ResolveAgentsDir(root), "rules", "index.md")
+	data, err := os.ReadFile(indexPath)
+	if err != nil {
+		return ""
+	}
+	return "\n## Rules Reference\n\nLoad `.agents/rules/index.md` at task start, then load only the matching rule files:\n\n" + string(data)
+}
+
+// skillIndexEntry holds a skill's name and trigger description for slim injection.
+type skillIndexEntry struct {
+	Name    string
+	Trigger string
+}
+
+// extractSkillTrigger reads a SKILL.md file and extracts the description from YAML frontmatter.
+func extractSkillTrigger(skillPath string) string {
+	skillMD := filepath.Join(skillPath, "SKILL.md")
+	data, err := os.ReadFile(skillMD)
+	if err != nil {
+		return ""
+	}
+	content := string(data)
+	// Parse YAML frontmatter between --- markers
+	if !strings.HasPrefix(content, "---") {
+		return ""
+	}
+	end := strings.Index(content[3:], "---")
+	if end < 0 {
+		return ""
+	}
+	frontmatter := content[3 : 3+end]
+	var fm struct {
+		Description string `yaml:"description"`
+	}
+	if err := yaml.Unmarshal([]byte(frontmatter), &fm); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(fm.Description)
+}
+
+// buildSkillIndexSection builds a compact skill index listing skill names and triggers.
+// Only used in slim mode. Returns empty string if no skills found.
+func buildSkillIndexSection(root, roleName, rolePath string) string {
+	var entries []skillIndexEntry
+
+	// Role skill itself
+	trigger := extractSkillTrigger(rolePath)
+	if trigger != "" {
+		entries = append(entries, skillIndexEntry{Name: roleName, Trigger: trigger})
+	}
+
+	// Dependency skills
+	skills, err := ReadRoleSkillsFromPath(rolePath)
+	if err != nil {
+		return ""
+	}
+	for _, skillName := range skills {
+		shortName := parseSkillName(skillName)
+		sp := findSkillPath(root, skillName)
+		if sp == "" {
+			entries = append(entries, skillIndexEntry{Name: shortName, Trigger: ""})
+			continue
+		}
+		t := extractSkillTrigger(sp)
+		entries = append(entries, skillIndexEntry{Name: shortName, Trigger: t})
+	}
+
+	if len(entries) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\n## Skill Index\n\n")
+	for _, e := range entries {
+		if e.Trigger != "" {
+			b.WriteString("- **" + e.Name + "**: " + e.Trigger + "\n")
+		} else {
+			b.WriteString("- **" + e.Name + "**\n")
+		}
+	}
+	return b.String()
+}
+
 // buildRoleSectionFromPath builds the AGENT_TEAM section content from the role at rolePath.
+// When .agents/rules/ exists, uses slim mode (minimal identity + rules index + skill index).
+// Otherwise falls back to legacy mode (full system.md + inline Git Rules & Task Completion Protocol).
 func buildRoleSectionFromPath(wtPath, workerID, roleName, rolePath, root string) (string, error) {
 	roleSystemPath := filepath.Join(rolePath, "system.md")
-	prompt, err := os.ReadFile(roleSystemPath)
-	if err != nil {
+	if _, err := os.Stat(roleSystemPath); err != nil {
 		if os.IsNotExist(err) {
 			return "", nil
 		}
 		return "", err
 	}
 
-	var skills []string
+	var depSkills []string
 	if s, sErr := ReadRoleSkillsFromPath(rolePath); sErr == nil {
 		for _, skill := range s {
-			skills = append(skills, parseSkillName(skill))
+			depSkills = append(depSkills, parseSkillName(skill))
 		}
 	}
 
@@ -542,22 +681,35 @@ func buildRoleSectionFromPath(wtPath, workerID, roleName, rolePath, root string)
 		WorkerID: workerID,
 		WtPath:   wtPath,
 		Root:     root,
-		Skills:   skills,
+		Skills:   depSkills,
 	}
 
 	var b strings.Builder
-	b.Write(prompt)
-	if err := roleSectionTmpl.Execute(&b, data); err != nil {
-		return "", fmt.Errorf("execute role section template: %w", err)
+
+	if hasRulesDir(root) {
+		// Slim mode: minimal identity + slim template + rules index + skill index
+		b.WriteString(buildRoleIdentity(roleName, rolePath))
+		if err := slimRoleSectionTmpl.Execute(&b, data); err != nil {
+			return "", fmt.Errorf("execute slim role section template: %w", err)
+		}
+		b.WriteString(buildRulesIndexSection(root))
+		b.WriteString(buildSkillIndexSection(root, roleName, rolePath))
+	} else {
+		// Legacy mode: full system.md + full inline template
+		prompt, err := os.ReadFile(roleSystemPath)
+		if err != nil {
+			return "", err
+		}
+		b.Write(prompt)
+		if err := legacyRoleSectionTmpl.Execute(&b, data); err != nil {
+			return "", fmt.Errorf("execute legacy role section template: %w", err)
+		}
 	}
 
 	return b.String(), nil
 }
 
-// buildRoleSection builds the AGENT_TEAM section content from the role's system.md.
-func buildRoleSection(wtPath, workerID, roleName, root string) (string, error) {
-	return buildRoleSectionFromPath(wtPath, workerID, roleName, RoleDir(root, roleName), root)
-}
+const injectTag = "AGENT_TEAM"
 
 // InjectRolePromptWithPath injects the role prompt using an explicit rolePath.
 func InjectRolePromptWithPath(wtPath, workerID, roleName, rolePath, root string) error {
@@ -569,25 +721,17 @@ func InjectRolePromptWithPath(wtPath, workerID, roleName, rolePath, root string)
 		return nil
 	}
 
-	claudePath := filepath.Join(wtPath, "CLAUDE.md")
-	if err := InjectSection(claudePath, "AGENT_TEAM", content); err != nil {
-		return fmt.Errorf("inject CLAUDE.md: %w", err)
-	}
-
-	agentsPath := filepath.Join(wtPath, "AGENTS.md")
-	if err := InjectSection(agentsPath, "AGENT_TEAM", content); err != nil {
-		return fmt.Errorf("inject AGENTS.md: %w", err)
-	}
-
-	geminiPath := filepath.Join(wtPath, "GEMINI.md")
-	if err := InjectSection(geminiPath, "AGENT_TEAM", content); err != nil {
-		return fmt.Errorf("inject GEMINI.md: %w", err)
+	for _, name := range []string{"CLAUDE.md", "AGENTS.md", "GEMINI.md"} {
+		fp := filepath.Join(wtPath, name)
+		if err := InjectSection(fp, injectTag, content); err != nil {
+			return fmt.Errorf("inject %s: %w", name, err)
+		}
 	}
 
 	return nil
 }
 
-// InjectRolePrompt injects the role prompt into CLAUDE.md and AGENTS.md using tagged sections.
+// InjectRolePrompt injects the role prompt into CLAUDE.md, AGENTS.md, and GEMINI.md using tagged sections.
 func InjectRolePrompt(wtPath, workerID, roleName, root string) error {
 	return InjectRolePromptWithPath(wtPath, workerID, roleName, RoleDir(root, roleName), root)
 }
