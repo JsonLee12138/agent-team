@@ -2,9 +2,11 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/JsonLee12138/agent-team/internal"
 	"github.com/spf13/cobra"
@@ -40,6 +42,37 @@ func NewRootCmd() *cobra.Command {
 		gc, err := internal.NewGitClient(cwd)
 		if err != nil {
 			return fmt.Errorf("not in a git repository")
+		}
+
+		// Check if .agents/rules/ exists (initialization check)
+		if !internal.HasRulesDir(gc.Root()) {
+			// Check if running in non-interactive mode
+			nonInteractive := os.Getenv("AGENT_TEAM_NONINTERACTIVE") == "1"
+
+			if nonInteractive {
+				return fmt.Errorf(".agents/rules/ not found. Run 'agent-team init' first (or set AGENT_TEAM_NONINTERACTIVE=0 for interactive mode)")
+			}
+
+			// Interactive mode: prompt user to run init
+			fmt.Println("⚠️  .agents/rules/ not found. This project has not been initialized for agent-team.")
+			fmt.Print("Run agent-team init now? [Y/n] ")
+
+			reader := bufio.NewReader(os.Stdin)
+			input, err := reader.ReadString('\n')
+			if err != nil {
+				return fmt.Errorf("read input: %w", err)
+			}
+
+			response := strings.TrimSpace(strings.ToLower(input))
+			if response == "" || response == "y" || response == "yes" {
+				fmt.Println()
+				if err := runInit(); err != nil {
+					return fmt.Errorf("initialization failed: %w", err)
+				}
+				fmt.Println()
+			} else {
+				return fmt.Errorf("initialization cancelled by user")
+			}
 		}
 
 		app := &App{
