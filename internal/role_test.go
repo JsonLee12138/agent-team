@@ -245,12 +245,12 @@ func TestInjectSection(t *testing.T) {
 	})
 }
 
-func TestInjectRolePromptV2(t *testing.T) {
+func TestInjectRolePromptLegacy(t *testing.T) {
 	dir := t.TempDir()
 	wtPath := filepath.Join(dir, ".worktrees", "dev-001")
 	os.MkdirAll(wtPath, 0755)
 
-	// Create role system.md in .agents/teams/dev/
+	// Create role system.md in .agents/teams/dev/ (NO .agents/rules/ → legacy mode)
 	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
 	os.MkdirAll(roleDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# System Prompt: dev\n\nA developer role.\n"), 0644)
@@ -276,22 +276,131 @@ func TestInjectRolePromptV2(t *testing.T) {
 		t.Error("CLAUDE.md should contain worker branch name")
 	}
 	if !strings.Contains(content, "Task Completion Protocol") {
-		t.Error("CLAUDE.md should contain task completion protocol")
+		t.Error("CLAUDE.md should contain task completion protocol (legacy)")
 	}
 	if !strings.Contains(content, "Reply to main controller (used by workers)") {
-		t.Error("CLAUDE.md should require reply-main protocol")
+		t.Error("CLAUDE.md should require reply-main protocol (legacy)")
 	}
 	if !strings.Contains(content, "Task completed: <summary>") {
-		t.Error("CLAUDE.md should contain completion reply example")
+		t.Error("CLAUDE.md should contain completion reply example (legacy)")
 	}
 	if !strings.Contains(content, "After the archive attempt (success or failure)") {
-		t.Error("CLAUDE.md should require notification after archive attempt")
+		t.Error("CLAUDE.md should require notification after archive attempt (legacy)")
 	}
 	if !strings.Contains(content, "agent-team task archive") {
-		t.Error("CLAUDE.md should contain task archive command")
+		t.Error("CLAUDE.md should contain task archive command (legacy)")
 	}
 	if !strings.Contains(content, "Need decision: <problem or options>") {
-		t.Error("CLAUDE.md should contain blocker/options reply example")
+		t.Error("CLAUDE.md should contain blocker/options reply example (legacy)")
+	}
+}
+
+func TestInjectRolePromptSlim(t *testing.T) {
+	dir := t.TempDir()
+	wtPath := filepath.Join(dir, ".worktrees", "dev-001")
+	os.MkdirAll(wtPath, 0755)
+
+	// Create role with system.md and role.yaml
+	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	refDir := filepath.Join(roleDir, "references")
+	os.MkdirAll(refDir, 0755)
+	os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# System Prompt: dev\n\nA developer role.\n"), 0644)
+	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte("name: dev\ndescription: \"Full-stack developer\"\nskills:\n  - \"systematic-debugging\"\n"), 0644)
+
+	// Create SKILL.md with frontmatter trigger
+	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("---\nname: dev\ndescription: >\n  Full-stack dev skill.\n  Use when the user asks for dev work.\n---\n# dev\n"), 0644)
+
+	// Create .agents/rules/ directory with index.md → triggers slim mode
+	rulesDir := filepath.Join(dir, ".agents", "rules")
+	os.MkdirAll(rulesDir, 0755)
+	os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("- `debugging.md`: bug, flaky test\n- `task-protocol.md`: task start, verify\n"), 0644)
+
+	err := InjectRolePrompt(wtPath, "dev-001", "dev", dir)
+	if err != nil {
+		t.Fatalf("InjectRolePrompt: %v", err)
+	}
+
+	// Check all three provider files get the same content
+	for _, name := range []string{"CLAUDE.md", "AGENTS.md", "GEMINI.md"} {
+		data, err := os.ReadFile(filepath.Join(wtPath, name))
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		content := string(data)
+
+		if !strings.Contains(content, "<!-- AGENT_TEAM:START -->") {
+			t.Errorf("%s should contain AGENT_TEAM start marker", name)
+		}
+		// Slim mode: minimal identity (generated, not full system.md)
+		if !strings.Contains(content, "You are the dev role") {
+			t.Errorf("%s should contain role identity line", name)
+		}
+		if !strings.Contains(content, "Full-stack developer") {
+			t.Errorf("%s should contain description from role.yaml", name)
+		}
+		// Slim mode: Development Environment present but Git Rules / Task Completion Protocol NOT inlined
+		if !strings.Contains(content, "Development Environment") {
+			t.Errorf("%s should contain worktree context", name)
+		}
+		if strings.Contains(content, "### Git Rules") {
+			t.Errorf("%s should NOT inline Git Rules in slim mode", name)
+		}
+		if strings.Contains(content, "### Task Completion Protocol") {
+			t.Errorf("%s should NOT inline Task Completion Protocol in slim mode", name)
+		}
+		// Rules index section present
+		if !strings.Contains(content, "Rules Reference") {
+			t.Errorf("%s should contain Rules Reference section", name)
+		}
+		if !strings.Contains(content, "debugging.md") {
+			t.Errorf("%s should contain rules index content", name)
+		}
+		// Skill index section present
+		if !strings.Contains(content, "Skill Index") {
+			t.Errorf("%s should contain Skill Index section", name)
+		}
+		if !strings.Contains(content, "**dev**") {
+			t.Errorf("%s should list role skill in index", name)
+		}
+	}
+}
+
+func TestInjectRolePromptSlimShorterThanLegacy(t *testing.T) {
+	dir := t.TempDir()
+
+	// Setup role
+	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	refDir := filepath.Join(roleDir, "references")
+	os.MkdirAll(refDir, 0755)
+	os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# System Prompt: dev\n\nA developer role.\n"), 0644)
+	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte("name: dev\ndescription: \"Full-stack developer\"\n"), 0644)
+
+	// Build legacy content (no rules dir)
+	legacyWT := filepath.Join(dir, ".worktrees", "legacy-001")
+	os.MkdirAll(legacyWT, 0755)
+	err := InjectRolePrompt(legacyWT, "legacy-001", "dev", dir)
+	if err != nil {
+		t.Fatalf("legacy inject: %v", err)
+	}
+	legacyData, _ := os.ReadFile(filepath.Join(legacyWT, "CLAUDE.md"))
+	legacyLen := len(legacyData)
+
+	// Now create rules dir and build slim content
+	rulesDir := filepath.Join(dir, ".agents", "rules")
+	os.MkdirAll(rulesDir, 0755)
+	os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("- `debugging.md`: bug\n"), 0644)
+
+	slimWT := filepath.Join(dir, ".worktrees", "slim-001")
+	os.MkdirAll(slimWT, 0755)
+	err = InjectRolePrompt(slimWT, "slim-001", "dev", dir)
+	if err != nil {
+		t.Fatalf("slim inject: %v", err)
+	}
+	slimData, _ := os.ReadFile(filepath.Join(slimWT, "CLAUDE.md"))
+	slimLen := len(slimData)
+
+	if slimLen >= legacyLen {
+		t.Errorf("slim mode (%d bytes) should be shorter than legacy mode (%d bytes)", slimLen, legacyLen)
 	}
 }
 
