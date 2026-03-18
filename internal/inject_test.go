@@ -229,8 +229,8 @@ func TestInjectRolePromptWithPath_DependencySkillsListed(t *testing.T) {
 	}
 }
 
-// TestHasRulesDir verifies the HasRulesDir helper.
-func TestHasRulesDir(t *testing.T) {
+// TestHasRulesDirInit verifies the HasRulesDir helper from init context.
+func TestHasRulesDirInit(t *testing.T) {
 	t.Run("exists", func(t *testing.T) {
 		dir := t.TempDir()
 		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
