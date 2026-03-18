@@ -245,6 +245,98 @@ func TestFormatProviderList(t *testing.T) {
 	}
 }
 
+func TestDetectProjectBuildScripts(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(dir, "Makefile"), []byte(".PHONY: build test lint\nbuild:\n\tgo build ./...\n\ntest:\n\tgo test ./...\n\nlint:\n\tgo vet ./...\n"), 0644); err != nil {
+		t.Fatalf("write Makefile: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/project\n\ngo 1.24.2\n"), 0644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "web"), 0755); err != nil {
+		t.Fatalf("mkdir web: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "web", "package.json"), []byte(`{"name":"web","scripts":{"build":"vite build","lint":"eslint .","test":"vitest run"}}`), 0644); err != nil {
+		t.Fatalf("write package.json: %v", err)
+	}
+
+	scan, err := DetectProjectBuildScripts(dir)
+	if err != nil {
+		t.Fatalf("DetectProjectBuildScripts: %v", err)
+	}
+	if scan.Hash == "" {
+		t.Fatal("hash should not be empty")
+	}
+	if len(scan.Files) != 3 {
+		t.Fatalf("Files = %v, want 3 entries", scan.Files)
+	}
+	if !strings.Contains(strings.Join(scan.MakeTargets, ","), "build") {
+		t.Fatalf("MakeTargets = %v, want build target", scan.MakeTargets)
+	}
+	if len(scan.GoModules) != 1 || scan.GoModules[0].Module != "example.com/project" {
+		t.Fatalf("GoModules = %+v, want example.com/project", scan.GoModules)
+	}
+	if len(scan.NodePackages) != 1 || scan.NodePackages[0].Path != filepath.Join("web", "package.json") {
+		t.Fatalf("NodePackages = %+v, want web/package.json", scan.NodePackages)
+	}
+	if len(scan.NodePackages[0].Scripts) != 3 {
+		t.Fatalf("Scripts = %+v, want 3 scripts", scan.NodePackages[0].Scripts)
+	}
+}
+
+func TestRebuildBuildRules(t *testing.T) {
+	dir := t.TempDir()
+
+	if err := os.MkdirAll(filepath.Join(dir, ".agents"), 0755); err != nil {
+		t.Fatalf("mkdir .agents: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "Makefile"), []byte("build:\n\tgo build ./...\n\ntest:\n\tgo test ./...\n"), 0644); err != nil {
+		t.Fatalf("write Makefile: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/project\n\ngo 1.24.2\n"), 0644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "role-hub"), 0755); err != nil {
+		t.Fatalf("mkdir role-hub: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "role-hub", "package.json"), []byte(`{"name":"role-hub","scripts":{"build":"remix build","test":"vitest run"}}`), 0644); err != nil {
+		t.Fatalf("write role-hub/package.json: %v", err)
+	}
+
+	scan, err := RebuildBuildRules(dir)
+	if err != nil {
+		t.Fatalf("RebuildBuildRules: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, ".agents", "rules", "build-verification.md"))
+	if err != nil {
+		t.Fatalf("read build-verification.md: %v", err)
+	}
+	content := string(data)
+	for _, needle := range []string{
+		"Current build-script hash: `" + scan.Hash + "`",
+		"`Makefile`",
+		"`go.mod`",
+		"`role-hub/package.json`",
+		"`make build`",
+		"`go test ./...`",
+		"`npm --prefix role-hub run build`",
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("build-verification.md missing %q\n%s", needle, content)
+		}
+	}
+
+	hashData, err := os.ReadFile(BuildHashPath(dir))
+	if err != nil {
+		t.Fatalf("read .build-hash: %v", err)
+	}
+	if got := strings.TrimSpace(string(hashData)); got != scan.Hash {
+		t.Fatalf(".build-hash = %q, want %q", got, scan.Hash)
+	}
+}
+
 func TestInitRulesDir(t *testing.T) {
 	t.Run("creates all default rule files", func(t *testing.T) {
 		dir := t.TempDir()
@@ -265,6 +357,9 @@ func TestInitRulesDir(t *testing.T) {
 			if _, err := os.Stat(fp); os.IsNotExist(err) {
 				t.Errorf("expected %s to exist", name)
 			}
+		}
+		if _, err := os.Stat(BuildHashPath(dir)); os.IsNotExist(err) {
+			t.Error(".build-hash should be created")
 		}
 	})
 
