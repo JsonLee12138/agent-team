@@ -248,6 +248,21 @@ Use this command to send Claude's built-in `/compact` into a recorded session pa
 
 For target resolution details and examples, see [references/compact.md](references/compact.md).
 
+### Controller policy
+
+Use `strategic-compact` as the main-first context strategy layer.
+
+- After worker `reply-main`, main evaluates whether the next step is a `phase-transition`.
+- Before main reads a large diff, large log, long test output, or long worker reply, evaluate `pre-large-read`.
+- When main resumes after a pause or stale context, evaluate `resume-after-pause`.
+- Do not embed custom compact policy in controller replies; route through the shared strategic skill.
+
+### Worker policy
+
+- Worker standard completion remains verify -> archive -> reply-main.
+- Do not compact a worker by default after routine completion.
+- Worker compact is an exception only for long-running, blocked, or multi-round tasks that must stay on the same worker.
+
 ## Skill Cache Management
 
 Remote skills installed via `npx skills add` are cached at `.agents/.cache/skills/` and symlinked into worktrees. Use the `skill` subcommands to manage this cache.

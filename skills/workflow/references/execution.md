@@ -7,6 +7,7 @@
 - Persist state before and after every meaningful transition.
 - Surface blocked decisions to the user instead of guessing.
 - Keep `agent-team` as a fixed backend and compose public commands only.
+- Route context-management triggers through `strategic-compact` instead of embedding workflow-local compact policy.
 
 ## Node Execution Matrix
 
@@ -64,6 +65,8 @@ Pause immediately when any of these occur:
 - a command fails
 - state cannot be written safely
 
+Before a pause caused by `wait`, `block`, or resumed control after a restart, check whether `strategic-compact` should create a recovery anchor for main.
+
 When paused:
 
 1. Persist the current node and blocking reason.
@@ -83,14 +86,17 @@ agent-team workflow state show <state-file>
 ### Dispatch To Worker
 
 ```bash
+# evaluate strategic-compact if this starts a new controller phase
 agent-team workflow state start <state-file> --node <node-id>
 agent-team worker assign <worker-id> "<task>"
+# evaluate strategic-compact before the controller enters waiting state if context should be checkpointed
 agent-team workflow state wait <state-file> --node <node-id> --reason "waiting for worker reply"
 ```
 
 ### Resolve Worker Reply
 
 ```bash
+# evaluate strategic-compact before large worker output or review material is read
 agent-team workflow state complete <state-file> --node <node-id> --summary "<reply summary>"
 agent-team workflow state show <state-file>
 ```

@@ -25,6 +25,7 @@ validation, and run-state persistence.
 - Keep template files and run-state files separate at all times.
 - Use existing `agent-team` commands as the only execution backend.
 - Persist state after every node transition and before every pause or confirmation gate.
+- When a context-management trigger fires, route through the `strategic-compact` skill instead of inventing workflow-local compact logic.
 
 ## Default Paths
 
@@ -70,8 +71,9 @@ Use this flow when the user asks to run `workflow.yaml`, resume a run, or inspec
 3. Resolve each workflow role alias to a concrete worker at runtime.
 4. Create or reuse workers with `agent-team worker create` and `agent-team worker open`.
 5. Execute the current node, then persist state with `agent-team workflow state ...`.
-6. Pause on worker wait states, proactive worker replies, ambiguous outcomes, or controller confirmations.
-7. Resume by reading the run-state file and continuing from `current_node`.
+6. Before or after a meaningful phase transition, evaluate whether `strategic-compact` must run for `phase-transition`, `pre-large-read`, or `resume-after-pause`.
+7. Pause on worker wait states, proactive worker replies, ambiguous outcomes, or controller confirmations.
+8. Resume by reading the run-state file and continuing from `current_node`, using `strategic-compact` first when resumed context is stale.
 
 Example bootstrap:
 
@@ -85,8 +87,10 @@ agent-team workflow state init .agents/workflow/feature-delivery.yaml
 Follow this controller loop for every run:
 
 1. Read the template and current run-state.
-2. Start the current node with `agent-team workflow state start`.
-3. Execute the node action:
+2. On resumed runs or stale controller context, route through `strategic-compact` with `resume-after-pause` before broad rereads.
+3. Start the current node with `agent-team workflow state start`.
+4. Evaluate `phase-transition` before or after `workflow state start|wait|block|complete|confirm` when the main session is about to track a materially different phase.
+5. Execute the node action:
    - `controller_task`: do the task directly, then complete or confirm it.
    - `assign_role_task`: assign work to the mapped worker with `agent-team worker assign`, then move the run into a waiting state for worker feedback.
    - `wait_for_completion`: wait for the worker's `reply-main` message as the default completion signal.
@@ -94,12 +98,13 @@ Follow this controller loop for every run:
    - `handoff`: assign the follow-up task to the next role and capture the transfer in state.
    - `verify_or_test`: run verification or dispatch QA verification, then branch on outcome.
    - `merge`: run `agent-team worker merge <worker-id>` only after explicit controller approval.
-4. Persist one of these outcomes:
+6. Before reading large workflow output, diffs, logs, or test results, route through `strategic-compact` with `pre-large-read`.
+7. Persist one of these outcomes:
    - `wait` when waiting on worker feedback or external verification
    - `block` when the run cannot advance without controller intervention
    - `complete` when the node finishes and can auto-advance
    - `confirm` when a confirmation gate is satisfied and a branch is selected
-5. Stop when the run state becomes `completed` or `blocked`.
+8. Stop when the run state becomes `completed` or `blocked`.
 
 ## Default Wait Protocol
 
@@ -141,6 +146,7 @@ Use `agent-team workflow state confirm` to resolve confirmation nodes determinis
 
 - Read [references/schema.md](references/schema.md) when you need the workflow and run-state schema.
 - Read [references/execution.md](references/execution.md) when you need the node-type execution contract and controller behavior.
+- Read [../strategic-compact/SKILL.md](../strategic-compact/SKILL.md) when a phase transition, resume, or pre-large-read checkpoint requires controller-side compact strategy.
 
 ## Commands
 

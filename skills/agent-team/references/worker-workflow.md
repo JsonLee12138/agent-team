@@ -21,38 +21,38 @@ Before implementing, define what "done" means:
 1. Implement each task in `change.yaml`
 2. Mark each task done as you complete it:
    ```bash
-   agent-team task done <change-name> <task-id>
+   agent-team task done <worker-id> <change-name> <task-id>
    ```
-3. Keep committing regularly with clear messages
+3. Keep commits task-scoped and ready for archive after verification
 
 ## Step 4 — Verify
 
 When all tasks are marked done:
 
 ```bash
-agent-team task verify <change-name>
+agent-team task verify <worker-id> <change-name>
 ```
 
 This runs the verify command from `change.yaml` (or `.tasks/config.yaml` default).
 
-## Step 5 — Notify main
+## Step 5 — Archive and notify main
 
-After verify completes:
+After verify completes, follow the required completion chain:
 
 ```bash
-# If verify passed:
-agent-team reply-main "Task completed: <summary>; verify: passed"
+agent-team task archive <worker-id> <change-name>
 
-# If verify failed (describe what failed):
-agent-team reply-main "Task completed: <summary>; verify: failed — <reason>"
+# If archive succeeds:
+agent-team reply-main "Task completed: <summary>; change archived: <change-name>"
 
-# If verify is skipped (no verify config):
-agent-team reply-main "Task completed: <summary>; verify: skipped"
+# If archive fails:
+agent-team reply-main "Task completed: <summary>; archive failed for <change-name>: <error>"
 ```
 
 ## Rules
 
-- NEVER notify before running verify (or explicitly skipping it)
-- If verify fails, fix and re-run before notifying
+- NEVER notify before running verify and attempting archive
+- If verify fails, report the failure explicitly and do not claim completion
+- If archive fails, still notify main with the archive failure
 - If blocked, report immediately: `agent-team reply-main "Need decision: <options>"`
 - After completion, any new work must go through a new assign cycle
