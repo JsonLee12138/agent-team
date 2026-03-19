@@ -44,8 +44,14 @@ func NewRootCmd() *cobra.Command {
 			return fmt.Errorf("not in a git repository")
 		}
 
+		branch, err := gc.CurrentBranch()
+		if err != nil {
+			branch = "main"
+		}
+		requiresInitialization := !strings.HasPrefix(branch, "team/")
+
 		// Check if .agents/rules/ exists (initialization check)
-		if !internal.HasRulesDir(gc.Root()) {
+		if requiresInitialization && !internal.HasRulesDir(gc.Root()) {
 			// Check if running in non-interactive mode
 			nonInteractive := os.Getenv("AGENT_TEAM_NONINTERACTIVE") == "1"
 

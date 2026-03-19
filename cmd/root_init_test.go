@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,14 +14,13 @@ import (
 // TestPersistentPreRunE_UninitializedProject tests the initialization check
 // in PersistentPreRunE when .agents/rules/ does not exist.
 func TestPersistentPreRunE_UninitializedProject(t *testing.T) {
-	t.Run("non-interactive mode returns error", func(t *testing.T) {
-		// Create a temp directory without .agents/rules/
+	runPreRun := func(t *testing.T, branch string) error {
+		t.Helper()
+
 		tmpDir := t.TempDir()
-
-		// Initialize git repo (required for NewGitClient)
 		runGitCommand(t, tmpDir, "init")
+		runGitCommand(t, tmpDir, "symbolic-ref", "HEAD", "refs/heads/"+branch)
 
-		// Save and restore cwd
 		origCwd, err := os.Getwd()
 		if err != nil {
 			t.Fatalf("getwd: %v", err)
@@ -28,23 +28,8 @@ func TestPersistentPreRunE_UninitializedProject(t *testing.T) {
 		defer os.Chdir(origCwd) // nolint:errcheck
 		os.Chdir(tmpDir)        // nolint:errcheck
 
-		// Set non-interactive mode AFTER changing directory
 		t.Setenv("AGENT_TEAM_NONINTERACTIVE", "1")
 
-		// Verify env var is set
-		if os.Getenv("AGENT_TEAM_NONINTERACTIVE") != "1" {
-			t.Fatalf("AGENT_TEAM_NONINTERACTIVE is '%s', expected '1'", os.Getenv("AGENT_TEAM_NONINTERACTIVE"))
-		}
-
-		// Verify .agents/rules/ does not exist
-		if _, err := os.Stat(filepath.Join(tmpDir, ".agents", "rules")); err == nil {
-			t.Fatal(".agents/rules/ should not exist")
-		}
-
-		// Debug: check what HasRulesDir returns
-		t.Logf("HasRulesDir(tmpDir) = %v", internal.HasRulesDir(tmpDir))
-
-		// Create root cmd and worker subcommand
 		rootCmd := NewRootCmd()
 		workerCmd := &cobra.Command{
 			Use: "worker",
@@ -52,30 +37,41 @@ func TestPersistentPreRunE_UninitializedProject(t *testing.T) {
 				return nil
 			},
 		}
+		workerCmd.SetContext(context.Background())
 		rootCmd.AddCommand(workerCmd)
 
-		// Manually invoke PersistentPreRunE
 		if rootCmd.PersistentPreRunE == nil {
 			t.Fatal("PersistentPreRunE is not set")
 		}
 
-		// Execute PersistentPreRunE directly
-		err = rootCmd.PersistentPreRunE(workerCmd, []string{})
+		return rootCmd.PersistentPreRunE(workerCmd, []string{})
+	}
 
-		// The error should be about initialization
+	t.Run("main branch requires initialization", func(t *testing.T) {
+		err := runPreRun(t, "main")
 		if err == nil {
-			t.Fatal("Expected error when .agents/rules/ not found in non-interactive mode")
+			t.Fatal("Expected error when .agents/rules/ not found on main branch")
 		}
-		t.Logf("Got error: %v", err)
 		if !contains(err.Error(), ".agents/rules/ not found") {
 			t.Errorf("Expected initialization error, got: %v", err)
 		}
 	})
 
-	t.Run("interactive mode would prompt (skipped)", func(t *testing.T) {
-		// Interactive mode requires stdin input, which is hard to test
-		// This test documents the expected behavior
-		t.Skip("Interactive mode test requires mocking stdin")
+	t.Run("team branch bypasses initialization", func(t *testing.T) {
+		err := runPreRun(t, "team/test-001")
+		if err != nil {
+			t.Fatalf("Expected no error on team/* branch, got: %v", err)
+		}
+	})
+
+	t.Run("non-team branch still requires initialization", func(t *testing.T) {
+		err := runPreRun(t, "feature/foo")
+		if err == nil {
+			t.Fatal("Expected error when .agents/rules/ not found on non-team branch")
+		}
+		if !contains(err.Error(), ".agents/rules/ not found") {
+			t.Errorf("Expected initialization error, got: %v", err)
+		}
 	})
 }
 
