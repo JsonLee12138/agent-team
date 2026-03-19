@@ -126,3 +126,36 @@ func TestWorkerConfigRoleScopeOmitEmpty(t *testing.T) {
 		t.Error("YAML should not contain role_path when empty")
 	}
 }
+
+func TestMainSessionConfigRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := MainSessionYAMLPath(dir)
+
+	original := &MainSessionConfig{
+		Backend:   "wezterm",
+		PaneID:    "200",
+		UpdatedAt: "2026-03-19T10:00:00Z",
+	}
+
+	if err := original.Save(path); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	loaded, err := LoadMainSessionConfig(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if loaded.Backend != original.Backend {
+		t.Errorf("Backend = %q, want %q", loaded.Backend, original.Backend)
+	}
+	if loaded.PaneID != original.PaneID {
+		t.Errorf("PaneID = %q, want %q", loaded.PaneID, original.PaneID)
+	}
+}
+
+func TestLoadMainSessionConfigNotFound(t *testing.T) {
+	_, err := LoadMainSessionConfig("/nonexistent/main-session.yaml")
+	if err == nil {
+		t.Fatal("expected error for missing main session config")
+	}
+}

@@ -787,6 +787,20 @@ func cleanupLegacyRuleArtifacts(root string) error {
 // providerFileTag is the tag used for injecting rules references into provider files.
 const providerFileTag = "AGENT_TEAM"
 
+type ClaudeSettings map[string]json.RawMessage
+
+type ClaudeHookMatcher struct {
+	Matcher string      `json:"matcher,omitempty"`
+	Hooks   []ClaudeHook `json:"hooks"`
+}
+
+type ClaudeHook struct {
+	Name    string `json:"name,omitempty"`
+	Type    string `json:"type"`
+	Command string `json:"command"`
+	Timeout int    `json:"timeout,omitempty"`
+}
+
 // defaultProviderInstructions returns the content to inject into provider files.
 func defaultProviderInstructions(root string) string {
 	agentsDir := ResolveAgentsDir(root)
@@ -828,5 +842,84 @@ func InitProviderFiles(root string) error {
 			return fmt.Errorf("inject %s: %w", name, err)
 		}
 	}
+	if err := InitClaudeLocalSettings(root); err != nil {
+		return err
+	}
 	return nil
+}
+
+func InitClaudeLocalSettings(root string) error {
+	settingsPath := filepath.Join(root, ".claude", "settings.local.json")
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0755); err != nil {
+		return fmt.Errorf("create .claude directory: %w", err)
+	}
+
+	cfg := ClaudeSettings{}
+	if data, err := os.ReadFile(settingsPath); err == nil {
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			return fmt.Errorf("parse %s: %w", settingsPath, err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("read %s: %w", settingsPath, err)
+	}
+
+	hook := ClaudeHook{
+		Name:    "record-main-pane",
+		Type:    "command",
+		Command: "./scripts/session-start-record-main-pane.sh",
+		Timeout: 10000,
+	}
+	matcher := ClaudeHookMatcher{
+		Matcher: "*",
+		Hooks:   []ClaudeHook{hook},
+	}
+
+	var hooks map[string][]ClaudeHookMatcher
+	if raw, ok := cfg["hooks"]; ok && len(raw) > 0 {
+		if err := json.Unmarshal(raw, &hooks); err != nil {
+			return fmt.Errorf("parse hooks in %s: %w", settingsPath, err)
+		}
+	}
+	if hooks == nil {
+		hooks = map[string][]ClaudeHookMatcher{}
+	}
+	hooks["SessionStart"] = upsertSessionStartMatcher(hooks["SessionStart"], matcher)
+
+	hooksData, err := json.Marshal(hooks)
+	if err != nil {
+		return fmt.Errorf("marshal hooks for %s: %w", settingsPath, err)
+	}
+	cfg["hooks"] = hooksData
+
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal %s: %w", settingsPath, err)
+	}
+	data = append(data, '\n')
+	if err := os.WriteFile(settingsPath, data, 0644); err != nil {
+		return fmt.Errorf("write %s: %w", settingsPath, err)
+	}
+	return nil
+}
+
+func upsertSessionStartMatcher(existing []ClaudeHookMatcher, matcher ClaudeHookMatcher) []ClaudeHookMatcher {
+	for i := range existing {
+		if existing[i].Matcher != matcher.Matcher {
+			continue
+		}
+		for _, want := range matcher.Hooks {
+			found := false
+			for _, got := range existing[i].Hooks {
+				if got.Command == want.Command && got.Type == want.Type {
+					found = true
+					break
+				}
+			}
+			if !found {
+				existing[i].Hooks = append(existing[i].Hooks, want)
+			}
+		}
+		return existing
+	}
+	return append(existing, matcher)
 }

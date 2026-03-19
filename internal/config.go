@@ -23,9 +23,21 @@ type WorkerConfig struct {
 	CreatedAt        string `yaml:"created_at"`
 }
 
+// MainSessionConfig stores the project's main/controller pane metadata.
+type MainSessionConfig struct {
+	Backend   string `yaml:"backend,omitempty"`
+	PaneID    string `yaml:"pane_id"`
+	UpdatedAt string `yaml:"updated_at,omitempty"`
+}
+
 // WorkerYAMLPath returns the path to worker.yaml in the worktree root.
 func WorkerYAMLPath(wtPath string) string {
 	return filepath.Join(wtPath, "worker.yaml")
+}
+
+// MainSessionYAMLPath returns the path to the project-local main pane config.
+func MainSessionYAMLPath(root string) string {
+	return filepath.Join(root, ".agent-team", "main-session.yaml")
 }
 
 func LoadWorkerConfig(path string) (*WorkerConfig, error) {
@@ -40,6 +52,18 @@ func LoadWorkerConfig(path string) (*WorkerConfig, error) {
 	return &cfg, nil
 }
 
+func LoadMainSessionConfig(path string) (*MainSessionConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read main session config %s: %w", path, err)
+	}
+	var cfg MainSessionConfig
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("parse main session config %s: %w", path, err)
+	}
+	return &cfg, nil
+}
+
 func (c *WorkerConfig) Save(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return fmt.Errorf("create config directory: %w", err)
@@ -47,6 +71,17 @@ func (c *WorkerConfig) Save(path string) error {
 	data, err := yaml.Marshal(c)
 	if err != nil {
 		return fmt.Errorf("marshal worker config: %w", err)
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
+func (c *MainSessionConfig) Save(path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return fmt.Errorf("create config directory: %w", err)
+	}
+	data, err := yaml.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("marshal main session config: %w", err)
 	}
 	return os.WriteFile(path, data, 0644)
 }

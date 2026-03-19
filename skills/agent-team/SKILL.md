@@ -6,7 +6,7 @@ description: >
   Triggers: /agent-team, create a team, batch create roles, create a role,
   create a worker, open worker session, assign task, show team status,
   merge worker branch, search catalog, find role, install role,
-  check task status, role-hub.
+  check task status, role-hub, compact a session.
 ---
 
 # agent-team
@@ -235,6 +235,18 @@ agent-team reply-main "<message>"
 Messages appear in the controller's terminal as `[Worker: <worker-id>] <message>`. For full protocol details, see [references/details.md](references/details.md).
 
 > **AI Behavior**: Surface worker questions to user immediately. Do NOT answer on behalf of user. Batch-present multiple blocked workers.
+
+## Context Management
+
+### Manually inject `/compact`
+
+```bash
+agent-team compact [--pane-id <id>] [--worker <worker-id>] [--to main] [--message "<text>"]
+```
+
+Use this command to send Claude's built-in `/compact` into a recorded session pane.
+
+For target resolution details and examples, see [references/compact.md](references/compact.md).
 
 ## Skill Cache Management
 

@@ -24,3 +24,6 @@ docs/marketing
 
 # Remote skill cache (installed by npx skills add)
 .agents/.cache/
+
+# Project-local session metadata
+.agent-team/

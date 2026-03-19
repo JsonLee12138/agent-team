@@ -487,6 +487,18 @@ func TestInitProviderFiles(t *testing.T) {
 				t.Errorf("%s should reference rules/project-commands.md", name)
 			}
 		}
+
+		settingsData, err := os.ReadFile(filepath.Join(dir, ".claude", "settings.local.json"))
+		if err != nil {
+			t.Fatalf("read settings.local.json: %v", err)
+		}
+		content := string(settingsData)
+		if !strings.Contains(content, "SessionStart") {
+			t.Fatal("settings.local.json should contain SessionStart hook")
+		}
+		if !strings.Contains(content, "./scripts/session-start-record-main-pane.sh") {
+			t.Fatal("settings.local.json should contain record-main-pane script")
+		}
 	})
 
 	t.Run("preserves user content when updating", func(t *testing.T) {
@@ -537,6 +549,61 @@ func TestInitProviderFiles(t *testing.T) {
 		}
 		if strings.Count(content, "<!-- AGENT_TEAM:START -->") != 1 {
 			t.Error("should have exactly one start marker")
+		}
+	})
+
+	t.Run("merges settings.local hooks without clobbering existing config", func(t *testing.T) {
+		dir := t.TempDir()
+		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
+		if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0755); err != nil {
+			t.Fatalf("mkdir .claude: %v", err)
+		}
+		original := `{
+  "permissions": {
+    "allow": ["Bash(git:*)"]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "existing-hook",
+            "type": "command",
+            "command": "./scripts/existing.sh",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  }
+}
+`
+		settingsPath := filepath.Join(dir, ".claude", "settings.local.json")
+		if err := os.WriteFile(settingsPath, []byte(original), 0644); err != nil {
+			t.Fatalf("write settings.local.json: %v", err)
+		}
+
+		if err := InitProviderFiles(dir); err != nil {
+			t.Fatalf("InitProviderFiles: %v", err)
+		}
+
+		data, err := os.ReadFile(settingsPath)
+		if err != nil {
+			t.Fatalf("read settings.local.json: %v", err)
+		}
+		content := string(data)
+		if !strings.Contains(content, "Bash(git:*)") {
+			t.Fatal("existing permissions should be preserved")
+		}
+		if !strings.Contains(content, "./scripts/existing.sh") {
+			t.Fatal("existing SessionStart hook should be preserved")
+		}
+		if !strings.Contains(content, "./scripts/session-start-record-main-pane.sh") {
+			t.Fatal("record-main-pane hook should be added")
+		}
+		if strings.Count(content, "./scripts/session-start-record-main-pane.sh") != 1 {
+			t.Fatal("record-main-pane hook should not be duplicated")
 		}
 	})
 }
