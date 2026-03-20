@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/JsonLee12138/agent-team/internal"
+	"github.com/JsonLee12138/agent-team/internal/orchestrator"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -18,6 +19,7 @@ func newWorkflowCmd() *cobra.Command {
 	}
 	cmd.AddCommand(newWorkflowCreateCmd())
 	cmd.AddCommand(newWorkflowValidateCmd())
+	cmd.AddCommand(newWorkflowPlanCmd())
 	cmd.AddCommand(newWorkflowStateCmd())
 	return cmd
 }
@@ -36,15 +38,16 @@ func newWorkflowCreateCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			app := GetApp(cmd)
-			workflow, err := internal.NewWorkflowTemplate(args[0], preset, ctoRole, devRole, qaRole, executionMode)
+			uc := orchestrator.NewUsecases(app.Git.Root())
+			workflow, err := uc.Workflow.NewTemplate(args[0], preset, ctoRole, devRole, qaRole, executionMode)
 			if err != nil {
 				return err
 			}
 			target := output
 			if target == "" {
-				target = internal.WorkflowTemplatePath(app.Git.Root(), workflow.Name)
+				target = uc.Workflow.WorkflowTemplatePath(workflow.Name)
 			}
-			if err := internal.SaveWorkflowTemplate(target, workflow); err != nil {
+			if err := uc.Workflow.SaveTemplate(target, workflow); err != nil {
 				return err
 			}
 			fmt.Println(target)
@@ -67,11 +70,13 @@ func newWorkflowValidateCmd() *cobra.Command {
 		Short: "Validate a workflow template",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			wf, err := internal.LoadWorkflowTemplate(args[0])
+			app := GetApp(cmd)
+			uc := orchestrator.NewUsecases(app.Git.Root())
+			wf, err := uc.Workflow.LoadTemplate(args[0])
 			if err != nil {
 				return err
 			}
-			errs := internal.ValidateWorkflowTemplate(wf)
+			errs := uc.Workflow.ValidateTemplate(wf)
 			if len(errs) > 0 {
 				return fmt.Errorf("workflow validation failed:\n- %s", joinErrors(errs))
 			}
@@ -79,6 +84,125 @@ func newWorkflowValidateCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func newWorkflowPlanCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "plan",
+		Short: "Manage governance workflow plans",
+	}
+	cmd.AddCommand(newWorkflowPlanGenerateCmd())
+	cmd.AddCommand(newWorkflowPlanApproveCmd())
+	cmd.AddCommand(newWorkflowPlanActivateCmd())
+	return cmd
+}
+
+func newWorkflowPlanGenerateCmd() *cobra.Command {
+	var planID string
+	var taskID string
+	var owner string
+	var moduleID string
+	var ref []string
+	var evidence []string
+	var reason []string
+	var archived bool
+
+	cmd := &cobra.Command{
+		Use:   "generate",
+		Short: "Generate a governance workflow plan (proposed)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			app := GetApp(cmd)
+			uc := orchestrator.NewUsecases(app.Git.Root())
+			plan, err := uc.GenerateWorkflowPlan(orchestrator.GenerateWorkflowPlanInput{
+				PlanID:             planID,
+				TaskID:             taskID,
+				Owner:              owner,
+				ModuleID:           moduleID,
+				DeclaredReferences: ref,
+				EvidenceRefs:       evidence,
+				Reasons:            reason,
+				UsesArchivedInput:  archived,
+				Now:                time.Now().UTC(),
+			})
+			if err != nil {
+				return err
+			}
+			fmt.Printf("plan_id=%s\n", plan.ID)
+			fmt.Printf("status=%s\n", plan.Status)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&planID, "plan-id", "", "Workflow plan id")
+	cmd.Flags().StringVar(&taskID, "task-id", "", "Task id")
+	cmd.Flags().StringVar(&owner, "owner", "", "Owner id")
+	cmd.Flags().StringVar(&moduleID, "module", "workflow", "Module id")
+	cmd.Flags().StringArrayVar(&ref, "ref", nil, "Declared reference id (repeatable)")
+	cmd.Flags().StringArrayVar(&evidence, "evidence", nil, "Evidence reference (repeatable)")
+	cmd.Flags().StringArrayVar(&reason, "reason", nil, "Reason (repeatable)")
+	cmd.Flags().BoolVar(&archived, "use-archived", false, "Uses archived input")
+	_ = cmd.MarkFlagRequired("plan-id")
+	_ = cmd.MarkFlagRequired("task-id")
+	_ = cmd.MarkFlagRequired("owner")
+	return cmd
+}
+
+func newWorkflowPlanApproveCmd() *cobra.Command {
+	var planID string
+	var actor string
+
+	cmd := &cobra.Command{
+		Use:   "approve",
+		Short: "Approve a workflow plan (owner only)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			app := GetApp(cmd)
+			uc := orchestrator.NewUsecases(app.Git.Root())
+			plan, err := uc.ApproveWorkflowPlan(orchestrator.ApproveWorkflowPlanInput{
+				PlanID: planID,
+				Actor:  actor,
+				Now:    time.Now().UTC(),
+			})
+			if err != nil {
+				return err
+			}
+			fmt.Printf("plan_id=%s\n", plan.ID)
+			fmt.Printf("status=%s\n", plan.Status)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&planID, "plan-id", "", "Workflow plan id")
+	cmd.Flags().StringVar(&actor, "actor", "", "Approver actor id")
+	_ = cmd.MarkFlagRequired("plan-id")
+	_ = cmd.MarkFlagRequired("actor")
+	return cmd
+}
+
+func newWorkflowPlanActivateCmd() *cobra.Command {
+	var planID string
+
+	cmd := &cobra.Command{
+		Use:   "activate",
+		Short: "Activate an approved workflow plan",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			app := GetApp(cmd)
+			uc := orchestrator.NewUsecases(app.Git.Root())
+			plan, err := uc.ActivateWorkflowPlan(orchestrator.ActivateWorkflowPlanInput{
+				PlanID: planID,
+				Now:    time.Now().UTC(),
+			})
+			if err != nil {
+				return err
+			}
+			fmt.Printf("plan_id=%s\n", plan.ID)
+			fmt.Printf("status=%s\n", plan.Status)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&planID, "plan-id", "", "Workflow plan id")
+	_ = cmd.MarkFlagRequired("plan-id")
+	return cmd
 }
 
 func newWorkflowStateCmd() *cobra.Command {
@@ -106,11 +230,12 @@ func newWorkflowStateInitCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			app := GetApp(cmd)
-			wf, err := internal.LoadWorkflowTemplate(args[0])
+			uc := orchestrator.NewUsecases(app.Git.Root())
+			wf, err := uc.Workflow.LoadTemplate(args[0])
 			if err != nil {
 				return err
 			}
-			errs := internal.ValidateWorkflowTemplate(wf)
+			errs := uc.Workflow.ValidateTemplate(wf)
 			if len(errs) > 0 {
 				return fmt.Errorf("workflow validation failed:\n- %s", joinErrors(errs))
 			}
@@ -120,13 +245,13 @@ func newWorkflowStateInitCmd() *cobra.Command {
 			}
 			target := stateFile
 			if target == "" {
-				target = internal.WorkflowRunPath(app.Git.Root(), wf.Name, actualRunID)
+				target = uc.Workflow.WorkflowRunPath(wf.Name, actualRunID)
 			}
 			workflowPath := args[0]
 			if !filepath.IsAbs(workflowPath) {
 				workflowPath = filepath.Clean(workflowPath)
 			}
-			state := internal.NewWorkflowRunState(workflowPath, wf, actualRunID)
+			state := uc.Workflow.NewRunState(workflowPath, wf, actualRunID)
 			if err := state.Save(target); err != nil {
 				return err
 			}
