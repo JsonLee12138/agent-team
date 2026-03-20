@@ -315,29 +315,48 @@ func ListAvailableRoles(root string) []string {
 	return roles
 }
 
-// ListWorkers scans worktrees for directories containing worker.yaml.
+// ListWorkers scans centralized worker configs and legacy worktree-local configs.
 func ListWorkers(root, wtBase string) []WorkerInfo {
-	wtDir := filepath.Join(root, wtBase)
-	entries, err := os.ReadDir(wtDir)
-	if err != nil {
-		return nil
-	}
+	seen := map[string]struct{}{}
 	var workers []WorkerInfo
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
+
+	workersDir := filepath.Join(ResolveAgentsDir(root), "workers")
+	if entries, err := os.ReadDir(workersDir); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			workerID := e.Name()
+			cfg, err := LoadWorkerConfig(WorkerConfigPath(root, workerID))
+			if err != nil {
+				continue
+			}
+			workers = append(workers, WorkerInfo{WorkerID: workerID, Role: cfg.Role, Config: cfg})
+			seen[workerID] = struct{}{}
 		}
-		configPath := WorkerYAMLPath(filepath.Join(wtDir, e.Name()))
-		cfg, err := LoadWorkerConfig(configPath)
-		if err != nil {
-			continue
-		}
-		workers = append(workers, WorkerInfo{
-			WorkerID: e.Name(),
-			Role:     cfg.Role,
-			Config:   cfg,
-		})
 	}
+
+	wtDir := filepath.Join(root, wtBase)
+	if entries, err := os.ReadDir(wtDir); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			workerID := e.Name()
+			if _, ok := seen[workerID]; ok {
+				continue
+			}
+			cfg, err := LoadWorkerConfig(WorkerYAMLPath(filepath.Join(wtDir, workerID)))
+			if err != nil {
+				continue
+			}
+			workers = append(workers, WorkerInfo{WorkerID: workerID, Role: cfg.Role, Config: cfg})
+		}
+	}
+
+	sort.Slice(workers, func(i, j int) bool {
+		return workers[i].WorkerID < workers[j].WorkerID
+	})
 	return workers
 }
 
@@ -346,36 +365,49 @@ var workerIDPattern = regexp.MustCompile(`^(.+)-(\d{3})$`)
 
 // NextWorkerID computes the next worker ID for a given role (e.g., frontend-dev-001).
 func NextWorkerID(root, wtBase, roleName string) string {
-	wtDir := filepath.Join(root, wtBase)
-	entries, err := os.ReadDir(wtDir)
-	if err != nil {
-		return fmt.Sprintf("%s-001", roleName)
-	}
-
 	maxNum := 0
 	prefix := roleName + "-"
-	for _, e := range entries {
-		if !e.IsDir() || !strings.HasPrefix(e.Name(), prefix) {
-			continue
+	consider := func(workerID string) {
+		if !strings.HasPrefix(workerID, prefix) {
+			return
 		}
-		m := workerIDPattern.FindStringSubmatch(e.Name())
+		m := workerIDPattern.FindStringSubmatch(workerID)
 		if m == nil || m[1] != roleName {
-			continue
+			return
 		}
 		num, err := strconv.Atoi(m[2])
 		if err != nil {
-			continue
+			return
 		}
 		if num > maxNum {
 			maxNum = num
 		}
 	}
+
+	workersDir := filepath.Join(ResolveAgentsDir(root), "workers")
+	if entries, err := os.ReadDir(workersDir); err == nil {
+		for _, e := range entries {
+			if e.IsDir() {
+				consider(e.Name())
+			}
+		}
+	}
+
+	wtDir := filepath.Join(root, wtBase)
+	if entries, err := os.ReadDir(wtDir); err == nil {
+		for _, e := range entries {
+			if e.IsDir() {
+				consider(e.Name())
+			}
+		}
+	}
+
 	return fmt.Sprintf("%s-%03d", roleName, maxNum+1)
 }
 
 // WriteWorktreeGitignore writes a .gitignore to exclude worker-local files.
 func WriteWorktreeGitignore(wtPath string) error {
-	content := ".gitignore\n.claude/\n.codex/\n.gemini/\n.opencode/\n.tasks/\nworker.yaml\n"
+	content := ".gitignore\n.claude/\n.codex/\n.gemini/\n.opencode/\n.tasks/\nworker.yaml\nCLAUDE.md\nGEMINI.md\nAGENTS.md\n"
 	return os.WriteFile(filepath.Join(wtPath, ".gitignore"), []byte(content), 0644)
 }
 

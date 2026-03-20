@@ -38,15 +38,9 @@ func newWorkerAssignCmd() *cobra.Command {
 func (a *App) RunWorkerAssign(workerID, desc, provider, model, proposalPath, designPath string, newWindow bool) error {
 	root := a.Git.Root()
 	wtPath := internal.WtPath(root, a.WtBase, workerID)
-	configPath := internal.WorkerYAMLPath(wtPath)
-
-	cfg, err := internal.LoadWorkerConfig(configPath)
+	cfg, _, err := internal.LoadWorkerConfigByID(root, a.WtBase, workerID)
 	if err != nil {
 		return fmt.Errorf("worker '%s' not found: %w", workerID, err)
-	}
-
-	if _, err := os.Stat(wtPath); os.IsNotExist(err) {
-		return fmt.Errorf("worker worktree '%s' not found at %s", workerID, wtPath)
 	}
 
 	// Read proposal content
@@ -74,6 +68,30 @@ func (a *App) RunWorkerAssign(workerID, desc, provider, model, proposalPath, des
 		designContent = string(data)
 	}
 
+	if !cfg.IsWorktreeCreated() {
+		fmt.Printf("Worker '%s' worktree not yet created; bootstrap will happen during open...\n", workerID)
+	} else {
+		if _, err := os.Stat(wtPath); os.IsNotExist(err) {
+			return fmt.Errorf("worker worktree '%s' not found at %s", workerID, wtPath)
+		}
+		if internal.CountActiveChanges(wtPath) == 0 {
+			fmt.Printf("Worker '%s' is idle; rebasing worktree onto main from controller...\n", workerID)
+			if err := a.Git.RebaseWorktree(wtPath, "main"); err != nil {
+				return fmt.Errorf("sync idle worker '%s' with main: %w", workerID, err)
+			}
+		}
+	}
+
+	if !cfg.IsWorktreeCreated() {
+		if err := a.RunWorkerOpen(workerID, provider, model, newWindow, false, false); err != nil {
+			return err
+		}
+		cfg, _, err = internal.LoadWorkerConfigByID(root, a.WtBase, workerID)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Create task change
 	ts := time.Now().Format("2006-01-02-15-04-05")
 	slug := internal.Slugify(desc, 50)
@@ -91,7 +109,7 @@ func (a *App) RunWorkerAssign(workerID, desc, provider, model, proposalPath, des
 		if err := a.RunWorkerOpen(workerID, provider, model, newWindow, false, false); err != nil {
 			return err
 		}
-		cfg, err = internal.LoadWorkerConfig(configPath)
+		cfg, _, err = internal.LoadWorkerConfigByID(root, a.WtBase, workerID)
 		if err != nil {
 			return err
 		}

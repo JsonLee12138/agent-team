@@ -607,6 +607,8 @@ var defaultRuleFiles = map[string]string{
 Read the matching rule first:
 - ` + "`debugging.md`" + `: bug, flaky test, runtime error
 - ` + "`project-commands.md`" + `: before running any project command
+- ` + "`agent-team-commands.md`" + `: agent-team CLI boundaries, worker lifecycle commands
+- ` + "`merge-workflow.md`" + `: controller-side rebase, merge sequencing, generated file safety
 - ` + "`communication.md`" + `: ` + "`reply-main`" + `, blocker escalation, progress update
 - ` + "`context-management.md`" + `: context pressure, handoff, provider switch, compact
 - ` + "`task-protocol.md`" + `: task start, verify, completion, archive
@@ -644,6 +646,24 @@ MUST follow the ` + "`systematic-debugging`" + ` workflow in order. ALWAYS repro
 - MUST rerun the original reproduction steps after the fix.
 - MUST run the targeted verification commands for the affected scope.
 `,
+	"agent-team-commands.md": `# Agent-Team Commands Rules
+
+## Trigger
+
+Apply this rule whenever a worker session needs project workflow operations such as create, open, assign, archive, reply, or other ` + "`agent-team`" + ` CLI actions.
+
+## Command Boundary
+
+- MUST use the ` + "`agent-team`" + ` CLI for worker lifecycle and task lifecycle operations when the repository provides it.
+- MUST NOT bypass ` + "`agent-team worker open`" + `, ` + "`agent-team worker assign`" + `, ` + "`agent-team task archive`" + `, or ` + "`agent-team reply-main`" + ` with ad hoc shell commands.
+- MUST treat worker bootstrap files and provider prompt files as controller-managed artifacts.
+
+## Generated File Safety
+
+- MUST NOT commit generated worker-local prompt files such as ` + "`CLAUDE.md`" + `, ` + "`GEMINI.md`" + `, or ` + "`AGENTS.md`" + ` from a worker worktree.
+- MUST NOT commit worker-local metadata such as ` + "`.tasks/`" + `, ` + "`.claude/`" + `, ` + "`.codex/`" + `, ` + "`.gemini/`" + `, ` + "`.opencode/`" + `, or ` + "`worker.yaml`" + ` from a worker worktree.
+- MUST keep deliverable files in tracked repository paths managed by the assigned change.
+`,
 	"communication.md": `# Communication Rules
 
 ## Trigger
@@ -661,6 +681,24 @@ Apply this rule for all worker-to-controller updates, blockers, handoffs, and co
 
 - MUST report blockers immediately when progress depends on a user or controller decision.
 - NEVER hide failed verification, skipped checks, or archive errors.
+`,
+	"merge-workflow.md": `# Merge Workflow Rules
+
+## Trigger
+
+Apply this rule when preparing a worker branch for assignment, merge, or controller-side synchronization.
+
+## Controller-Side Synchronization
+
+- MUST keep worker-side sessions free of ` + "`git rebase`" + ` and ` + "`git merge`" + ` inside the worker worktree.
+- MUST perform any required rebase from the controller side before assignment when the worker is idle.
+- MUST stop and surface conflicts immediately if controller-side rebase fails.
+
+## Merge Safety
+
+- MUST merge worker branches back through the controller workflow.
+- MUST review generated files and ignore-only artifacts before merge so worker-local prompts or metadata do not enter commits.
+- MUST preserve the repository's tracked deliverables while excluding controller-managed bootstrap files.
 `,
 	"context-management.md": `# Context Management Rules
 
@@ -820,10 +858,14 @@ func defaultProviderInstructions(root string) string {
 	b.WriteString("- MUST follow `" + rulesRel + "/task-protocol.md` before reporting completion.\n")
 	b.WriteString("- MUST obey `" + rulesRel + "/worktree.md` for branch and git safety.\n")
 	b.WriteString("- MUST read `" + rulesRel + "/project-commands.md` before running any project command.\n")
+	b.WriteString("- MUST follow `" + rulesRel + "/agent-team-commands.md` for worker lifecycle and generated-file boundaries.\n")
+	b.WriteString("- MUST follow `" + rulesRel + "/merge-workflow.md` for controller-side rebase and merge sequencing.\n")
 	b.WriteString("\n## Rules Reference\n\n")
 	b.WriteString("Load `" + rulesRel + "/index.md` first, then load only the matching rule files:\n\n")
 	b.WriteString("- `" + rulesRel + "/debugging.md` for bugs, flaky tests, runtime errors, or unexpected behavior\n")
 	b.WriteString("- `" + rulesRel + "/project-commands.md` before running any project command\n")
+	b.WriteString("- `" + rulesRel + "/agent-team-commands.md` for agent-team CLI boundaries and worker lifecycle operations\n")
+	b.WriteString("- `" + rulesRel + "/merge-workflow.md` for controller-side rebase, merge ordering, and generated file safety\n")
 	b.WriteString("- `" + rulesRel + "/communication.md` for `reply-main`, blocker escalation, and progress updates\n")
 	b.WriteString("- `" + rulesRel + "/context-management.md` for `/compact` decisions, handoff summaries, and provider-specific context control\n")
 	b.WriteString("- `" + rulesRel + "/task-protocol.md` for task execution, verify, commit, archive, and completion reporting\n")

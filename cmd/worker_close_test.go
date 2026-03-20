@@ -63,7 +63,7 @@ func TestRunWorkerCloseKillsLivePane(t *testing.T) {
 		PaneID:           "42",
 		ControllerPaneID: "99",
 	}
-	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
+	if err := cfg.Save(internal.WorkerConfigPath(dir, workerID)); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 
@@ -75,7 +75,7 @@ func TestRunWorkerCloseKillsLivePane(t *testing.T) {
 		t.Fatalf("killed panes = %v, want [42]", mock.killedPanes)
 	}
 
-	reloaded, err := internal.LoadWorkerConfig(internal.WorkerYAMLPath(wtPath))
+	reloaded, err := internal.LoadWorkerConfig(internal.WorkerConfigPath(dir, workerID))
 	if err != nil {
 		t.Fatalf("LoadWorkerConfig: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestRunWorkerCloseSucceedsWhenPaneAlreadyOffline(t *testing.T) {
 		Provider: "claude",
 		PaneID:   "42",
 	}
-	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
+	if err := cfg.Save(internal.WorkerConfigPath(dir, workerID)); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 
@@ -125,7 +125,7 @@ func TestRunWorkerCloseSucceedsWhenPaneAlreadyOffline(t *testing.T) {
 		t.Fatalf("killed panes = %v, want none", mock.killedPanes)
 	}
 
-	reloaded, err := internal.LoadWorkerConfig(internal.WorkerYAMLPath(wtPath))
+	reloaded, err := internal.LoadWorkerConfig(internal.WorkerConfigPath(dir, workerID))
 	if err != nil {
 		t.Fatalf("LoadWorkerConfig: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestRunWorkerCloseSucceedsWhenPaneIDAlreadyEmpty(t *testing.T) {
 		Provider: "claude",
 		PaneID:   "",
 	}
-	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
+	if err := cfg.Save(internal.WorkerConfigPath(dir, workerID)); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 
@@ -184,7 +184,7 @@ func TestRunWorkerCloseReturnsErrorWhenKillFails(t *testing.T) {
 		Provider: "claude",
 		PaneID:   "42",
 	}
-	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
+	if err := cfg.Save(internal.WorkerConfigPath(dir, workerID)); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 
@@ -194,7 +194,7 @@ func TestRunWorkerCloseReturnsErrorWhenKillFails(t *testing.T) {
 	}
 
 	// PaneID should NOT be cleared when kill fails
-	reloaded, loadErr := internal.LoadWorkerConfig(internal.WorkerYAMLPath(wtPath))
+	reloaded, loadErr := internal.LoadWorkerConfig(internal.WorkerConfigPath(dir, workerID))
 	if loadErr != nil {
 		t.Fatalf("LoadWorkerConfig: %v", loadErr)
 	}

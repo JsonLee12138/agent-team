@@ -41,9 +41,12 @@ func (a *App) RunReplyMain(message string) error {
 		return fmt.Errorf("could not determine worktree root: %w", err)
 	}
 	workerID := filepath.Base(worktreeRoot)
+	projectRoot, err := internal.ResolveProjectRootFromWorktree(worktreeRoot)
+	if err != nil {
+		return fmt.Errorf("could not determine project root: %w", err)
+	}
 
-	configPath := internal.WorkerYAMLPath(worktreeRoot)
-	wcfg, err := internal.LoadWorkerConfig(configPath)
+	wcfg, _, err := internal.LoadWorkerConfigByID(projectRoot, internal.FindWtBase(projectRoot), workerID)
 	if err != nil {
 		return fmt.Errorf("worker '%s' not found: %w", workerID, err)
 	}

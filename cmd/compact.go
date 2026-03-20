@@ -81,7 +81,8 @@ func (a *App) resolveCompactTarget(explicitPaneID, workerID, target string) (pan
 
 	if target == "main" {
 		if isWorkerWorktree {
-			cfg, err := internal.LoadWorkerConfig(internal.WorkerYAMLPath(currentRoot))
+			workerID := filepath.Base(currentRoot)
+			cfg, _, err := internal.LoadWorkerConfigByID(root, a.WtBase, workerID)
 			if err != nil {
 				return "", "", fmt.Errorf("load worker config for current worktree: %w", err)
 			}
@@ -94,7 +95,8 @@ func (a *App) resolveCompactTarget(explicitPaneID, workerID, target string) (pan
 	}
 
 	if isWorkerWorktree {
-		cfg, err := internal.LoadWorkerConfig(internal.WorkerYAMLPath(currentRoot))
+		workerID := filepath.Base(currentRoot)
+		cfg, _, err := internal.LoadWorkerConfigByID(root, a.WtBase, workerID)
 		if err != nil {
 			return "", "", fmt.Errorf("load worker config for current worktree: %w", err)
 		}
@@ -108,8 +110,7 @@ func (a *App) resolveCompactTarget(explicitPaneID, workerID, target string) (pan
 		return "", "", fmt.Errorf("must specify --worker <worker-id> when running from repo root, or use --to main")
 	}
 
-	wtPath := internal.WtPath(root, a.WtBase, workerID)
-	cfg, err := internal.LoadWorkerConfig(internal.WorkerYAMLPath(wtPath))
+	cfg, _, err := internal.LoadWorkerConfigByID(root, a.WtBase, workerID)
 	if err != nil {
 		return "", "", fmt.Errorf("worker '%s' not found: %w", workerID, err)
 	}

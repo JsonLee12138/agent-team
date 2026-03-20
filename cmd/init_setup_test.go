@@ -96,11 +96,10 @@ func TestInitCmd_ProjectLevelInit(t *testing.T) {
 	}
 
 	// Verify index.md exists
-	if _, err := os.Stat(filepath.Join(rulesDir, "index.md")); os.IsNotExist(err) {
-		t.Error("index.md should be created in rules dir")
-	}
-	if _, err := os.Stat(filepath.Join(rulesDir, "project-commands.md")); os.IsNotExist(err) {
-		t.Error("project-commands.md should be created by init")
+	for _, name := range []string{"index.md", "project-commands.md", "agent-team-commands.md", "merge-workflow.md"} {
+		if _, err := os.Stat(filepath.Join(rulesDir, name)); os.IsNotExist(err) {
+			t.Errorf("%s should be created in rules dir", name)
+		}
 	}
 
 	// Verify provider files

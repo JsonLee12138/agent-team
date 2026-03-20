@@ -57,7 +57,7 @@ func TestRunWorkerOpenPersistsExplicitOverrides(t *testing.T) {
 		DefaultModel: "sonnet",
 		PaneID:       "",
 	}
-	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
+	if err := cfg.Save(internal.WorkerConfigPath(dir, "backend-001")); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 
@@ -65,7 +65,7 @@ func TestRunWorkerOpenPersistsExplicitOverrides(t *testing.T) {
 		t.Fatalf("RunWorkerOpen: %v", err)
 	}
 
-	reloaded, err := internal.LoadWorkerConfig(internal.WorkerYAMLPath(wtPath))
+	reloaded, err := internal.LoadWorkerConfig(internal.WorkerConfigPath(dir, "backend-001"))
 	if err != nil {
 		t.Fatalf("LoadWorkerConfig: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestRunWorkerOpenWithoutFlagsUsesPersistedConfig(t *testing.T) {
 		Provider:     "codex",
 		DefaultModel: "gpt-5",
 	}
-	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
+	if err := cfg.Save(internal.WorkerConfigPath(dir, "backend-001")); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 
@@ -124,7 +124,7 @@ func TestRunWorkerOpenWithoutFlagsUsesPersistedConfig(t *testing.T) {
 		t.Fatalf("RunWorkerOpen: %v", err)
 	}
 
-	reloaded, err := internal.LoadWorkerConfig(internal.WorkerYAMLPath(wtPath))
+	reloaded, err := internal.LoadWorkerConfig(internal.WorkerConfigPath(dir, "backend-001"))
 	if err != nil {
 		t.Fatalf("LoadWorkerConfig: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestRunWorkerOpenCompatProviderFallbackDoesNotPersist(t *testing.T) {
 		WorkerID: "backend-001",
 		Role:     "backend",
 	}
-	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
+	if err := cfg.Save(internal.WorkerConfigPath(dir, "backend-001")); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 
@@ -181,7 +181,7 @@ func TestRunWorkerOpenCompatProviderFallbackDoesNotPersist(t *testing.T) {
 		t.Fatalf("RunWorkerOpen: %v", err)
 	}
 
-	reloaded, err := internal.LoadWorkerConfig(internal.WorkerYAMLPath(wtPath))
+	reloaded, err := internal.LoadWorkerConfig(internal.WorkerConfigPath(dir, "backend-001"))
 	if err != nil {
 		t.Fatalf("LoadWorkerConfig: %v", err)
 	}
@@ -192,6 +192,123 @@ func TestRunWorkerOpenCompatProviderFallbackDoesNotPersist(t *testing.T) {
 		t.Fatal("expected launch command to be sent")
 	}
 	if got := mock.SentTexts[0]; got != "claude --dangerously-skip-permissions" {
+		t.Fatalf("launch command = %q", got)
+	}
+}
+
+func TestRunWorkerOpenBootstrapsDeferredWorktree(t *testing.T) {
+	skillInstaller = func(_, _, _, _, _ string, _ bool) error { return nil }
+	taskSetup = func(string) error { return nil }
+	workerShellInitDelay = 0
+	t.Cleanup(func() {
+		skillInstaller = internal.InstallSkillsForWorkerFromPath
+		taskSetup = defaultTaskSetup
+		workerShellInitDelay = 2 * time.Second
+	})
+
+	app, dir := initTestApp(t)
+	mock := &MockBackend{
+		SpawnedID:  "pane-6",
+		AlivePanes: map[string]bool{},
+	}
+	app.Session = mock
+
+	roleDir := filepath.Join(dir, ".agents", "teams", "backend")
+	if err := os.MkdirAll(roleDir, 0755); err != nil {
+		t.Fatalf("mkdir role dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# backend\n"), 0644); err != nil {
+		t.Fatalf("write SKILL.md: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# backend\n"), 0644); err != nil {
+		t.Fatalf("write system.md: %v", err)
+	}
+
+	falseValue := false
+	cfg := &internal.WorkerConfig{
+		WorkerID:        "backend-001",
+		Role:            "backend",
+		Provider:        "claude",
+		WorktreeCreated: &falseValue,
+	}
+	if err := cfg.Save(internal.WorkerConfigPath(dir, "backend-001")); err != nil {
+		t.Fatalf("save worker config: %v", err)
+	}
+
+	wtPath := filepath.Join(dir, ".worktrees", "backend-001")
+	if _, err := os.Stat(wtPath); !os.IsNotExist(err) {
+		t.Fatalf("worktree should not exist before open, err=%v", err)
+	}
+
+	if err := app.RunWorkerOpen("backend-001", "", "", false, false, false); err != nil {
+		t.Fatalf("RunWorkerOpen: %v", err)
+	}
+
+	if _, err := os.Stat(wtPath); err != nil {
+		t.Fatalf("expected bootstrapped worktree: %v", err)
+	}
+	reloaded, err := internal.LoadWorkerConfig(internal.WorkerConfigPath(dir, "backend-001"))
+	if err != nil {
+		t.Fatalf("LoadWorkerConfig: %v", err)
+	}
+	if !reloaded.IsWorktreeCreated() {
+		t.Fatal("WorktreeCreated should be true after bootstrap")
+	}
+	if len(mock.SentTexts) == 0 {
+		t.Fatal("expected launch command to be sent")
+	}
+	if got := mock.SentTexts[0]; got != "claude --dangerously-skip-permissions" {
+		t.Fatalf("launch command = %q", got)
+	}
+}
+
+func TestRunWorkerOpenFallsBackToLegacyConfig(t *testing.T) {
+	skillInstaller = func(_, _, _, _, _ string, _ bool) error { return nil }
+	workerShellInitDelay = 0
+	t.Cleanup(func() {
+		skillInstaller = internal.InstallSkillsForWorkerFromPath
+		workerShellInitDelay = 2 * time.Second
+	})
+
+	app, dir := initTestApp(t)
+	mock := &MockBackend{
+		SpawnedID:  "pane-7",
+		AlivePanes: map[string]bool{},
+	}
+	app.Session = mock
+
+	roleDir := filepath.Join(dir, ".agents", "teams", "backend")
+	if err := os.MkdirAll(roleDir, 0755); err != nil {
+		t.Fatalf("mkdir role dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# backend\n"), 0644); err != nil {
+		t.Fatalf("write SKILL.md: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# backend\n"), 0644); err != nil {
+		t.Fatalf("write system.md: %v", err)
+	}
+
+	wtPath := filepath.Join(dir, ".worktrees", "backend-001")
+	if err := os.MkdirAll(wtPath, 0755); err != nil {
+		t.Fatalf("mkdir worktree: %v", err)
+	}
+	cfg := &internal.WorkerConfig{
+		WorkerID:     "backend-001",
+		Role:         "backend",
+		Provider:     "claude",
+		DefaultModel: "sonnet",
+	}
+	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
+		t.Fatalf("save legacy worker config: %v", err)
+	}
+
+	if err := app.RunWorkerOpen("backend-001", "", "", false, false, false); err != nil {
+		t.Fatalf("RunWorkerOpen: %v", err)
+	}
+	if len(mock.SentTexts) == 0 {
+		t.Fatal("expected launch command to be sent")
+	}
+	if got := mock.SentTexts[0]; got != "claude --dangerously-skip-permissions --model sonnet" {
 		t.Fatalf("launch command = %q", got)
 	}
 }

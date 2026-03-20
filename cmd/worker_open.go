@@ -30,18 +30,43 @@ func newWorkerOpenCmd() *cobra.Command {
 	return cmd
 }
 
+func (a *App) bootstrapWorkerWorktree(root, wtPath, workerID, sessionProvider string, cfg *internal.WorkerConfig, fresh bool) (string, error) {
+	branch := "team/" + workerID
+	if err := a.Git.WorktreeAdd(wtPath, branch); err != nil {
+		return "", err
+	}
+	if err := internal.WriteWorktreeGitignore(wtPath); err != nil {
+		return "", fmt.Errorf("write .gitignore: %w", err)
+	}
+	rolePath := cfg.RolePath
+	if rolePath == "" {
+		rolePath = internal.RoleDir(root, cfg.Role)
+	}
+	if err := internal.InjectRolePromptWithPath(wtPath, workerID, cfg.Role, rolePath, root); err != nil {
+		return "", fmt.Errorf("inject role prompt: %w", err)
+	}
+	if err := skillInstaller(wtPath, root, cfg.Role, rolePath, sessionProvider, fresh); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: skill sync had errors: %v\n", err)
+	}
+	if err := taskSetup(wtPath); err != nil {
+		return "", fmt.Errorf("task setup: %w", err)
+	}
+	worktreeCreated := true
+	cfg.WorktreeCreated = &worktreeCreated
+	configPath := internal.WorkerConfigPath(root, workerID)
+	if err := cfg.Save(configPath); err != nil {
+		return "", fmt.Errorf("save worker config: %w", err)
+	}
+	return configPath, nil
+}
+
 func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow, persistProvider, persistModel bool) error {
 	root := a.Git.Root()
 	wtPath := internal.WtPath(root, a.WtBase, workerID)
-	configPath := internal.WorkerYAMLPath(wtPath)
 
-	cfg, err := internal.LoadWorkerConfig(configPath)
+	cfg, configPath, err := internal.LoadWorkerConfigByID(root, a.WtBase, workerID)
 	if err != nil {
 		return fmt.Errorf("worker '%s' not found: %w", workerID, err)
-	}
-
-	if _, err := os.Stat(wtPath); os.IsNotExist(err) {
-		return fmt.Errorf("worker worktree '%s' not found at %s", workerID, wtPath)
 	}
 
 	if provider != "" {
@@ -80,6 +105,18 @@ func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow, persist
 		}
 	}
 
+	bootstrapped := false
+	if !cfg.IsWorktreeCreated() {
+		fmt.Printf("  Bootstrapping worktree for worker '%s'...\n", workerID)
+		configPath, err = a.bootstrapWorkerWorktree(root, wtPath, workerID, sessionProvider, cfg, false)
+		if err != nil {
+			return err
+		}
+		bootstrapped = true
+	} else if _, err := os.Stat(wtPath); os.IsNotExist(err) {
+		return fmt.Errorf("worker worktree '%s' not found at %s", workerID, wtPath)
+	}
+
 	if a.Session.PaneAlive(cfg.PaneID) {
 		if configChanged {
 			fmt.Printf("Worker '%s' is already running (pane %s); saved provider/model overrides for future launches\n", workerID, cfg.PaneID)
@@ -89,22 +126,21 @@ func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow, persist
 		return nil
 	}
 
-	// Re-sync skills
 	if usedCompatProviderFallback {
 		fmt.Println("  worker.yaml has no provider; using claude for this launch only")
 	}
-	fmt.Printf("  Syncing skills for role '%s'...\n", cfg.Role)
-	rolePath := cfg.RolePath
-	if rolePath == "" {
-		rolePath = internal.RoleDir(root, cfg.Role)
-	}
-	if err := skillInstaller(wtPath, root, cfg.Role, rolePath, sessionProvider, false); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: skill sync had errors: %v\n", err)
-	}
-
-	// Inject role prompt into CLAUDE.md and AGENTS.md
-	if err := internal.InjectRolePromptWithPath(wtPath, workerID, cfg.Role, rolePath, root); err != nil {
-		return fmt.Errorf("inject role prompt: %w", err)
+	if !bootstrapped {
+		fmt.Printf("  Syncing skills for role '%s'...\n", cfg.Role)
+		rolePath := cfg.RolePath
+		if rolePath == "" {
+			rolePath = internal.RoleDir(root, cfg.Role)
+		}
+		if err := skillInstaller(wtPath, root, cfg.Role, rolePath, sessionProvider, false); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: skill sync had errors: %v\n", err)
+		}
+		if err := internal.InjectRolePromptWithPath(wtPath, workerID, cfg.Role, rolePath, root); err != nil {
+			return fmt.Errorf("inject role prompt: %w", err)
+		}
 	}
 
 	// Spawn pane

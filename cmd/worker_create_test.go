@@ -76,7 +76,7 @@ func TestRunWorkerCreateDefaultsProviderAndPersistsModel(t *testing.T) {
 		t.Fatalf("RunWorkerCreate: %v", err)
 	}
 
-	cfg, err := internal.LoadWorkerConfig(filepath.Join(dir, ".worktrees", "backend-001", "worker.yaml"))
+	cfg, err := internal.LoadWorkerConfig(internal.WorkerConfigPath(dir, "backend-001"))
 	if err != nil {
 		t.Fatalf("LoadWorkerConfig: %v", err)
 	}
@@ -85,6 +85,12 @@ func TestRunWorkerCreateDefaultsProviderAndPersistsModel(t *testing.T) {
 	}
 	if cfg.DefaultModel != "gpt-5" {
 		t.Fatalf("DefaultModel = %q, want gpt-5", cfg.DefaultModel)
+	}
+	if cfg.WorktreeCreated == nil || *cfg.WorktreeCreated != false {
+		t.Fatalf("WorktreeCreated = %#v, want false", cfg.WorktreeCreated)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".worktrees", "backend-001")); !os.IsNotExist(err) {
+		t.Fatalf("worktree should not exist after create, err=%v", err)
 	}
 	// create no longer spawns a pane or sends launch commands
 	if cfg.PaneID != "" {
@@ -122,7 +128,7 @@ func TestRunWorkerCreatePersistsExplicitProvider(t *testing.T) {
 		t.Fatalf("RunWorkerCreate: %v", err)
 	}
 
-	cfg, err := internal.LoadWorkerConfig(filepath.Join(dir, ".worktrees", "backend-001", "worker.yaml"))
+	cfg, err := internal.LoadWorkerConfig(internal.WorkerConfigPath(dir, "backend-001"))
 	if err != nil {
 		t.Fatalf("LoadWorkerConfig: %v", err)
 	}

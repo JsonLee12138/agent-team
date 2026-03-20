@@ -20,9 +20,8 @@ func newInjectRolePromptCmd() *cobra.Command {
 			if worktree == "" || workerID == "" || role == "" || root == "" {
 				return fmt.Errorf("--worktree, --worker-id, --role, and --root are all required")
 			}
-			// Try to read RolePath from worker.yaml for global role support
-			configPath := internal.WorkerYAMLPath(worktree)
-			if cfg, err := internal.LoadWorkerConfig(configPath); err == nil && cfg.RolePath != "" {
+			// Try to read RolePath from worker config for global role support
+			if cfg, _, err := internal.LoadWorkerConfigByID(root, internal.FindWtBase(root), workerID); err == nil && cfg.RolePath != "" {
 				return internal.InjectRolePromptWithPath(worktree, workerID, role, cfg.RolePath, root)
 			}
 			return internal.InjectRolePrompt(worktree, workerID, role, root)

@@ -21,10 +21,7 @@ func newWorkerCloseCmd() *cobra.Command {
 
 func (a *App) RunWorkerClose(workerID string) error {
 	root := a.Git.Root()
-	wtPath := internal.WtPath(root, a.WtBase, workerID)
-	configPath := internal.WorkerYAMLPath(wtPath)
-
-	cfg, err := internal.LoadWorkerConfig(configPath)
+	cfg, configPath, err := internal.LoadWorkerConfigByID(root, a.WtBase, workerID)
 	if err != nil {
 		return fmt.Errorf("worker '%s' not found: %w", workerID, err)
 	}

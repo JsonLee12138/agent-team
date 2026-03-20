@@ -62,7 +62,7 @@ func TestRunWorkerDeleteKillsAlivePane(t *testing.T) {
 		Provider: "claude",
 		PaneID:   "50",
 	}
-	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
+	if err := cfg.Save(internal.WorkerConfigPath(dir, workerID)); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 
@@ -97,7 +97,7 @@ func TestRunWorkerDeleteSkipsKillWhenPaneOffline(t *testing.T) {
 		Provider: "claude",
 		PaneID:   "50",
 	}
-	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
+	if err := cfg.Save(internal.WorkerConfigPath(dir, workerID)); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 
@@ -130,7 +130,7 @@ func TestRunWorkerDeleteStopsWhenCloseFails(t *testing.T) {
 		Provider: "claude",
 		PaneID:   "50",
 	}
-	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
+	if err := cfg.Save(internal.WorkerConfigPath(dir, workerID)); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 
@@ -142,5 +142,32 @@ func TestRunWorkerDeleteStopsWhenCloseFails(t *testing.T) {
 	// worktree should still exist since delete was aborted
 	if _, statErr := os.Stat(wtPath); os.IsNotExist(statErr) {
 		t.Fatal("worktree should not be removed when close fails")
+	}
+}
+
+func TestRunWorkerDeleteRemovesConfigOnlyWorker(t *testing.T) {
+	app, dir := initTestApp(t)
+	app.Session = &deleteMockBackend{alivePanes: map[string]bool{}}
+
+	workerID := "dev-001"
+	configPath := internal.WorkerConfigPath(dir, workerID)
+	cfg := &internal.WorkerConfig{
+		WorkerID: workerID,
+		Role:     "dev",
+		Provider: "claude",
+	}
+	if err := cfg.Save(configPath); err != nil {
+		t.Fatalf("save worker config: %v", err)
+	}
+
+	if err := app.RunWorkerDelete(workerID); err != nil {
+		t.Fatalf("RunWorkerDelete: %v", err)
+	}
+
+	if _, err := os.Stat(configPath); !os.IsNotExist(err) {
+		t.Fatalf("config still exists after delete: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, app.WtBase, workerID)); !os.IsNotExist(err) {
+		t.Fatalf("worktree should remain absent, err=%v", err)
 	}
 }

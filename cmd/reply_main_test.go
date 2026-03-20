@@ -97,7 +97,7 @@ func TestRunReplyMainV2(t *testing.T) {
 		PaneID:           "50",
 		ControllerPaneID: "99",
 	}
-	wcfg.Save(internal.WorkerYAMLPath(wtPath))
+	wcfg.Save(internal.WorkerConfigPath(dir, filepath.Base(wtPath)))
 
 	// Override resolveWorktreeRoot to return the test worktree path
 	origResolve := resolveWorktreeRoot
@@ -127,7 +127,7 @@ func TestRunReplyMainNoController(t *testing.T) {
 	wtPath := filepath.Join(dir, ".worktrees", "solo-001")
 	os.MkdirAll(wtPath, 0755)
 	wcfg := &internal.WorkerConfig{WorkerID: "solo-001", Role: "solo", Provider: "claude"}
-	wcfg.Save(internal.WorkerYAMLPath(wtPath))
+	wcfg.Save(internal.WorkerConfigPath(dir, filepath.Base(wtPath)))
 
 	// Override resolveWorktreeRoot to return the test worktree path
 	origResolve := resolveWorktreeRoot

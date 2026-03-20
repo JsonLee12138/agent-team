@@ -59,7 +59,10 @@ func (a *App) RunWorkerStatus() error {
 
 		// Count changes
 		wtPath := internal.WtPath(root, a.WtBase, w.WorkerID)
-		active := internal.CountActiveChanges(wtPath)
+		active := 0
+		if w.Config != nil && w.Config.IsWorktreeCreated() {
+			active = internal.CountActiveChanges(wtPath)
+		}
 		changesSummary := "0"
 		if active > 0 {
 			changesSummary = fmt.Sprintf("%d active", active)

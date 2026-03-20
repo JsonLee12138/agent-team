@@ -127,6 +127,78 @@ func TestWorkerConfigRoleScopeOmitEmpty(t *testing.T) {
 	}
 }
 
+func TestWorkerConfigPathHelpers(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".agents"), 0755); err != nil {
+		t.Fatalf("mkdir .agents: %v", err)
+	}
+	if got := WorkerConfigDir(dir, "dev-001"); got != filepath.Join(dir, ".agents", "workers", "dev-001") {
+		t.Fatalf("WorkerConfigDir = %q", got)
+	}
+	if got := WorkerConfigPath(dir, "dev-001"); got != filepath.Join(dir, ".agents", "workers", "dev-001", "worker.yaml") {
+		t.Fatalf("WorkerConfigPath = %q", got)
+	}
+}
+
+func TestWorkerConfigIsWorktreeCreatedCompatibility(t *testing.T) {
+	trueValue := true
+	falseValue := false
+	if !((&WorkerConfig{}).IsWorktreeCreated()) {
+		t.Fatal("nil worktree_created should default to true")
+	}
+	if !((&WorkerConfig{WorktreeCreated: &trueValue}).IsWorktreeCreated()) {
+		t.Fatal("true worktree_created should stay true")
+	}
+	if (&WorkerConfig{WorktreeCreated: &falseValue}).IsWorktreeCreated() {
+		t.Fatal("false worktree_created should stay false")
+	}
+}
+
+func TestLoadWorkerConfigByIDPrefersCentralizedPath(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".agents"), 0755); err != nil {
+		t.Fatalf("mkdir .agents: %v", err)
+	}
+	newCfg := &WorkerConfig{WorkerID: "dev-001", Role: "new-role"}
+	legacyCfg := &WorkerConfig{WorkerID: "dev-001", Role: "legacy-role"}
+	if err := newCfg.Save(WorkerConfigPath(dir, "dev-001")); err != nil {
+		t.Fatalf("save new config: %v", err)
+	}
+	legacyPath := WorkerYAMLPath(filepath.Join(dir, ".worktrees", "dev-001"))
+	if err := legacyCfg.Save(legacyPath); err != nil {
+		t.Fatalf("save legacy config: %v", err)
+	}
+	loaded, path, err := LoadWorkerConfigByID(dir, ".worktrees", "dev-001")
+	if err != nil {
+		t.Fatalf("LoadWorkerConfigByID: %v", err)
+	}
+	if loaded.Role != "new-role" {
+		t.Fatalf("Role = %q, want new-role", loaded.Role)
+	}
+	if path != WorkerConfigPath(dir, "dev-001") {
+		t.Fatalf("path = %q", path)
+	}
+}
+
+func TestLoadWorkerConfigByIDFallsBackToLegacyPath(t *testing.T) {
+	dir := t.TempDir()
+	legacyPath := WorkerYAMLPath(filepath.Join(dir, ".worktrees", "dev-001"))
+	legacyCfg := &WorkerConfig{WorkerID: "dev-001", Role: "legacy-role"}
+	if err := legacyCfg.Save(legacyPath); err != nil {
+		t.Fatalf("save legacy config: %v", err)
+	}
+	loaded, path, err := LoadWorkerConfigByID(dir, ".worktrees", "dev-001")
+	if err != nil {
+		t.Fatalf("LoadWorkerConfigByID: %v", err)
+	}
+	if loaded.Role != "legacy-role" {
+		t.Fatalf("Role = %q, want legacy-role", loaded.Role)
+	}
+	if path != legacyPath {
+		t.Fatalf("path = %q, want %q", path, legacyPath)
+	}
+}
+
 func TestMainSessionConfigRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	path := MainSessionYAMLPath(dir)

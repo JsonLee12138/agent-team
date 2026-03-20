@@ -46,6 +46,7 @@ func TestListAvailableRoles(t *testing.T) {
 func TestListWorkers(t *testing.T) {
 	dir := t.TempDir()
 	wtBase := ".worktrees"
+	os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
 
 	// empty → no workers
 	workers := ListWorkers(dir, wtBase)
@@ -53,43 +54,62 @@ func TestListWorkers(t *testing.T) {
 		t.Errorf("ListWorkers(empty) = %v, want empty", workers)
 	}
 
-	// create a worktree dir with worker.yaml
-	wtDir := filepath.Join(dir, wtBase, "backend-001")
-	os.MkdirAll(wtDir, 0755)
-	cfg := &WorkerConfig{WorkerID: "backend-001", Role: "backend", Provider: "claude"}
-	cfg.Save(WorkerYAMLPath(wtDir))
+	central := &WorkerConfig{WorkerID: "backend-001", Role: "backend", Provider: "claude"}
+	if err := central.Save(WorkerConfigPath(dir, "backend-001")); err != nil {
+		t.Fatalf("save centralized config: %v", err)
+	}
+
+	legacyDir := filepath.Join(dir, wtBase, "backend-002")
+	os.MkdirAll(legacyDir, 0755)
+	legacy := &WorkerConfig{WorkerID: "backend-002", Role: "backend", Provider: "claude"}
+	if err := legacy.Save(WorkerYAMLPath(legacyDir)); err != nil {
+		t.Fatalf("save legacy config: %v", err)
+	}
+
+	duplicateDir := filepath.Join(dir, wtBase, "backend-001")
+	os.MkdirAll(duplicateDir, 0755)
+	duplicate := &WorkerConfig{WorkerID: "backend-001", Role: "legacy-duplicate", Provider: "claude"}
+	if err := duplicate.Save(WorkerYAMLPath(duplicateDir)); err != nil {
+		t.Fatalf("save duplicate legacy config: %v", err)
+	}
 
 	workers = ListWorkers(dir, wtBase)
-	if len(workers) != 1 || workers[0].WorkerID != "backend-001" {
-		t.Errorf("ListWorkers = %v, want [backend-001]", workers)
+	if len(workers) != 2 {
+		t.Fatalf("ListWorkers = %v, want 2 workers", workers)
 	}
-	if workers[0].Role != "backend" {
-		t.Errorf("ListWorkers[0].Role = %q, want backend", workers[0].Role)
+	if workers[0].WorkerID != "backend-001" || workers[0].Role != "backend" {
+		t.Fatalf("workers[0] = %+v", workers[0])
+	}
+	if workers[1].WorkerID != "backend-002" || workers[1].Role != "backend" {
+		t.Fatalf("workers[1] = %+v", workers[1])
 	}
 }
 
 func TestNextWorkerID(t *testing.T) {
 	dir := t.TempDir()
 	wtBase := ".worktrees"
+	os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
 
-	// no worktrees → 001
+	// no workers → 001
 	got := NextWorkerID(dir, wtBase, "frontend-dev")
 	if got != "frontend-dev-001" {
 		t.Errorf("NextWorkerID(empty) = %q, want frontend-dev-001", got)
 	}
 
-	// create worktree 001
-	os.MkdirAll(filepath.Join(dir, wtBase, "frontend-dev-001"), 0755)
+	// centralized 001
+	if err := os.MkdirAll(WorkerConfigDir(dir, "frontend-dev-001"), 0755); err != nil {
+		t.Fatalf("mkdir centralized worker: %v", err)
+	}
 	got = NextWorkerID(dir, wtBase, "frontend-dev")
 	if got != "frontend-dev-002" {
-		t.Errorf("NextWorkerID(001 exists) = %q, want frontend-dev-002", got)
+		t.Errorf("NextWorkerID(centralized 001 exists) = %q, want frontend-dev-002", got)
 	}
 
-	// create worktree 005 (gap)
+	// legacy 005
 	os.MkdirAll(filepath.Join(dir, wtBase, "frontend-dev-005"), 0755)
 	got = NextWorkerID(dir, wtBase, "frontend-dev")
 	if got != "frontend-dev-006" {
-		t.Errorf("NextWorkerID(005 exists) = %q, want frontend-dev-006", got)
+		t.Errorf("NextWorkerID(legacy 005 exists) = %q, want frontend-dev-006", got)
 	}
 }
 
@@ -103,7 +123,7 @@ func TestWriteWorktreeGitignore(t *testing.T) {
 		t.Fatalf("read .gitignore: %v", err)
 	}
 	content := string(data)
-	for _, expected := range []string{".gitignore", ".claude/", ".codex/", ".tasks/", "worker.yaml"} {
+	for _, expected := range []string{".gitignore", ".claude/", ".codex/", ".tasks/", "worker.yaml", "CLAUDE.md", "GEMINI.md", "AGENTS.md"} {
 		if !strings.Contains(content, expected) {
 			t.Errorf(".gitignore should contain %q", expected)
 		}

@@ -23,29 +23,33 @@ func newWorkerDeleteCmd() *cobra.Command {
 func (a *App) RunWorkerDelete(workerID string) error {
 	root := a.Git.Root()
 	wtPath := internal.WtPath(root, a.WtBase, workerID)
-	configPath := internal.WorkerYAMLPath(wtPath)
+	configDir := internal.WorkerConfigDir(root, workerID)
+	configPath := internal.WorkerConfigPath(root, workerID)
 
-	if _, err := os.Stat(wtPath); os.IsNotExist(err) {
+	_, wtErr := os.Stat(wtPath)
+	_, cfgErr := os.Stat(configPath)
+	if os.IsNotExist(wtErr) && os.IsNotExist(cfgErr) {
 		return fmt.Errorf("worker '%s' not found", workerID)
 	}
 
 	fmt.Printf("Deleting worker '%s'...\n", workerID)
 
-	// Close running session via shared helper
-	cfg, err := internal.LoadWorkerConfig(configPath)
-	if err == nil {
-		if err := closeWorkerSession(a.Session, cfg, configPath); err != nil {
+	cfg, loadedConfigPath, err := internal.LoadWorkerConfigByID(root, a.WtBase, workerID)
+	if err == nil && !os.IsNotExist(wtErr) {
+		if err := closeWorkerSession(a.Session, cfg, loadedConfigPath); err != nil {
 			return fmt.Errorf("failed to close session before delete: %w", err)
 		}
 	}
 
-	// Remove worktree
-	if err := a.Git.WorktreeRemove(wtPath); err != nil {
-		os.RemoveAll(wtPath)
+	if !os.IsNotExist(wtErr) {
+		if err := a.Git.WorktreeRemove(wtPath); err != nil {
+			os.RemoveAll(wtPath)
+		}
 	}
 
-	// Delete branch
 	a.Git.DeleteBranch("team/" + workerID)
+	_ = os.Remove(configPath)
+	_ = os.RemoveAll(configDir)
 
 	fmt.Printf("✓ Deleted worker '%s'\n", workerID)
 	return nil

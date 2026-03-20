@@ -4,6 +4,7 @@ package internal
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -23,6 +24,23 @@ func NewGitClient(dir string) (*GitClient, error) {
 
 func (g *GitClient) Root() string {
 	return g.root
+}
+
+func ResolveProjectRootFromWorktree(worktreeRoot string) (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--git-common-dir")
+	cmd.Dir = worktreeRoot
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("resolve git common dir for %s: %w", worktreeRoot, err)
+	}
+	commonDir := strings.TrimSpace(string(out))
+	if commonDir == "" || commonDir == ".git" || commonDir == "./.git" {
+		return worktreeRoot, nil
+	}
+	if filepath.IsAbs(commonDir) {
+		return filepath.Clean(filepath.Join(commonDir, "..")), nil
+	}
+	return filepath.Clean(filepath.Join(worktreeRoot, commonDir, "..")), nil
 }
 
 func (g *GitClient) CurrentBranch() (string, error) {
@@ -71,6 +89,15 @@ func (g *GitClient) Merge(branch, message string) error {
 	cmd.Dir = g.root
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("merge: %s (%w)", out, err)
+	}
+	return nil
+}
+
+func (g *GitClient) RebaseWorktree(wtPath, onto string) error {
+	cmd := exec.Command("git", "-C", wtPath, "rebase", onto)
+	cmd.Dir = g.root
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("rebase worktree %s onto %s: %s (%w)", wtPath, onto, out, err)
 	}
 	return nil
 }

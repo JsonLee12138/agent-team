@@ -447,8 +447,10 @@ func TestSyncRulesDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read index.md: %v", err)
 	}
-	if !strings.Contains(string(indexData), "project-commands.md") {
-		t.Fatalf("index.md should reference project-commands.md, got:\n%s", string(indexData))
+	for _, needle := range []string{"project-commands.md", "agent-team-commands.md", "merge-workflow.md"} {
+		if !strings.Contains(string(indexData), needle) {
+			t.Fatalf("index.md should reference %s, got:\n%s", needle, string(indexData))
+		}
 	}
 	if _, err := os.Stat(filepath.Join(rulesDir, "build-verification.md")); !os.IsNotExist(err) {
 		t.Fatalf("legacy build-verification.md should be removed, err=%v", err)
@@ -483,8 +485,10 @@ func TestInitProviderFiles(t *testing.T) {
 			if !strings.Contains(content, ".agents/rules/index.md") {
 				t.Errorf("%s should reference rules/index.md", name)
 			}
-			if !strings.Contains(content, ".agents/rules/project-commands.md") {
-				t.Errorf("%s should reference rules/project-commands.md", name)
+			for _, needle := range []string{".agents/rules/project-commands.md", ".agents/rules/agent-team-commands.md", ".agents/rules/merge-workflow.md"} {
+				if !strings.Contains(content, needle) {
+					t.Errorf("%s should reference %s", name, needle)
+				}
 			}
 		}
 

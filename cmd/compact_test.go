@@ -19,7 +19,7 @@ func TestRunCompactFromWorkerWorktreeUsesWorkerPane(t *testing.T) {
 		t.Fatalf("mkdir worktree: %v", err)
 	}
 	cfg := &internal.WorkerConfig{WorkerID: "dev-001", Role: "dev", Provider: "claude", PaneID: "50", ControllerPaneID: "99"}
-	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
+	if err := cfg.Save(internal.WorkerConfigPath(dir, "dev-001")); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 
@@ -62,7 +62,7 @@ func TestRunCompactWithWorkerFlagUsesWorkerPane(t *testing.T) {
 		t.Fatalf("mkdir worktree: %v", err)
 	}
 	cfg := &internal.WorkerConfig{WorkerID: "dev-001", Role: "dev", Provider: "claude", PaneID: "50"}
-	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
+	if err := cfg.Save(internal.WorkerConfigPath(dir, "dev-001")); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 
@@ -88,7 +88,7 @@ func TestRunCompactFromWorkerWorktreeToMainUsesControllerPane(t *testing.T) {
 		t.Fatalf("mkdir worktree: %v", err)
 	}
 	cfg := &internal.WorkerConfig{WorkerID: "dev-001", Role: "dev", Provider: "claude", PaneID: "50", ControllerPaneID: "99"}
-	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
+	if err := cfg.Save(internal.WorkerConfigPath(dir, "dev-001")); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 

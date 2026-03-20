@@ -3,7 +3,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/JsonLee12138/agent-team/internal"
 	"github.com/spf13/cobra"
@@ -34,11 +33,7 @@ func (a *App) RunTaskList(workerID, statusFilter string) error {
 	// Determine which worker(s) to list
 	var workers []internal.WorkerInfo
 	if workerID != "" {
-		wtPath := internal.WtPath(root, a.WtBase, workerID)
-		if _, err := os.Stat(wtPath); os.IsNotExist(err) {
-			return fmt.Errorf("worker '%s' not found", workerID)
-		}
-		cfg, err := internal.LoadWorkerConfig(internal.WorkerYAMLPath(wtPath))
+		cfg, _, err := internal.LoadWorkerConfigByID(root, a.WtBase, workerID)
 		if err != nil {
 			return fmt.Errorf("load worker config: %w", err)
 		}

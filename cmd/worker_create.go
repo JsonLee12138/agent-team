@@ -46,6 +46,7 @@ func newWorkerCreateCmd() *cobra.Command {
 }
 
 func (a *App) RunWorkerCreate(roleName, provider, model string, fresh bool) error {
+	_ = fresh
 	root := a.Git.Root()
 
 	projectCommandsPath := filepath.Join(internal.ResolveAgentsDir(root), "rules", "project-commands.md")
@@ -92,65 +93,45 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, fresh bool) erro
 	workerID := internal.NextWorkerID(root, a.WtBase, roleName)
 	wtPath := internal.WtPath(root, a.WtBase, workerID)
 	branch := "team/" + workerID
+	configPath := internal.WorkerConfigPath(root, workerID)
 
 	if _, err := os.Stat(wtPath); err == nil {
 		return fmt.Errorf("worker '%s' already exists at %s", workerID, wtPath)
 	}
+	if _, err := os.Stat(configPath); err == nil {
+		return fmt.Errorf("worker '%s' already exists at %s", workerID, configPath)
+	}
 
 	fmt.Printf("Creating worker '%s' (role: %s, provider: %s)...\n", workerID, roleName, provider)
 
-	// 4. Create worktree
-	if err := a.Git.WorktreeAdd(wtPath, branch); err != nil {
-		return err
-	}
-
-	// 5. Write .gitignore (includes worker.yaml)
-	if err := internal.WriteWorktreeGitignore(wtPath); err != nil {
-		return fmt.Errorf("write .gitignore: %w", err)
-	}
-
-	// 6. Create and save worker.yaml to worktree root
+	// 4. Create and save centralized worker config only.
 	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
+	worktreeCreated := false
 	cfg := &internal.WorkerConfig{
-		WorkerID:     workerID,
-		Role:         roleName,
-		Provider:     provider,
-		DefaultModel: model,
-		PaneID:       "",
-		CreatedAt:    now,
+		WorkerID:        workerID,
+		Role:            roleName,
+		Provider:        provider,
+		DefaultModel:    model,
+		PaneID:          "",
+		CreatedAt:       now,
+		WorktreeCreated: &worktreeCreated,
 	}
 	if roleScope == "global" {
 		cfg.RoleScope = roleScope
 		cfg.RolePath = rolePath
 	}
-	configPath := internal.WorkerYAMLPath(wtPath)
 	if err := cfg.Save(configPath); err != nil {
 		return fmt.Errorf("save worker config: %w", err)
 	}
 
-	// 7. Initialize tasks in worktree
-	if err := taskSetup(wtPath); err != nil {
-		return fmt.Errorf("task setup: %w", err)
-	}
-
-	// 8. Inject role prompt into CLAUDE.md and AGENTS.md
-	if err := internal.InjectRolePromptWithPath(wtPath, workerID, roleName, rolePath, root); err != nil {
-		return fmt.Errorf("inject role prompt: %w", err)
-	}
-
-	// 9. Install skills
-	fmt.Printf("  Installing skills for role '%s'...\n", roleName)
-	if err := skillInstaller(wtPath, root, roleName, rolePath, provider, fresh); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: skill installation had errors: %v\n", err)
-	}
-
-	fmt.Printf("✓ Created worker '%s' at %s\n", workerID, wtPath)
+	fmt.Printf("✓ Created worker '%s'\n", workerID)
 	fmt.Printf("  → Role: %s\n", roleName)
 	if roleScope == "global" {
 		fmt.Printf("  → Role source: global (%s)\n", rolePath)
 	}
 	fmt.Printf("  → Provider: %s\n", provider)
 	fmt.Printf("  → Branch: %s\n", branch)
-	fmt.Printf("  → Run 'agent-team worker open %s' to start the session\n", workerID)
+	fmt.Printf("  → Worktree: deferred until first open/assign\n")
+	fmt.Printf("  → Run 'agent-team worker open %s' to create the worktree and start the session\n", workerID)
 	return nil
 }
