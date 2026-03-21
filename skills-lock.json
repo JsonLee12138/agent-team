@@ -11,6 +11,11 @@
       "sourceType": "github",
       "computedHash": "d31e234f0c90694a670222cdd1dafa853e051d7066beda389f1097c22dadd461"
     },
+    "prompt-engineering-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "53ca5b03a78c3d0c8117eaf330b73d83d06ed0d66789490ca8a263ce92849d22"
+    },
     "qa-expert": {
       "source": "daymade/claude-code-skills",
       "sourceType": "github",

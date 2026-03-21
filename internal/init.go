@@ -24,6 +24,9 @@ func InitProject(root string) error {
 			return fmt.Errorf("create .gitkeep: %w", err)
 		}
 	}
+	if err := EnsurePlanningDirs(root); err != nil {
+		return err
+	}
 	return nil
 }
 

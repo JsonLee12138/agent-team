@@ -121,4 +121,5 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(newSkillCmd())
 	rootCmd.AddCommand(newWorkflowCmd())
 	rootCmd.AddCommand(newTaskCmd())
+	rootCmd.AddCommand(newPlanningCmd())
 }

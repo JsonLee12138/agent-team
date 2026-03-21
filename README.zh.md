@@ -117,7 +117,7 @@ agent-team role-repo add JsonLee12138/agent-team
 - `worker-inspector`: 只读 worker 状态查看。
 - `role-browser`: 只读本地 role 浏览。
 - `role-creator`: 交互式构建新的智能体角色。
-- `brainstorming`: 在实现前通过对话验证想法。
+- `brainstorming`: 在实现前通过对话验证想法，并支持规划对象目标选择（`roadmap` / `milestone` / `phase` / `task` / `generic topic`）与保存位置选择。
 - `agent-team`: 已降级为兼容导航壳，负责把旧入口导向场景化 skills。
 - `strategic-compact`: 已废弃的兼容壳，统一迁移到 `context-cleanup`。
 
@@ -157,6 +157,12 @@ agent-team role-repo add JsonLee12138/agent-team
 - `agent-team reply <id> "<msg>"`: 向 worker 发送消息。
 - `agent-team reply-main "<msg>"`: Worker 向主控回传消息。
 
+### 规划工件
+- `agent-team planning create --kind <roadmap|milestone|phase> "<title>"`: 创建规划工件。
+- `agent-team planning list [--kind <kind>] [--lifecycle <planning|archived|deprecated>]`: 列出规划工件。
+- `agent-team planning show <id>`: 查看规划工件及引用检查结果。
+- `agent-team planning move <id> --to <planning|archived|deprecated>`: 在不同生命周期目录间迁移规划工件。
+
 ### 任务工件
 每个活跃 task 包固定包含 `.agent-team/task/<task-id>/` 下的三个标准工件：
 - `task.yaml`：生命周期元数据与状态。
@@ -177,13 +183,22 @@ agent-team role-repo add JsonLee12138/agent-team
 
 ```
 项目根目录/
-├── .agent-team/task/            <- 活跃 Task 包
-├── .agent-team/archive/task/    <- 已归档 Task 包
-├── .agent-team/deprecated/task/ <- 已废弃 Task 包
-├── .agents/teams/               <- 项目专属角色
-├── .worktrees/                  <- 隔离的 worker 工作区
-├── roles-lock.json              <- 远程角色版本锁
-└── gemini-extension.json        <- 扩展清单
+├── .agent-team/task/                  <- 活跃 Task 包
+├── .agent-team/planning/roadmaps/     <- 活跃 roadmap 工件
+├── .agent-team/planning/milestones/   <- 活跃 milestone 工件
+├── .agent-team/planning/phases/       <- 活跃 phase 工件
+├── .agent-team/archive/task/          <- 已归档 Task 包
+├── .agent-team/archive/roadmaps/      <- 已归档 roadmap 工件
+├── .agent-team/archive/milestones/    <- 已归档 milestone 工件
+├── .agent-team/archive/phases/        <- 已归档 phase 工件
+├── .agent-team/deprecated/task/       <- 已废弃 Task 包
+├── .agent-team/deprecated/roadmaps/   <- 已废弃 roadmap 工件
+├── .agent-team/deprecated/milestones/ <- 已废弃 milestone 工件
+├── .agent-team/deprecated/phases/     <- 已废弃 phase 工件
+├── .agents/teams/                     <- 项目专属角色
+├── .worktrees/                        <- 隔离的 worker 工作区
+├── roles-lock.json                    <- 远程角色版本锁
+└── gemini-extension.json              <- 扩展清单
 ```
 
 </details>

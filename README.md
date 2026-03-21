@@ -117,7 +117,7 @@ Available in `.agents/teams/`:
 - `worker-inspector`: Read-only worker status.
 - `role-browser`: Read-only local role browsing.
 - `role-creator`: Interactively build new agent roles.
-- `brainstorming`: Validates ideas via dialogue before implementation.
+- `brainstorming`: Validates ideas via dialogue before implementation, including planning-target selection (`roadmap` / `milestone` / `phase` / `task` / `generic topic`) and save-location choices.
 - `agent-team`: Legacy compatibility shell that now routes to the dedicated scenario skills.
 - `strategic-compact`: Deprecated compatibility shell redirected to `context-cleanup`.
 
@@ -157,6 +157,12 @@ Available in `.agents/teams/`:
 - `agent-team reply <id> "<msg>"`: Send message to worker.
 - `agent-team reply-main "<msg>"`: Worker talks back to main.
 
+### Planning Artifacts
+- `agent-team planning create --kind <roadmap|milestone|phase> "<title>"`: Create a planning artifact.
+- `agent-team planning list [--kind <kind>] [--lifecycle <planning|archived|deprecated>]`: List planning artifacts.
+- `agent-team planning show <id>`: Show a planning artifact and reference checks.
+- `agent-team planning move <id> --to <planning|archived|deprecated>`: Move a planning artifact across lifecycle directories.
+
 ### Task Artifacts
 Every active task package contains three standard artifacts under `.agent-team/task/<task-id>/`:
 - `task.yaml`: lifecycle metadata and status.
@@ -177,13 +183,22 @@ Lifecycle summary:
 
 ```
 project-root/
-├── .agent-team/task/            <- Active task packages
-├── .agent-team/archive/task/    <- Archived task packages
-├── .agent-team/deprecated/task/ <- Deprecated task packages
-├── .agents/teams/               <- Project-specific roles
-├── .worktrees/                  <- Isolated worker workspaces
-├── roles-lock.json              <- Remote role version locking
-└── gemini-extension.json        <- Extension manifest
+├── .agent-team/task/                  <- Active task packages
+├── .agent-team/planning/roadmaps/     <- Active roadmap artifacts
+├── .agent-team/planning/milestones/   <- Active milestone artifacts
+├── .agent-team/planning/phases/       <- Active phase artifacts
+├── .agent-team/archive/task/          <- Archived task packages
+├── .agent-team/archive/roadmaps/      <- Archived roadmap artifacts
+├── .agent-team/archive/milestones/    <- Archived milestone artifacts
+├── .agent-team/archive/phases/        <- Archived phase artifacts
+├── .agent-team/deprecated/task/       <- Deprecated task packages
+├── .agent-team/deprecated/roadmaps/   <- Deprecated roadmap artifacts
+├── .agent-team/deprecated/milestones/ <- Deprecated milestone artifacts
+├── .agent-team/deprecated/phases/     <- Deprecated phase artifacts
+├── .agents/teams/                     <- Project-specific roles
+├── .worktrees/                        <- Isolated worker workspaces
+├── roles-lock.json                    <- Remote role version locking
+└── gemini-extension.json              <- Extension manifest
 ```
 
 </details>

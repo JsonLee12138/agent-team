@@ -30,8 +30,10 @@ You MUST complete these items in order:
 2. Ask clarifying questions: one question per message.
 3. Propose 2-3 approaches: include trade-offs and recommendation.
 4. Present design sections: architecture, components, data flow, error handling, testing; get user approval section by section.
-5. Write brainstorming doc: ask for save location choice (default / custom / skip saving) before writing.
-6. Stop after delivering the brainstorming doc: do not transition to implementation planning.
+5. When the topic is planning-oriented, explicitly ask which target object the brainstorming is for: `roadmap`, `milestone`, `phase`, `task`, or `generic topic`.
+6. When relevant, ask whether the brainstorming should build on an existing object or reference set (for example an existing roadmap, milestone, phase, or multiple task/phase refs).
+7. Write brainstorming doc: ask for save location choice (default / custom / skip saving) before writing.
+8. Stop after delivering the brainstorming doc: do not transition to implementation planning.
 
 ## Process Flow
 
@@ -68,6 +70,8 @@ Before any file write, always ask the user to choose:
 2. Custom directory: user-provided path
 3. Skip saving: do not write any file
 
+If the brainstorming target is `roadmap`, `milestone`, or `phase`, also offer saving into the target object's directory when the user explicitly wants the doc colocated with that object.
+
 If the user chooses default, use:
 - `docs/brainstorming/YYYY-MM-DD-<topic>-brainstorming.md`
 
@@ -93,10 +97,12 @@ If the user chooses skip saving, do not write any file — output the doc conten
 
 Include:
 - Role used for brainstorming (explicit role or `general strategist`)
+- Target object (`roadmap`, `milestone`, `phase`, `task`, or `generic topic`) when relevant
 - Problem statement and goals
 - Constraints and assumptions
 - Candidate approaches with trade-offs
 - Recommended design
+- For planning-layer topics, explicitly restate that `task` remains the only execution unit and that planning artifacts are planning/display objects
 - Risks and mitigations
 - Validation/test strategy
 - Open questions (if any)

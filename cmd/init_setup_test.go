@@ -77,6 +77,21 @@ func TestInitCmd_ProjectLevelInit(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, ".agent-team", "teams")); os.IsNotExist(err) {
 		t.Error(".agent-team/teams/ should be created by init")
 	}
+	for _, rel := range []string{
+		filepath.Join(".agent-team", "planning", "roadmaps"),
+		filepath.Join(".agent-team", "planning", "milestones"),
+		filepath.Join(".agent-team", "planning", "phases"),
+		filepath.Join(".agent-team", "archive", "roadmaps"),
+		filepath.Join(".agent-team", "archive", "milestones"),
+		filepath.Join(".agent-team", "archive", "phases"),
+		filepath.Join(".agent-team", "deprecated", "roadmaps"),
+		filepath.Join(".agent-team", "deprecated", "milestones"),
+		filepath.Join(".agent-team", "deprecated", "phases"),
+	} {
+		if _, err := os.Stat(filepath.Join(dir, rel)); os.IsNotExist(err) {
+			t.Errorf("%s should be created by init", rel)
+		}
+	}
 
 	// Verify .agent-team/rules/ exists with default rule files
 	rulesDir := filepath.Join(dir, ".agent-team", "rules")
