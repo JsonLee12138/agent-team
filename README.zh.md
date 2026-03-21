@@ -6,7 +6,7 @@
 
 `agent-team` 是一个多智能体开发管理器，采用 **Role + Worker** 模型，在隔离的 Git worktree 和专用终端会话中运行 AI 智能体。
 
-- **🎭 Role (角色)**: 可复用的技能包 (`.agents/teams/`)，定义目标、提示词和工具。
+- **🎭 Role (角色)**: 可复用的技能包 (`.agent-team/teams/`)，定义目标、提示词和工具。
 - **🛠️ Worker (工作者)**: 隔离的运行实例 (`.worktrees/`)，拥有独立的逻辑分支和会话。
 
 ---
@@ -95,7 +95,7 @@ agent-team role-repo add JsonLee12138/agent-team
 ## 🧰 工具箱
 
 ### 内置角色
-位于 `.agents/teams/`:
+位于 `.agent-team/teams/`:
 - `pm`: 产品经理，负责需求梳理。
 - `frontend-architect`: 前端架构，负责 UI/UX 顶层设计。
 - `vite-react-dev`: 专为 Vite + React 开发优化。
@@ -141,7 +141,7 @@ agent-team role-repo add JsonLee12138/agent-team
 
 ### 角色管理
 - `agent-team role list`: 列出本地角色。
-- `agent-team role create <name>`: 创建新的角色包。
+- `agent-team role create <name>`: 创建新的角色包（生成 `SKILL.md`、`references/role.yaml`、`system.md`，输出到 `skills/`、`.agent-team/teams/` 或自定义目标目录）。
 - `agent-team role-repo add <owner/repo>`: 从 GitHub 安装角色。
 
 ### Worker 操作
@@ -195,7 +195,7 @@ agent-team role-repo add JsonLee12138/agent-team
 ├── .agent-team/deprecated/roadmaps/   <- 已废弃 roadmap 工件
 ├── .agent-team/deprecated/milestones/ <- 已废弃 milestone 工件
 ├── .agent-team/deprecated/phases/     <- 已废弃 phase 工件
-├── .agents/teams/                     <- 项目专属角色
+├── .agent-team/teams/                 <- 项目专属角色
 ├── .worktrees/                        <- 隔离的 worker 工作区
 ├── roles-lock.json                    <- 远程角色版本锁
 └── gemini-extension.json              <- 扩展清单

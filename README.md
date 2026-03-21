@@ -6,7 +6,7 @@ English | [中文](./README.zh.md)
 
 `agent-team` is a multi-agent development manager that uses a **Role + Worker** model to run AI agents in isolated Git worktrees and dedicated terminal sessions.
 
-- **🎭 Role**: Reusable skill packages (`.agents/teams/`) defining goals, prompts, and tools.
+- **🎭 Role**: Reusable skill packages (`.agent-team/teams/`) defining goals, prompts, and tools.
 - **🛠️ Worker**: Isolated runtime instances (`.worktrees/`) with their own branch and session.
 
 ---
@@ -95,7 +95,7 @@ agent-team role-repo add JsonLee12138/agent-team
 ## 🧰 The Toolkit
 
 ### Built-in Roles
-Available in `.agents/teams/`:
+Available in `.agent-team/teams/`:
 - `pm`: Product Manager & Requirement Shaping.
 - `frontend-architect`: High-level UI/UX structure.
 - `vite-react-dev`: Specialized for Vite + React.
@@ -141,7 +141,7 @@ Available in `.agents/teams/`:
 
 ### Role Management
 - `agent-team role list`: Show local roles.
-- `agent-team role create <name>`: Create a new role package.
+- `agent-team role create <name>`: Create a new role package (`SKILL.md`, `references/role.yaml`, `system.md`) under `skills/`, `.agent-team/teams/`, or a custom target path.
 - `agent-team role-repo add <owner/repo>`: Install roles from GitHub.
 
 ### Worker Operations
@@ -195,7 +195,7 @@ project-root/
 ├── .agent-team/deprecated/roadmaps/   <- Deprecated roadmap artifacts
 ├── .agent-team/deprecated/milestones/ <- Deprecated milestone artifacts
 ├── .agent-team/deprecated/phases/     <- Deprecated phase artifacts
-├── .agents/teams/                     <- Project-specific roles
+├── .agent-team/teams/                 <- Project-specific roles
 ├── .worktrees/                        <- Isolated worker workspaces
 ├── roles-lock.json                    <- Remote role version locking
 └── gemini-extension.json              <- Extension manifest
