@@ -102,8 +102,24 @@ Available in `.agents/teams/`:
 - `pencil-designer`: UI design tool specialist.
 
 ### Built-in Skills
+- `task-orchestrator`: Task lifecycle entry.
+- `workflow-orchestrator`: Governance-only workflow plan entry.
+- `worker-dispatch`: Controller-side worker open/reply entry.
+- `worker-recovery`: Worker-first resume entry.
+- `worker-reply-main`: Worker -> main reporting entry.
+- `context-cleanup`: Session cleanup + index-first file re-anchoring.
+- `task-inspector`: Read-only task inspection.
+- `role-repo-manager`: Role source management.
+- `catalog-browser`: Read-only catalog browsing.
+- `project-bootstrap`: `init` / `setup` / `migrate` entry.
+- `rules-maintenance`: `rules sync` entry.
+- `skill-maintenance`: Skill cache maintenance.
+- `worker-inspector`: Read-only worker status.
+- `role-browser`: Read-only local role browsing.
 - `role-creator`: Interactively build new agent roles.
 - `brainstorming`: Validates ideas via dialogue before implementation.
+- `agent-team`: Legacy compatibility shell that now routes to the dedicated scenario skills.
+- `strategic-compact`: Deprecated compatibility shell redirected to `context-cleanup`.
 
 ---
 

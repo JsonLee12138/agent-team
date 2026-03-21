@@ -102,8 +102,24 @@ agent-team role-repo add JsonLee12138/agent-team
 - `pencil-designer`: Pencil UI 设计工具专家。
 
 ### 内置 Skills
+- `task-orchestrator`: 任务生命周期入口。
+- `workflow-orchestrator`: 治理型 workflow plan 入口。
+- `worker-dispatch`: controller 侧 worker 打开/回复入口。
+- `worker-recovery`: worker 恢复当前任务入口。
+- `worker-reply-main`: worker -> main 汇报入口。
+- `context-cleanup`: 会话清理 + 索引优先文件重锚。
+- `task-inspector`: 只读任务查看。
+- `role-repo-manager`: role 来源管理。
+- `catalog-browser`: 只读 catalog 浏览。
+- `project-bootstrap`: `init` / `setup` / `migrate` 入口。
+- `rules-maintenance`: `rules sync` 入口。
+- `skill-maintenance`: skill 缓存维护。
+- `worker-inspector`: 只读 worker 状态查看。
+- `role-browser`: 只读本地 role 浏览。
 - `role-creator`: 交互式构建新的智能体角色。
 - `brainstorming`: 在实现前通过对话验证想法。
+- `agent-team`: 已降级为兼容导航壳，负责把旧入口导向场景化 skills。
+- `strategic-compact`: 已废弃的兼容壳，统一迁移到 `context-cleanup`。
 
 ---
 

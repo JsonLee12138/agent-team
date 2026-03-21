@@ -112,8 +112,17 @@ func TestInitCmd_ProjectLevelInit(t *testing.T) {
 		if !strings.Contains(string(data), "AGENT_TEAM:START") {
 			t.Errorf("%s should contain AGENT_TEAM tag", name)
 		}
-		if !strings.Contains(string(data), ".agents/rules/project-commands.md") {
+		content := string(data)
+		if !strings.Contains(content, ".agents/rules/project-commands.md") {
 			t.Errorf("%s should reference project-commands.md", name)
+		}
+		if strings.Contains(content, "MUST call `/compact`") {
+			t.Errorf("%s should not require /compact", name)
+		}
+		for _, needle := range []string{"context-cleanup", "index-first recovery"} {
+			if !strings.Contains(content, needle) {
+				t.Errorf("%s should reference %s", name, needle)
+			}
 		}
 	}
 }

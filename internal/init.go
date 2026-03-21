@@ -609,7 +609,7 @@ Read the matching rule first:
 - ` + "`project-commands.md`" + `: before running any project command
 - ` + "`agent-team-commands.md`" + `: agent-team CLI boundaries, worker lifecycle commands
 - ` + "`merge-workflow.md`" + `: controller-side rebase, merge sequencing, generated file safety
-- ` + "`context-management.md`" + `: context pressure, handoff, provider switch, compact
+- ` + "`context-management.md`" + `: context cleanup, handoff, provider switch, index-first recovery
 - ` + "`worktree.md`" + `: worktree safety, branch limits, ignored paths
 
 If unsure, MUST open this index.
@@ -684,19 +684,28 @@ Apply this rule when preparing a worker branch for assignment, merge, or control
 
 ## Trigger
 
-Apply this rule whenever context grows, the task changes phase, or a provider session is degrading.
+Apply this rule whenever context grows, the task changes phase, or resumed work needs a recovery anchor.
 
-## Compact Triggers
+## Context-Cleanup Triggers
 
-1. MUST compact before starting a new logical phase after finishing the current one.
-2. MUST compact before reading or pasting large outputs, logs, or diffs that are not yet necessary.
-3. MUST compact when the active thread can no longer hold the task goal, constraints, and next actions clearly.
-4. MUST compact before handoff, provider switch, session restart, or resumed work after a long pause.
+1. MUST enter context cleanup before starting a new logical phase after finishing the current one.
+2. MUST enter context cleanup before reading or pasting large outputs, logs, replies, or diffs that may displace the current working context.
+3. MUST enter context cleanup when the active thread can no longer hold the task goal, constraints, and next actions clearly.
+4. MUST enter context cleanup before resumed work after a long pause, restart, handoff, or provider switch.
+
+## Required Recovery Model
+
+- Context cleanup resets session context; it MUST NOT rewrite, compress, or discard file artifacts.
+- Context cleanup is NOT a synonym for ` + "`/compact`" + `.
+- Controller/main MUST read ` + "`.agents/rules/index.md`" + ` first, then open only the matching rule files, then the current workflow/task artifacts.
+- Worker MUST read ` + "`worker.yaml`" + ` first, then ` + "`task.yaml`" + `, and only then read ` + "`context.md`" + ` or referenced materials when needed.
+- NEVER jump directly to rule bodies, ` + "`context.md`" + `, or other detail files before reading the required entry file.
+- NEVER default to scanning every context file; expand only what the index or current task explicitly requires.
 
 ## Provider Handling
 
-- Claude MUST use ` + "`/compact`" + ` when any trigger above fires.
-- Codex and Gemini MUST create a manual summary of goal, constraints, changed files, verification state, and next step.
+- Claude, Codex, Gemini, and other providers MUST follow the same context-cleanup and index-first recovery strategy.
+- Provider-specific prompt injections MUST point to this rule instead of requiring ` + "`/compact`" + `.
 `,
 	"worktree.md": `# Worktree Rules
 
@@ -811,8 +820,8 @@ func defaultProviderInstructions(root string) string {
 	var b strings.Builder
 	b.WriteString("# Claude Instructions\n\n")
 	b.WriteString("Use this file when working in Claude Code on this repository.\n\n")
-	b.WriteString("- MUST read `" + rulesRel + "/index.md` at task start and load the rule files required by the task.\n")
-	b.WriteString("- MUST call `/compact` whenever any trigger in `" + rulesRel + "/context-management.md` fires.\n")
+	b.WriteString("- MUST read `" + rulesRel + "/index.md` at task start and load only the rule files required by the task.\n")
+	b.WriteString("- MUST follow `" + rulesRel + "/context-management.md` for context-cleanup and index-first recovery whenever context drifts, phases change, or work resumes.\n")
 	b.WriteString("- MUST keep status updates concise.\n")
 	b.WriteString("- MUST obey `" + rulesRel + "/worktree.md` for branch and git safety.\n")
 	b.WriteString("- MUST read `" + rulesRel + "/project-commands.md` before running any project command.\n")
@@ -824,7 +833,7 @@ func defaultProviderInstructions(root string) string {
 	b.WriteString("- `" + rulesRel + "/project-commands.md` before running any project command\n")
 	b.WriteString("- `" + rulesRel + "/agent-team-commands.md` for agent-team CLI boundaries and worker lifecycle operations\n")
 	b.WriteString("- `" + rulesRel + "/merge-workflow.md` for controller-side rebase, merge ordering, and generated file safety\n")
-	b.WriteString("- `" + rulesRel + "/context-management.md` for `/compact` decisions, handoff summaries, and provider-specific context control\n")
+	b.WriteString("- `" + rulesRel + "/context-management.md` for context-cleanup triggers, session reset boundaries, and index-first file recovery\n")
 	b.WriteString("- `" + rulesRel + "/worktree.md` for branch safety, worktree limits, and ignored path handling\n")
 	return b.String()
 }

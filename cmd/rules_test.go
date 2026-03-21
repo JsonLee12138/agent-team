@@ -81,7 +81,16 @@ func TestRulesSyncRefreshesStaticRulesAndProjectCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read AGENTS.md: %v", err)
 	}
-	if !strings.Contains(string(agentData), ".agents/rules/project-commands.md") {
-		t.Fatalf("AGENTS.md should reference project-commands.md, got:\n%s", string(agentData))
+	contentAGENTS := string(agentData)
+	if !strings.Contains(contentAGENTS, ".agents/rules/project-commands.md") {
+		t.Fatalf("AGENTS.md should reference project-commands.md, got:\n%s", contentAGENTS)
+	}
+	if strings.Contains(contentAGENTS, "MUST call `/compact`") {
+		t.Fatalf("AGENTS.md should not require /compact, got:\n%s", contentAGENTS)
+	}
+	for _, needle := range []string{"context-cleanup", "index-first recovery"} {
+		if !strings.Contains(contentAGENTS, needle) {
+			t.Fatalf("AGENTS.md should reference %q, got:\n%s", needle, contentAGENTS)
+		}
 	}
 }

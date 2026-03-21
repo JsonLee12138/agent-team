@@ -111,6 +111,7 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(newReplyCmd())
 	rootCmd.AddCommand(newReplyMainCmd())
 	rootCmd.AddCommand(newCompactCmd())
+	rootCmd.AddCommand(newContextCleanupCmd())
 	rootCmd.AddCommand(newMigrateCmd())
 	rootCmd.AddCommand(newInjectRolePromptCmd())
 	rootCmd.AddCommand(newRecordMainPaneCmd())
