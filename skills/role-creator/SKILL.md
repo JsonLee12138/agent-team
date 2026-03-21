@@ -51,10 +51,12 @@ Target directory options:
 1. Run `find-skills` to get recommendation candidates.
 2. Show recommendation list and let user select desired skills.
 3. Ask for manual additions after selection.
-4. Merge selected + manual additions with de-duplication, then confirm final list.
-5. Final skills may be empty — will be persisted as `skills: []` in `references/role.yaml`; otherwise persist `skills[{name, description}]`.
+4. When confirming the final skill identifiers, prefer the full remote identifier if the skill is known from a remote source (for example `jsonlee12138/prompts@design-patterns-principles`).
+5. Only use a local short name (for example `design-patterns-principles`) when no matching remote skill is found and the skill exists only locally.
+6. Merge selected + manual additions with de-duplication, then confirm final list.
+7. Final skills may be empty — will be persisted as `skills: []` in `references/role.yaml`; otherwise persist `skills[{name, description}]` using the preferred identifier rule above.
 
-If `find-skills` is unavailable or returns empty, skip recommendations and ask for manual additions only.
+If `find-skills` is unavailable or returns empty, skip recommendations and ask for manual additions only. In that fallback path, still prefer a full remote identifier if the user already provides one; otherwise use a local short name only for local-only skills.
 
 ## Step 4: Execute CLI
 

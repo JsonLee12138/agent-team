@@ -206,7 +206,7 @@ func ResolveRole(root, roleName string) (*RoleMatch, error) {
 		}, nil
 	}
 
-	return nil, fmt.Errorf("role '%s' not found in .agent-team/teams/ or ~/.agents/roles/.\nCreate it first using the role-creator skill", roleName)
+	return nil, fmt.Errorf("role '%s' not found in .agent-team/teams/ or ~/.agents/roles/.\nTry searching and installing it first with:\n  agent-team role-repo find %s\nIf no matching role exists in role-repo, then create it using the role-creator skill.", roleName, roleName)
 }
 
 // SearchGlobalRoles searches global roles by exact name match and keyword matching.
