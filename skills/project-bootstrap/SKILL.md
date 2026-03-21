@@ -1,8 +1,8 @@
 ---
 name: project-bootstrap
 description: >
-  Project bootstrap and migration entry for initializing agent-team in a repository,
-  running setup flows, or migrating legacy project state.
+  Project bootstrap and migration entry for initializing agent-team in a repository
+  or migrating legacy project state.
 ---
 
 # project-bootstrap
@@ -15,13 +15,11 @@ description: >
 ## Triggers
 
 - init project
-- setup agent-team
 - migrate project
 
 ## CLI Binding
 
 - `agent-team init`
-- `agent-team setup`
 - `agent-team migrate`
 
 ## Required Entry

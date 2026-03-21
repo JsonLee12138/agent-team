@@ -18,7 +18,7 @@ Do not keep adding new behavior here. Prefer the dedicated first-level skills be
 - `task-orchestrator`: task lifecycle actions
 - `workflow-orchestrator`: workflow plan governance
 - `worker-dispatch`: open worker, reply to worker, targeted worker dispatch
-- `project-bootstrap`: `init`, `setup`, `migrate`
+- `project-bootstrap`: `init`, `migrate`
 - `rules-maintenance`: `rules sync`
 - `skill-maintenance`: `skill check/update/clean`
 - `role-repo-manager`: role source management

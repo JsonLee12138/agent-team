@@ -111,7 +111,7 @@ Available in `.agents/teams/`:
 - `task-inspector`: Read-only task inspection.
 - `role-repo-manager`: Role source management.
 - `catalog-browser`: Read-only catalog browsing.
-- `project-bootstrap`: `init` / `setup` / `migrate` entry.
+- `project-bootstrap`: `init` / `migrate` entry.
 - `rules-maintenance`: `rules sync` entry.
 - `skill-maintenance`: Skill cache maintenance.
 - `worker-inspector`: Read-only worker status.

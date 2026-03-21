@@ -10,7 +10,7 @@ import (
 	"github.com/JsonLee12138/agent-team/internal"
 )
 
-// --- 3B-3: init + setup command separation ---
+// --- init command coverage ---
 
 func stubInitProjectCommands(t *testing.T, content string) {
 	t.Helper()
@@ -45,27 +45,13 @@ func TestInitCmd_Exists(t *testing.T) {
 	}
 }
 
-func TestSetupCmd_Exists(t *testing.T) {
+func TestSetupCmd_NotRegistered(t *testing.T) {
 	root := NewRootCmd()
 	RegisterCommands(root)
 
 	cmd, _, err := root.Find([]string{"setup"})
-	if err != nil {
-		t.Fatalf("setup command not found: %v", err)
-	}
-	if cmd.Use != "setup" {
-		t.Errorf("Use = %q, want 'setup'", cmd.Use)
-	}
-}
-
-func TestSetupCmd_HasSkipDetectFlag(t *testing.T) {
-	root := NewRootCmd()
-	RegisterCommands(root)
-
-	cmd, _, _ := root.Find([]string{"setup"})
-	flag := cmd.Flags().Lookup("skip-detect")
-	if flag == nil {
-		t.Error("setup should have --skip-detect flag")
+	if err == nil {
+		t.Fatalf("expected setup to be removed, got command %q", cmd.CommandPath())
 	}
 }
 
@@ -206,19 +192,3 @@ func TestInitCmd_DoesNotSkipGitCheck(t *testing.T) {
 	}
 }
 
-func TestSetupCmd_SkipsGitCheck(t *testing.T) {
-	root := NewRootCmd()
-	RegisterCommands(root)
-
-	dir := t.TempDir()
-	origWd, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origWd)
-
-	// setup should not fail due to missing git repo
-	root.SetArgs([]string{"setup", "--skip-detect"})
-	// May fail for other reasons (no plugin root), but not for git
-	err := root.Execute()
-	// We just check it doesn't panic and runs past git check
-	_ = err
-}

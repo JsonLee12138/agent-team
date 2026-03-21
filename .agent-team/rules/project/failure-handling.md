@@ -8,7 +8,7 @@
 - Action: run `agent-team init` (or `go run . init`) from repo root.
 - Non-interactive behavior: with `AGENT_TEAM_NONINTERACTIVE=1`, the command fails instead of prompting.
 
-`init` and `setup` are explicitly exempt from this pre-check.
+`init` is explicitly exempt from this pre-check.
 
 ## Rules Sync Preconditions
 

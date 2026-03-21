@@ -21,7 +21,6 @@ This repository's CLI entrypoint is the module root (`go.mod` at repository root
 
 - `go run . --help`
 - `go run . init`
-- `go run . setup`
 - `go run . rules sync`
 - `go run . rules validate`
 - `go run . role ...`

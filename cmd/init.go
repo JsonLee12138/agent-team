@@ -22,8 +22,7 @@ It writes the fixed rules entry/core files, regenerates AI-based project rule fi
 Built-in entry/core rule files are created if missing. Project rules are regenerated on each run.
 Provider files only update the tagged section.
 
-For global environment setup (provider detection, plugin role installation),
-use 'agent-team setup' instead.`,
+For project-level setup and rule generation, run this command from the repository root.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runInit()
@@ -81,12 +80,10 @@ func runInit() error {
 	}
 	fmt.Println("✓ Rules validation passed")
 
-	// Step 5: Hint about setup if plugin roles might be needed
 	fmt.Println()
 	fmt.Println("Next steps:")
-	fmt.Println("  1. Run 'agent-team setup' to detect providers and install bundled roles")
-	fmt.Println("  2. Create roles:   agent-team role-repo find <query>")
-	fmt.Println("  3. Create workers: agent-team worker create <role>")
+	fmt.Println("  1. Create roles:   agent-team role-repo find <query>")
+	fmt.Println("  2. Create workers: agent-team worker create <role>")
 
 	return nil
 }

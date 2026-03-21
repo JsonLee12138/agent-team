@@ -111,7 +111,7 @@ agent-team role-repo add JsonLee12138/agent-team
 - `task-inspector`: 只读任务查看。
 - `role-repo-manager`: role 来源管理。
 - `catalog-browser`: 只读 catalog 浏览。
-- `project-bootstrap`: `init` / `setup` / `migrate` 入口。
+- `project-bootstrap`: `init` / `migrate` 入口。
 - `rules-maintenance`: `rules sync` 入口。
 - `skill-maintenance`: skill 缓存维护。
 - `worker-inspector`: 只读 worker 状态查看。

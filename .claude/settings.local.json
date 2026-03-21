@@ -127,7 +127,10 @@
       "Bash(open:*)",
       "Bash(status=$?)",
       "Read(//tmp/**)",
-      "Bash(exit $status)"
+      "Bash(exit $status)",
+      "Bash(\"/Users/jsonlee/Projects/agent-team/output/agent-team\" --help)",
+      "Bash(\"/Users/jsonlee/Projects/agent-team/output/agent-team\" setup:*)",
+      "Bash(\"/Users/jsonlee/Projects/agent-team/output/agent-team\" init:*)"
     ]
   },
   "hooks": {
