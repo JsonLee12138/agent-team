@@ -2,7 +2,7 @@
 name: role-creator
 description: >
   Create or update role-specific skill packages with deterministic files.
-  Supports output to skills/ (open-source publishing) or .agents/teams/ (team use).
+  Supports output to skills/ (open-source publishing) or .agent-team/teams/ (team use).
   Triggers: 创建角色, 新建 role, create role, 更新 role scope, edit role, update role,
   add role skill, 修改角色配置.
   Use when the user asks to create, update, or edit frontend/backend/product (or custom) role
@@ -18,7 +18,8 @@ Generate a role skill package in a fixed contract:
 
 Target directory options:
 - `skills/<role-name>/` — for open-source publishing (default)
-- `.agents/teams/<role-name>/` — for team use with agent-team
+- `.agent-team/teams/<role-name>/` — for team use with agent-team
+- `<custom-path>/<role-name>/` — for custom local output paths
 
 ## Required Workflow
 
@@ -30,7 +31,7 @@ Target directory options:
 
 ## Step 1: Normalize Input
 
-- `role-name` must be kebab-case (default: `frontend-dev` when not provided).
+- `role-name` must be kebab-case. The current CLI requires it as a positional argument.
 - If the input is not kebab-case, suggest a normalized version and confirm with user.
 
 ## Step 2: Generate Role Fields
@@ -42,8 +43,8 @@ Target directory options:
    - `out-of-scope` (comma-separated)
 2. Present generated fields for user approval.
 3. If user rejects, or AI confidence is low (ambiguous scope, conflicting boundaries, vague goals), delegate to `/brainstorming` skill for structured refinement.
-4. After fields are approved, ask user for target directory (`skills` or `.agents/teams`).
-5. If target is `.agents/teams` and the role already exists in global `~/.claude/skills/`, ask if user wants to copy from there instead of generating.
+4. After fields are approved, ask user for target directory (`skills`, `.agent-team/teams`, or a custom path).
+5. If target is `skills` or `.agent-team/teams`, note that the CLI checks matching global roles in `~/.agents/roles/` unless `--force` is passed. If matches are found, the CLI prompts whether to continue creating the local role.
 
 ## Step 3: Select Skills
 
@@ -71,7 +72,7 @@ If `find-skills` is unavailable or returns empty, skip recommendations and ask f
 | `--add-skills` | string | no | `""` | Skills to add on top of selection |
 | `--remove-skills` | string | no | `""` | Skills to remove from candidate list |
 | `--manual-skills` | string | no | `""` | Manual fallback when recommendations unavailable |
-| `--target-dir` | string | no | `skills` | Target: `skills`, `.agents/teams`, or custom path |
+| `--target-dir` | string | no | `skills` | Target: `skills`, `.agent-team/teams`, or custom path |
 | `--overwrite` | string | no | `ask` | Overwrite mode: `ask`/`yes`/`no` |
 | `--repo-root` | string | no | `.` | Repository root path |
 | `--force` | bool | no | `false` | Skip global duplicate check |
@@ -95,7 +96,7 @@ For team use (agent-team integration):
 
 ```bash
 agent-team role create frontend-dev \
-  --target-dir .agents/teams \
+  --target-dir .agent-team/teams \
   --description "Frontend role for UI implementation" \
   --system-goal "Ship accessible and maintainable UI work" \
   --in-scope "Build components,Improve accessibility" \
@@ -115,7 +116,7 @@ agent-team role create product-manager \
 
 Verify three files against actual template structure:
 
-1. **`SKILL.md`** — contains role name, description, and trigger keywords derived from in-scope items.
+1. **`SKILL.md`** — contains the role name, generated description frontmatter, and links to `references/role.yaml` and `system.md`.
 2. **`references/role.yaml`** — must contain:
    - `name` — role name
    - `description` — role description
@@ -126,21 +127,22 @@ Verify three files against actual template structure:
    - `skills` — selected skills as objects with `name` and `description` (or empty `[]`)
 3. **`system.md`** — contains system goal and operating constraints.
 
-If any file is missing or contains unexpected content, report the discrepancy and offer to regenerate.
+If any file is missing or contains unexpected content relative to the current templates, report the discrepancy and offer to regenerate.
 
 ## Overwrite Behavior
 
 - Controlled by `--overwrite` flag (`ask`/`yes`/`no`).
-- On overwrite, backup is created at `<parent>/.backup/<role-name>-<timestamp>/`.
-- Only managed files are overwritten (`SKILL.md`, `references/role.yaml`, `system.md`).
+- Current CLI does not create a backup directory when overwriting.
+- Only managed files are overwritten (`SKILL.md`, `references/role.yaml`, `system.md`); other files in the role directory are preserved.
+- Legacy root-level `role.yaml` is removed if present after generation.
 
 ## Runtime Skill Discovery (Role Usage Guideline)
 
 Generated roles should follow this behavior at runtime:
 
 1. When a role receives a task that requires a skill not listed in its `references/role.yaml`, it should invoke `find-skills` to search for a matching skill.
-2. If a suitable skill is found, it may only attempt project-level installation.
+2. If a suitable skill is found, it may only attempt project-level installation or use an already available local/project-cached skill.
 3. Global installation is not allowed for worker/runtime resolution.
-4. If project-level installation fails, emit a warning with the reason and suggested next step, then continue with best-effort execution.
+4. If the skill is still unavailable locally, emit a warning with the reason and suggested next step, then continue with best-effort execution.
 5. After successful use, suggest adding the skill to the role's `references/role.yaml` for future sessions by regenerating the role.
 6. If `find-skills` is unavailable or returns no match, the role should notify the user and proceed with best-effort execution.

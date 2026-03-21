@@ -32,7 +32,7 @@ You MUST complete these items in order:
 4. Present design sections: architecture, components, data flow, error handling, testing; get user approval section by section.
 5. When the topic is planning-oriented, explicitly ask which target object the brainstorming is for: `roadmap`, `milestone`, `phase`, `task`, or `generic topic`.
 6. When relevant, ask whether the brainstorming should build on an existing object or reference set (for example an existing roadmap, milestone, phase, or multiple task/phase refs).
-7. Write brainstorming doc: ask for save location choice (default / custom / skip saving) before writing.
+7. Write brainstorming doc: ask for save location choice before writing. In planning-layer scenarios, distinguish between default brainstorming directory, target-object directory, custom directory, and skip saving.
 8. Stop after delivering the brainstorming doc: do not transition to implementation planning.
 
 ## Process Flow
@@ -65,17 +65,35 @@ Do NOT invoke writing-plans or any implementation skill afterward.
 
 ## Save Location Rule (Required)
 
-Before any file write, always ask the user to choose:
+Before any file write, always ask the user to choose where the brainstorming doc should live.
+
+### Standard choices
 1. Default directory: `docs/brainstorming/`
 2. Custom directory: user-provided path
 3. Skip saving: do not write any file
 
-If the brainstorming target is `roadmap`, `milestone`, or `phase`, also offer saving into the target object's directory when the user explicitly wants the doc colocated with that object.
+### Extra choice for planning-layer targets
+If the brainstorming target is `roadmap`, `milestone`, or `phase`, also offer:
+4. Target object directory: save the brainstorming doc next to the target object's primary file when the user explicitly wants the doc colocated with that object.
 
-If the user chooses default, use:
-- `docs/brainstorming/YYYY-MM-DD-<topic>-brainstorming.md`
+### Decision rule
+- If the user has not asked for colocated storage, prefer `docs/brainstorming/` as the default.
+- Only use the target object directory when the user explicitly wants the brainstorming doc attached to that roadmap/milestone/phase.
+- Only use a custom directory when the user explicitly provides one.
+- If the user chooses skip saving, do not write any file.
 
-If the user chooses custom, write to the exact directory they provide with the same filename pattern.
+### Filename rule
+If the user chooses default, custom, or target object directory, use:
+- `<topic>-YYYY-MM-DD-brainstorming.md`
+
+For the default directory, the full path becomes:
+- `docs/brainstorming/<topic>-YYYY-MM-DD-brainstorming.md`
+
+For a target object directory, keep the same filename pattern and place it in that object's directory.
+
+Place the topic first so related brainstorming docs group together more naturally during directory browsing, with the date still preserved for chronology.
+
+For a custom directory, write to the exact directory the user provides with the same filename pattern.
 
 If the user chooses skip saving, do not write any file — output the doc content inline in the chat only.
 
@@ -113,5 +131,5 @@ Do not include implementation code.
 
 Only finish when:
 1. The user has approved the design.
-2. The user has chosen default, custom, or skip saving for the doc.
-3. The brainstorming doc has been written to file (default/custom) or output inline (skip saving), and shared.
+2. The user has chosen one of the allowed save destinations for the doc (`docs/brainstorming/`, target object directory when applicable, custom directory, or skip saving).
+3. The brainstorming doc has been written to file (default/target-object/custom) or output inline (skip saving), and shared.
