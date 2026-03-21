@@ -12,6 +12,8 @@ Use this skill as a single-user workflow. Do not introduce worker, task assignme
 - Read the request, relevant code, and constraints before implementing.
 - Define what counts as done before writing production code.
 - Prefer a red phase when the task supports automated tests.
+- Do not default to E2E. Use E2E only when explicitly requested, already required by the task contract, or when lower-cost verification cannot cover the acceptance risk.
+- If the task needs test-case design, regression planning, acceptance coverage, or broader QA execution, invoke `qa-expert` instead of expanding this skill into a full QA workflow.
 - If automated tests are not appropriate, define manual verification before implementing.
 - Do not treat the work as complete until verification finishes.
 - If verification is skipped, state the reason and residual risk explicitly.
@@ -82,6 +84,10 @@ Use the strongest available verification path in this order:
 2. New automated tests added for the change
 3. Repeatable manual verification with concrete steps and expected results
 4. `skipped` only when verification is blocked in the current environment
+
+E2E is not the default verification path. Prefer lower-cost checks first unless E2E is explicitly required or the acceptance risk cannot be covered otherwise.
+
+If the task needs dedicated test-case design, regression execution, or broader QA coverage during verification, invoke `qa-expert`.
 
 If verification fails, return to implementation and fix the issue before concluding.
 
