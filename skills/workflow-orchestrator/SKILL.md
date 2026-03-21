@@ -28,7 +28,7 @@ description: >
 
 ## Required Entry
 
-- MUST read `.agents/rules/index.md` first.
+- MUST read `.agent-team/rules/index.md` first.
 
 ## Expansion
 

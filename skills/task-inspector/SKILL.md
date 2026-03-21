@@ -27,7 +27,7 @@ description: >
 
 ## Required Entry
 
-- controller/human: MUST read `.agents/rules/index.md` first.
+- controller/human: MUST read `.agent-team/rules/index.md` first.
 - worker: MUST read `worker.yaml` first.
 
 ## Expansion

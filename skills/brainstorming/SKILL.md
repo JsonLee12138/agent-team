@@ -1,6 +1,6 @@
 ---
 name: brainstorming
-description: "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Turn rough ideas into validated brainstorming/design docs through one-question-at-a-time dialogue, role-based analysis, and explicit user approval. Use when users ask to brainstorm, shape requirements, compare approaches, or produce a planning/design document before implementation."
+description: "Use when users explicitly ask to brainstorm, shape requirements, compare approaches, or produce a planning/design document before implementation. Turn rough ideas into validated brainstorming/design docs through focused dialogue, role-based analysis, and explicit user approval. Do not trigger this skill for straightforward implementation requests that do not need dedicated design exploration."
 ---
 
 # Brainstorming Ideas Into Designs
@@ -17,23 +17,35 @@ Always support role-based brainstorming:
 Do NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until you have presented the design and the user has approved it.
 </HARD-GATE>
 
-## Anti-Pattern: "This Is Too Simple To Need Design"
+## Scope Rule
 
-Every project must follow this process, even for small changes.
-The design can be short for simple ideas, but it still must be presented and approved.
+Use this process when the user wants dedicated design exploration, option comparison, or requirement shaping before implementation.
+
+For straightforward implementation requests, small fixes, or clearly specified changes, do not force this full brainstorming flow.
+When lightweight design help is enough, keep the output short and ask only the minimum questions needed to remove ambiguity.
 
 ## Checklist
 
-You MUST complete these items in order:
+Choose the lightest checklist that fits the request.
 
-1. Explore project context: inspect files, docs, and recent commits.
-2. Ask clarifying questions: one question per message.
-3. Propose 2-3 approaches: include trade-offs and recommendation.
-4. Present design sections: architecture, components, data flow, error handling, testing; get user approval section by section.
+### Standard flow
+
+1. Explore project context: inspect only the files, docs, and recent changes needed for the topic.
+2. Ask clarifying questions: prefer one focused question at a time when ambiguity remains.
+3. Propose 2-3 approaches when trade-offs matter; include a recommendation.
+4. Present the design in concise sections covering only the dimensions that matter for the request.
 5. When the topic is planning-oriented, explicitly ask which target object the brainstorming is for: `roadmap`, `milestone`, `phase`, `task`, or `generic topic`.
-6. When relevant, ask whether the brainstorming should build on an existing object or reference set (for example an existing roadmap, milestone, phase, or multiple task/phase refs).
-7. Write brainstorming doc: ask for save location choice before writing. In planning-layer scenarios, distinguish between default brainstorming directory, target-object directory, custom directory, and skip saving.
-8. Stop after delivering the brainstorming doc: do not transition to implementation planning.
+6. When relevant, ask whether the brainstorming should build on an existing object or reference set.
+7. If the user wants a saved artifact, ask for save location choice before writing.
+8. Stop after delivering the brainstorming output unless the user explicitly asks to continue.
+
+### Lightweight flow
+
+Use this lighter path for narrow requirement shaping:
+1. Confirm the goal and key constraint.
+2. Present the recommended approach first.
+3. Mention alternatives only if they materially change scope, risk, or cost.
+4. Deliver the result inline unless the user asks to save it.
 
 ## Process Flow
 
@@ -61,7 +73,7 @@ digraph brainstorming {
 ```
 
 Terminal state is `Deliver doc and stop`.
-Do NOT invoke writing-plans or any implementation skill afterward.
+Do not continue into implementation planning or implementation unless the user explicitly asks for the next step.
 
 ## Save Location Rule (Required)
 
@@ -106,10 +118,11 @@ If the user chooses skip saving, do not write any file — output the doc conten
 
 ## Design Presentation Rules
 
-- Present 2-3 approaches before finalizing.
+- Present 2-3 approaches before finalizing only when meaningful trade-offs exist.
 - Lead with the recommended option and explain why.
 - Keep each section concise for simple tasks and detailed for complex tasks.
-- Ask for approval after each section.
+- For lightweight brainstorming, ask for a single overall approval instead of section-by-section approval.
+- Use section-by-section approval only when the design is large, risky, or materially ambiguous.
 
 ## Doc Content Guidelines
 

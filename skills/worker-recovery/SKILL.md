@@ -33,5 +33,5 @@ description: >
 ## Boundary
 
 - This is the standard worker recovery path.
-- Do not use controller assumptions or `.agents/rules/index.md` as the first entry here.
+- Do not use controller assumptions or `.agent-team/rules/index.md` as the first entry here.
 - Do not use this skill for worker -> main reporting; that belongs to `worker-reply-main`.
