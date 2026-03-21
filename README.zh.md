@@ -157,6 +157,14 @@ agent-team role-repo add JsonLee12138/agent-team
 - `agent-team reply <id> "<msg>"`: 向 worker 发送消息。
 - `agent-team reply-main "<msg>"`: Worker 向主控回传消息。
 
+### 任务工件
+每个 task 包现在固定包含 `.agent-team/task/<task-id>/` 下的三个标准工件：
+- `task.yaml`：生命周期元数据与状态。
+- `context.md`：背景、范围、约束与设计输入。
+- `verification.md`：验收合同、测试范围边界、实际检查记录与最终验收结果。
+
+执行 `agent-team task create` 时会自动生成 `verification.md`。默认模板保留 `E2E Required: no`、`Verified By: qa` 和 `pending` 结果，便于后续由 QA 或人工补全验收记录。
+
 </details>
 
 <details>
@@ -164,6 +172,7 @@ agent-team role-repo add JsonLee12138/agent-team
 
 ```
 项目根目录/
+├── .agent-team/task/     <- Task 包（`task.yaml`、`context.md`、`verification.md`）
 ├── .agents/teams/        <- 项目专属角色
 ├── .worktrees/           <- 隔离的 worker 工作区
 ├── roles-lock.json       <- 远程角色版本锁

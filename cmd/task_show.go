@@ -28,12 +28,18 @@ func (a *App) RunTaskShow(taskID string) error {
 		return err
 	}
 	contextPath := internal.TaskContextPath(root, taskID)
+	verificationPath := internal.TaskVerificationPath(root, taskID)
 	if archived {
 		contextPath = internal.TaskArchiveContextPath(root, taskID)
+		verificationPath = internal.TaskArchiveVerificationPath(root, taskID)
 	}
 	contextData, err := os.ReadFile(contextPath)
 	if err != nil {
 		return fmt.Errorf("read context.md: %w", err)
+	}
+	verificationData, err := os.ReadFile(verificationPath)
+	if err != nil {
+		return fmt.Errorf("read verification.md: %w", err)
 	}
 
 	fmt.Printf("Task: %s\n", record.TaskID)
@@ -58,5 +64,6 @@ func (a *App) RunTaskShow(taskID string) error {
 		fmt.Printf("Merged SHA: %s\n", record.MergedSHA)
 	}
 	fmt.Printf("\n%s\n", strings.TrimSpace(string(contextData)))
+	fmt.Printf("\n\n%s\n", strings.TrimSpace(string(verificationData)))
 	return nil
 }

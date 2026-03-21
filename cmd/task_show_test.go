@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -13,7 +14,12 @@ func TestRunTaskShowLoadsTaskRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateTaskPackage: %v", err)
 	}
-	if err := app.RunTaskShow(record.TaskID); err != nil {
-		t.Fatalf("RunTaskShow: %v", err)
+	out := captureStdout(t, func() {
+		if err := app.RunTaskShow(record.TaskID); err != nil {
+			t.Fatalf("RunTaskShow: %v", err)
+		}
+	})
+	if !strings.Contains(out, "# Verification") {
+		t.Fatalf("output should include verification.md, got:\n%s", out)
 	}
 }

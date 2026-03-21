@@ -60,11 +60,11 @@ func (a *App) runControllerContextCleanupForWorker(workerID string) error {
 	fmt.Printf("2. Read %s first.\n", internal.WorkerConfigWritePath(a.Git.Root(), a.WtBase, workerID))
 	if strings.TrimSpace(cfg.TaskID) != "" {
 		fmt.Printf("3. Then read %s.\n", internal.TaskYAMLPath(a.Git.Root(), cfg.TaskID))
-		fmt.Printf("4. Read %s only if needed after task.yaml.\n", internal.TaskContextPath(a.Git.Root(), cfg.TaskID))
+		fmt.Printf("4. Read %s and %s only if needed after task.yaml.\n", internal.TaskContextPath(a.Git.Root(), cfg.TaskID), internal.TaskVerificationPath(a.Git.Root(), cfg.TaskID))
 	} else if strings.TrimSpace(cfg.TaskPath) != "" {
 		taskPath := filepath.Join(a.Git.Root(), filepath.FromSlash(cfg.TaskPath))
 		fmt.Printf("3. Then read %s/task.yaml if it exists.\n", taskPath)
-		fmt.Printf("4. Read %s/context.md only if needed after task.yaml.\n", taskPath)
+		fmt.Printf("4. Read %s/context.md and %s/verification.md only if needed after task.yaml.\n", taskPath, taskPath)
 	} else {
 		fmt.Printf("3. No task is currently bound; stop after worker.yaml unless a new assignment names more files.\n")
 	}
@@ -88,11 +88,11 @@ func (a *App) runWorkerContextCleanup(worktreeRoot string) error {
 	fmt.Printf("2. Read %s first.\n", internal.WorkerYAMLPath(worktreeRoot))
 	if strings.TrimSpace(cfg.TaskID) != "" {
 		fmt.Printf("3. Then read %s.\n", internal.TaskYAMLPath(projectRoot, cfg.TaskID))
-		fmt.Printf("4. Read %s only if needed after task.yaml.\n", internal.TaskContextPath(projectRoot, cfg.TaskID))
+		fmt.Printf("4. Read %s and %s only if needed after task.yaml.\n", internal.TaskContextPath(projectRoot, cfg.TaskID), internal.TaskVerificationPath(projectRoot, cfg.TaskID))
 	} else if strings.TrimSpace(cfg.TaskPath) != "" {
 		taskPath := filepath.Join(projectRoot, filepath.FromSlash(cfg.TaskPath))
 		fmt.Printf("3. Then read %s/task.yaml if it exists.\n", taskPath)
-		fmt.Printf("4. Read %s/context.md only if needed after task.yaml.\n", taskPath)
+		fmt.Printf("4. Read %s/context.md and %s/verification.md only if needed after task.yaml.\n", taskPath, taskPath)
 	} else {
 		fmt.Printf("3. No task is currently bound; stop after worker.yaml unless the controller names more files.\n")
 	}

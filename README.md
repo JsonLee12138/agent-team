@@ -157,6 +157,14 @@ Available in `.agents/teams/`:
 - `agent-team reply <id> "<msg>"`: Send message to worker.
 - `agent-team reply-main "<msg>"`: Worker talks back to main.
 
+### Task Artifacts
+Every task package now contains three standard artifacts under `.agent-team/task/<task-id>/`:
+- `task.yaml`: lifecycle metadata and status.
+- `context.md`: background, scope, constraints, and design input.
+- `verification.md`: acceptance contract, test scope boundary, performed checks, and final verification result.
+
+`verification.md` is created automatically with `agent-team task create`. Its default template keeps `E2E Required: no`, `Verified By: qa`, and a pending result so QA or human acceptance can complete the record later.
+
 </details>
 
 <details>
@@ -164,6 +172,7 @@ Available in `.agents/teams/`:
 
 ```
 project-root/
+├── .agent-team/task/     <- Task packages (`task.yaml`, `context.md`, `verification.md`)
 ├── .agents/teams/        <- Project-specific roles
 ├── .worktrees/           <- Isolated worker workspaces
 ├── roles-lock.json       <- Remote role version locking

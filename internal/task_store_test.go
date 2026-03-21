@@ -29,6 +29,15 @@ func TestCreateTaskPackage(t *testing.T) {
 	if !strings.Contains(string(data), "## Design") {
 		t.Fatalf("context missing design section: %s", string(data))
 	}
+	verificationData, err := os.ReadFile(TaskVerificationPath(root, record.TaskID))
+	if err != nil {
+		t.Fatalf("ReadFile verification: %v", err)
+	}
+	for _, needle := range []string{"## Acceptance Criteria", "E2E Required: no", "## Result", "- pending", "## Verified By", "- qa"} {
+		if !strings.Contains(string(verificationData), needle) {
+			t.Fatalf("verification missing %q: %s", needle, string(verificationData))
+		}
+	}
 }
 
 func TestListTasksActiveOnly(t *testing.T) {

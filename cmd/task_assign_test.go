@@ -54,6 +54,9 @@ func TestRunTaskAssignCreatesWorkerAndSendsLightReminder(t *testing.T) {
 	if !strings.Contains(reminder, "Read worker.yaml first") {
 		t.Fatalf("reminder = %q", reminder)
 	}
+	if !strings.Contains(reminder, "verification.md") {
+		t.Fatalf("reminder should mention verification.md: %q", reminder)
+	}
 	if strings.Contains(reminder, record.Title) {
 		t.Fatalf("reminder should not contain task body/title: %q", reminder)
 	}

@@ -38,6 +38,9 @@ func TestRunTaskArchiveMovesTaskAndCleansWorker(t *testing.T) {
 	if _, err := os.Stat(internal.TaskArchiveDir(dir, record.TaskID)); err != nil {
 		t.Fatalf("archived task missing: %v", err)
 	}
+	if _, err := os.Stat(internal.TaskArchiveVerificationPath(dir, record.TaskID)); err != nil {
+		t.Fatalf("archived verification missing: %v", err)
+	}
 	if _, err := os.Stat(wtPath); !os.IsNotExist(err) {
 		t.Fatalf("worktree should be removed, err=%v", err)
 	}

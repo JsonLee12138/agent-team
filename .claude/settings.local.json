@@ -130,7 +130,8 @@
       "Bash(exit $status)",
       "Bash(\"/Users/jsonlee/Projects/agent-team/output/agent-team\" --help)",
       "Bash(\"/Users/jsonlee/Projects/agent-team/output/agent-team\" setup:*)",
-      "Bash(\"/Users/jsonlee/Projects/agent-team/output/agent-team\" init:*)"
+      "Bash(\"/Users/jsonlee/Projects/agent-team/output/agent-team\" init:*)",
+      "Bash(make:*)"
     ]
   },
   "hooks": {

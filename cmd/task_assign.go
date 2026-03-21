@@ -124,7 +124,7 @@ func (a *App) RunTaskAssign(taskID, requestedWorkerID, provider, model string, n
 	}
 
 	if cfg.PaneID != "" {
-		msg := fmt.Sprintf("[Task Assigned] Read worker.yaml first, then open %s/task.yaml and %s/context.md. Do not rely on this message for task details.", record.TaskPath, record.TaskPath)
+		msg := fmt.Sprintf("[Task Assigned] Read worker.yaml first, then open %s/task.yaml. Read %s/context.md and %s/verification.md only as needed after task.yaml. Do not rely on this message for task details.", record.TaskPath, record.TaskPath, record.TaskPath)
 		a.Session.PaneSend(cfg.PaneID, msg)
 	}
 

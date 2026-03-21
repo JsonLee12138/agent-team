@@ -86,6 +86,9 @@ func TestRunContextCleanupWorkerUsesWorkerAndTaskArtifacts(t *testing.T) {
 	if !strings.Contains(out, internal.TaskContextPath(dir, record.TaskID)) {
 		t.Fatalf("output should mention context.md as needed, got:\n%s", out)
 	}
+	if !strings.Contains(out, internal.TaskVerificationPath(dir, record.TaskID)) {
+		t.Fatalf("output should mention verification.md as needed, got:\n%s", out)
+	}
 	if !strings.Contains(out, "not context compression") {
 		t.Fatalf("output should state non-compression semantics, got:\n%s", out)
 	}
@@ -121,6 +124,9 @@ func TestRunContextCleanupFromControllerForWorkerUsesBoundWorker(t *testing.T) {
 	}
 	if !strings.Contains(out, internal.TaskYAMLPath(dir, record.TaskID)) {
 		t.Fatalf("output should mention task yaml path, got:\n%s", out)
+	}
+	if !strings.Contains(out, internal.TaskVerificationPath(dir, record.TaskID)) {
+		t.Fatalf("output should mention verification path, got:\n%s", out)
 	}
 }
 

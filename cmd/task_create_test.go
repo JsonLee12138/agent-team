@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/JsonLee12138/agent-team/internal"
 )
 
 func TestRunTaskCreateCreatesTaskPackage(t *testing.T) {
@@ -24,5 +26,9 @@ func TestRunTaskCreateCreatesTaskPackage(t *testing.T) {
 	}
 	if len(entries) != 1 {
 		t.Fatalf("entries = %d, want 1", len(entries))
+	}
+	taskID := entries[0].Name()
+	if _, err := os.Stat(internal.TaskVerificationPath(dir, taskID)); err != nil {
+		t.Fatalf("verification.md should exist: %v", err)
 	}
 }

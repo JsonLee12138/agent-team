@@ -41,12 +41,20 @@ func TaskContextPath(root, taskID string) string {
 	return filepath.Join(TaskDir(root, taskID), "context.md")
 }
 
+func TaskVerificationPath(root, taskID string) string {
+	return filepath.Join(TaskDir(root, taskID), "verification.md")
+}
+
 func TaskArchiveYAMLPath(root, taskID string) string {
 	return filepath.Join(TaskArchiveDir(root, taskID), "task.yaml")
 }
 
 func TaskArchiveContextPath(root, taskID string) string {
 	return filepath.Join(TaskArchiveDir(root, taskID), "context.md")
+}
+
+func TaskArchiveVerificationPath(root, taskID string) string {
+	return filepath.Join(TaskArchiveDir(root, taskID), "verification.md")
 }
 
 func TaskRelPath(taskID string) string {
@@ -79,8 +87,11 @@ func CreateTaskPackage(root, title, role, design string, now time.Time) (*TaskRe
 	if err := saveTaskRecordAt(taskDir, record); err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(filepath.Join(taskDir, "context.md"), []byte(defaultTaskContext(record, design)), 0644); err != nil {
+	if err := os.WriteFile(TaskContextPath(root, taskID), []byte(defaultTaskContext(record, design)), 0644); err != nil {
 		return nil, fmt.Errorf("write context.md: %w", err)
+	}
+	if err := os.WriteFile(TaskVerificationPath(root, taskID), []byte(defaultTaskVerification()), 0644); err != nil {
+		return nil, fmt.Errorf("write verification.md: %w", err)
 	}
 	return record, nil
 }
@@ -278,6 +289,10 @@ func defaultTaskContext(record *TaskRecord, design string) string {
 		design = "- None provided yet."
 	}
 	return fmt.Sprintf("# Task Context\n\n- Task ID: `%s`\n- Title: %s\n- Role: `%s`\n\n## Background\n\n- TODO\n\n## Scope\n\n- TODO\n\n## Acceptance\n\n- TODO\n\n## Constraints\n\n- Follow the approved workflow and repository rules.\n- Keep the task scoped to this assignment.\n\n## Design\n\n%s\n", record.TaskID, record.Title, record.Role, strings.TrimSpace(design))
+}
+
+func defaultTaskVerification() string {
+	return "# Verification\n\n## Acceptance Criteria\n- TODO\n\n## Test Scope\n- Unit Test Coverage Required: yes\n- E2E Required: no\n\n## Checks Performed\n- Not run yet.\n\n## Result\n- pending\n\n## Issues\n- None.\n\n## Verified By\n- qa\n\n## Verified At\n- TODO\n"
 }
 
 // Legacy .tasks helpers are kept for read-only compatibility during migration.
