@@ -91,9 +91,6 @@ func TestRulesSyncRefreshesStaticRulesAndProjectCommands(t *testing.T) {
 	if !strings.Contains(contentAGENTS, ".agent-team/rules/project/") {
 		t.Fatalf("AGENTS.md should reference .agent-team/rules/project/, got:\n%s", contentAGENTS)
 	}
-	if strings.Contains(contentAGENTS, "MUST call `/compact`") {
-		t.Fatalf("AGENTS.md should not require /compact, got:\n%s", contentAGENTS)
-	}
 	for _, needle := range []string{"context-cleanup", "index-first recovery"} {
 		if !strings.Contains(contentAGENTS, needle) {
 			t.Fatalf("AGENTS.md should reference %q, got:\n%s", needle, contentAGENTS)

@@ -355,17 +355,6 @@ func InitClaudeLocalSettings(root string) error {
 		return fmt.Errorf("read %s: %w", settingsPath, err)
 	}
 
-	hook := ClaudeHook{
-		Name:    "record-main-pane",
-		Type:    "command",
-		Command: "./scripts/session-start-record-main-pane.sh",
-		Timeout: 10000,
-	}
-	matcher := ClaudeHookMatcher{
-		Matcher: "*",
-		Hooks:   []ClaudeHook{hook},
-	}
-
 	var hooks map[string][]ClaudeHookMatcher
 	if raw, ok := cfg["hooks"]; ok && len(raw) > 0 {
 		if err := json.Unmarshal(raw, &hooks); err != nil {
@@ -375,13 +364,20 @@ func InitClaudeLocalSettings(root string) error {
 	if hooks == nil {
 		hooks = map[string][]ClaudeHookMatcher{}
 	}
-	hooks["SessionStart"] = upsertSessionStartMatcher(hooks["SessionStart"], matcher)
-
-	hooksData, err := json.Marshal(hooks)
-	if err != nil {
-		return fmt.Errorf("marshal hooks for %s: %w", settingsPath, err)
+	hooks["SessionStart"] = removeLegacySessionStartHooks(hooks["SessionStart"])
+	if len(hooks["SessionStart"]) == 0 {
+		delete(hooks, "SessionStart")
 	}
-	cfg["hooks"] = hooksData
+
+	if len(hooks) == 0 {
+		delete(cfg, "hooks")
+	} else {
+		hooksData, err := json.Marshal(hooks)
+		if err != nil {
+			return fmt.Errorf("marshal hooks for %s: %w", settingsPath, err)
+		}
+		cfg["hooks"] = hooksData
+	}
 
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
@@ -394,24 +390,25 @@ func InitClaudeLocalSettings(root string) error {
 	return nil
 }
 
-func upsertSessionStartMatcher(existing []ClaudeHookMatcher, matcher ClaudeHookMatcher) []ClaudeHookMatcher {
-	for i := range existing {
-		if existing[i].Matcher != matcher.Matcher {
+func removeLegacySessionStartHooks(existing []ClaudeHookMatcher) []ClaudeHookMatcher {
+	result := make([]ClaudeHookMatcher, 0, len(existing))
+	for _, matcher := range existing {
+		filtered := make([]ClaudeHook, 0, len(matcher.Hooks))
+		for _, hook := range matcher.Hooks {
+			if hook.Name == "record-main-pane" {
+				continue
+			}
+			base := filepath.Base(hook.Command)
+			if strings.HasPrefix(base, "session-start-") && strings.HasSuffix(base, "main-pane.sh") {
+				continue
+			}
+			filtered = append(filtered, hook)
+		}
+		matcher.Hooks = filtered
+		if len(matcher.Hooks) == 0 {
 			continue
 		}
-		for _, want := range matcher.Hooks {
-			found := false
-			for _, got := range existing[i].Hooks {
-				if got.Command == want.Command && got.Type == want.Type {
-					found = true
-					break
-				}
-			}
-			if !found {
-				existing[i].Hooks = append(existing[i].Hooks, want)
-			}
-		}
-		return existing
+		result = append(result, matcher)
 	}
-	return append(existing, matcher)
+	return result
 }

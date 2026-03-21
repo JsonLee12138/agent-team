@@ -23,16 +23,16 @@ description: >
 ## CLI Binding
 
 - `agent-team context-cleanup`
-- This skill is NOT equivalent to `compact` and is not a wrapper around `/compact`.
+- This skill is a standalone context-cleanup and file re-anchoring entry.
 
 ## Required Entry
 
-- controller/main: MUST read `.agents/rules/index.md` first.
+- controller/main: MUST read `.agent-team/rules/index.md` first.
 - worker: MUST read `worker.yaml` first.
 
 ## Expansion
 
-- controller/main: read only the rule files matched from `.agents/rules/index.md`, then the current workflow/task artifacts.
+- controller/main: read only the rule files matched from `.agent-team/rules/index.md`, then the current workflow/task artifacts.
 - worker: read `task.yaml` after `worker.yaml`, then `context.md` and referenced materials only when needed.
 
 ## Hard Rules
@@ -40,7 +40,7 @@ description: >
 - Clean session context, not file contents.
 - Never skip the required entry file.
 - Never default to scanning all rule bodies or all task context files.
-- Never describe this skill as a synonym for `/compact` or context compression.
+- Never describe this skill as context compression.
 
 ## Boundary
 

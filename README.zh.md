@@ -119,7 +119,6 @@ agent-team role-repo add JsonLee12138/agent-team
 - `role-creator`: 交互式构建新的智能体角色。
 - `brainstorming`: 在实现前通过对话验证想法，并支持规划对象目标选择（`roadmap` / `milestone` / `phase` / `task` / `generic topic`）以及明确的保存目标选择（`docs/brainstorming/`、对象目录、自定义目录或仅输出不保存）。
 - `agent-team`: 已降级为兼容导航壳，负责把旧入口导向场景化 skills。
-- `strategic-compact`: 已废弃的兼容壳，统一迁移到 `context-cleanup`。
 
 ---
 

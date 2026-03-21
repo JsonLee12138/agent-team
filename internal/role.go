@@ -587,7 +587,7 @@ func extractSkillTrigger(skillPath string) string {
 	return strings.TrimSpace(fm.Description)
 }
 
-// buildSkillIndexSection builds a compact skill index listing skill names and triggers.
+// buildSkillIndexSection builds a concise skill index listing skill names and triggers.
 // Only used in slim mode. Returns empty string if no skills found.
 func buildSkillIndexSection(root, roleName, rolePath string) string {
 	var entries []skillIndexEntry

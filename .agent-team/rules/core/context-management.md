@@ -14,7 +14,7 @@ Apply this rule whenever context grows, the task changes phase, or resumed work 
 ## Required Recovery Model
 
 - Context cleanup resets session context; it MUST NOT rewrite, compress, or discard file artifacts.
-- Context cleanup is NOT a synonym for `/compact`.
+- Context cleanup is a standalone session reset and file re-anchoring flow.
 - Controller/main MUST read `.agent-team/rules/index.md` first, then open only the matching rule files, then the current workflow/task artifacts.
 - Worker MUST read `worker.yaml` first, then `task.yaml`, and only then read `context.md` or referenced materials when needed.
 - NEVER jump directly to rule bodies, `context.md`, or other detail files before reading the required entry file.
@@ -23,4 +23,4 @@ Apply this rule whenever context grows, the task changes phase, or resumed work 
 ## Provider Handling
 
 - Claude, Codex, Gemini, and other providers MUST follow the same context-cleanup and index-first recovery strategy.
-- Provider-specific prompt injections MUST point to this rule instead of requiring `/compact`.
+- Provider-specific prompt injections MUST point to this rule for context-cleanup guidance.

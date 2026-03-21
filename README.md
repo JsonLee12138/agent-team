@@ -119,7 +119,6 @@ Available in `.agent-team/teams/`:
 - `role-creator`: Interactively build new agent roles.
 - `brainstorming`: Validates ideas via dialogue before implementation, including planning-target selection (`roadmap` / `milestone` / `phase` / `task` / `generic topic`) and explicit save-destination choices (`docs/brainstorming/`, target-object directory, custom path, or skip saving).
 - `agent-team`: Legacy compatibility shell that now routes to the dedicated scenario skills.
-- `strategic-compact`: Deprecated compatibility shell redirected to `context-cleanup`.
 
 ---
 

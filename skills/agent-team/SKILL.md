@@ -39,7 +39,7 @@ Do not keep adding new behavior here. Prefer the dedicated first-level skills be
 ## Routing rules
 
 - If the request implies a specific lifecycle action, route to the dedicated skill immediately.
-- If the request is about context stabilization or resumed work, route to `context-cleanup` or `worker-recovery` instead of describing compact behavior here.
+- If the request is about context stabilization or resumed work, route to `context-cleanup` or `worker-recovery`.
 - Keep this file as a compatibility surface for historical prompts only.
 
 ## References

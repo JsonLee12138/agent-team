@@ -91,7 +91,6 @@
       "Bash(gh repo:*)",
       "Bash(python3:*)",
       "Bash(make lint:*)",
-      "Bash(agent-team compact:*)",
       "Bash(GOROOT=$HOME/.gvm/gos/go1.24.2 $HOME/.gvm/gos/go1.24.2/bin/go vet ./cmd ./internal)",
       "Bash(make build:*)",
       "Bash(printenv:*)",
@@ -132,20 +131,6 @@
       "Bash(\"/Users/jsonlee/Projects/agent-team/output/agent-team\" setup:*)",
       "Bash(\"/Users/jsonlee/Projects/agent-team/output/agent-team\" init:*)",
       "Bash(make:*)"
-    ]
-  },
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "./scripts/session-start-record-main-pane.sh",
-            "timeout": 10000
-          }
-        ]
-      }
     ]
   }
 }

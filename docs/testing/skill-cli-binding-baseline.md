@@ -21,9 +21,8 @@
 ## Shared / strategy
 
 - `task-inspector` -> `agent-team task list/show`
-- `context-cleanup` -> `agent-team context-cleanup` (index-first recovery guidance), no `compact` synonym
+- `context-cleanup` -> `agent-team context-cleanup` (index-first recovery guidance)
 
 ## Compatibility shells
 
 - `agent-team` -> navigation shell only
-- `strategic-compact` -> deprecated shell redirecting to `context-cleanup`

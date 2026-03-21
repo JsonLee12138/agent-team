@@ -120,9 +120,6 @@ func TestInitCmd_ProjectLevelInit(t *testing.T) {
 		if !strings.Contains(content, ".agent-team/rules/project/") {
 			t.Errorf("%s should reference .agent-team/rules/project/", name)
 		}
-		if strings.Contains(content, "MUST call `/compact`") {
-			t.Errorf("%s should not require /compact", name)
-		}
 		for _, needle := range []string{"context-cleanup", "index-first recovery"} {
 			if !strings.Contains(content, needle) {
 				t.Errorf("%s should reference %s", name, needle)

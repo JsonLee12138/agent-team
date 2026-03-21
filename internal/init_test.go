@@ -278,9 +278,6 @@ func TestInitProviderFiles(t *testing.T) {
 			if !strings.Contains(content, ".agent-team/rules/index.md") {
 				t.Errorf("%s should reference rules/index.md", name)
 			}
-			if strings.Contains(content, "MUST call `/compact`") {
-				t.Errorf("%s should not require /compact", name)
-			}
 			for _, needle := range []string{"context-cleanup", "index-first recovery", ".agent-team/rules/core/context-management.md", ".agent-team/rules/project/", ".agent-team/rules/core/agent-team-commands.md", ".agent-team/rules/core/merge-workflow.md", ".agent-team/rules/core/worktree.md"} {
 				if !strings.Contains(content, needle) {
 					t.Errorf("%s should reference %s", name, needle)
@@ -293,11 +290,8 @@ func TestInitProviderFiles(t *testing.T) {
 			t.Fatalf("read settings.local.json: %v", err)
 		}
 		content := string(settingsData)
-		if !strings.Contains(content, "SessionStart") {
-			t.Fatal("settings.local.json should contain SessionStart hook")
-		}
-		if !strings.Contains(content, "./scripts/session-start-record-main-pane.sh") {
-			t.Fatal("settings.local.json should contain record-main-pane script")
+		if strings.Contains(content, "main-pane.sh") {
+			t.Fatal("settings.local.json should not contain removed legacy main pane hook")
 		}
 	})
 
@@ -399,11 +393,8 @@ func TestInitProviderFiles(t *testing.T) {
 		if !strings.Contains(content, "./scripts/existing.sh") {
 			t.Fatal("existing SessionStart hook should be preserved")
 		}
-		if !strings.Contains(content, "./scripts/session-start-record-main-pane.sh") {
-			t.Fatal("record-main-pane hook should be added")
-		}
-		if strings.Count(content, "./scripts/session-start-record-main-pane.sh") != 1 {
-			t.Fatal("record-main-pane hook should not be duplicated")
+		if strings.Contains(content, "./scripts/main-pane.sh") {
+			t.Fatal("removed record-main-pane hook should not remain")
 		}
 	})
 }
