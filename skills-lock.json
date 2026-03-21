@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "claude-hook-writer": {
+      "source": "secondsky/claude-skills",
+      "sourceType": "github",
+      "computedHash": "cfe509f86b008961647d6ce61c3cc3b595a77448cf5647e3177796cc91a34d52"
+    },
     "find-skills": {
       "source": "vercel-labs/skills",
       "sourceType": "github",

@@ -27,3 +27,4 @@ docs/marketing
 
 # Project-local session metadata
 .agent-team/
+.tmp
