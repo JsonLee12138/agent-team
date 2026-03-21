@@ -51,7 +51,11 @@ func TestListTasksActiveOnly(t *testing.T) {
 	if _, err := MarkTaskDone(root, archived.TaskID, now.Add(3*time.Minute)); err != nil {
 		t.Fatalf("MarkTaskDone archived: %v", err)
 	}
-	if _, err := ArchiveTask(root, archived.TaskID, "abc123", now.Add(4*time.Minute)); err != nil {
+	verificationPath := TaskVerificationPath(root, archived.TaskID)
+	if err := os.WriteFile(verificationPath, []byte("# Verification\n\n## Result\n- pass\n"), 0644); err != nil {
+		t.Fatalf("WriteFile verification: %v", err)
+	}
+	if _, err := ArchiveTask(root, archived.TaskID, "abc123", false, now.Add(4*time.Minute)); err != nil {
 		t.Fatalf("ArchiveTask: %v", err)
 	}
 	list, err := ListTasks(root, true)
@@ -63,7 +67,7 @@ func TestListTasksActiveOnly(t *testing.T) {
 	}
 }
 
-func TestBindTaskToWorkerAllowsReassignFromDone(t *testing.T) {
+func TestBindTaskToWorkerAllowsReassignFromVerifying(t *testing.T) {
 	root := t.TempDir()
 	now := time.Date(2026, 3, 21, 10, 0, 0, 0, time.UTC)
 	record, err := CreateTaskPackage(root, "Rework Task", "backend", "", now)
@@ -108,7 +112,11 @@ func TestArchiveTaskRollsBackOnWriteFailure(t *testing.T) {
 	}
 	defer func() { saveTaskRecordAt = orig }()
 
-	_, err = ArchiveTask(root, record.TaskID, "deadbeef", now.Add(3*time.Minute))
+	verificationPath := TaskVerificationPath(root, record.TaskID)
+	if err := os.WriteFile(verificationPath, []byte("# Verification\n\n## Result\n- pass\n"), 0644); err != nil {
+		t.Fatalf("WriteFile verification: %v", err)
+	}
+	_, err = ArchiveTask(root, record.TaskID, "deadbeef", false, now.Add(3*time.Minute))
 	if err == nil {
 		t.Fatal("expected archive failure")
 	}
@@ -122,7 +130,7 @@ func TestArchiveTaskRollsBackOnWriteFailure(t *testing.T) {
 	if loadErr != nil {
 		t.Fatalf("LoadTaskRecord: %v", loadErr)
 	}
-	if archived || loaded.Status != TaskStatusDone {
+	if archived != TaskRecordLocationActive || loaded.Status != TaskStatusVerifying {
 		t.Fatalf("loaded after rollback = %#v archived=%v", loaded, archived)
 	}
 }

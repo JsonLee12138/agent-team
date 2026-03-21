@@ -17,5 +17,6 @@ func newTaskCmd() *cobra.Command {
 	cmd.AddCommand(newTaskAssignCmd())
 	cmd.AddCommand(newTaskDoneCmd())
 	cmd.AddCommand(newTaskArchiveCmd())
+	cmd.AddCommand(newTaskDeprecatedCmd())
 	return cmd
 }

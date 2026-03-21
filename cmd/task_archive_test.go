@@ -32,7 +32,10 @@ func TestRunTaskArchiveMovesTaskAndCleansWorker(t *testing.T) {
 	if _, err := internal.MarkTaskDone(dir, record.TaskID, time.Now().UTC()); err != nil {
 		t.Fatalf("MarkTaskDone: %v", err)
 	}
-	if err := app.RunTaskArchive(record.TaskID, "deadbeef"); err != nil {
+	if err := os.WriteFile(internal.TaskVerificationPath(dir, record.TaskID), []byte("# Verification\n\n## Result\n- pass\n"), 0644); err != nil {
+		t.Fatalf("WriteFile verification: %v", err)
+	}
+	if err := app.RunTaskArchive(record.TaskID, "deadbeef", false); err != nil {
 		t.Fatalf("RunTaskArchive: %v", err)
 	}
 	if _, err := os.Stat(internal.TaskArchiveDir(dir, record.TaskID)); err != nil {
@@ -43,5 +46,22 @@ func TestRunTaskArchiveMovesTaskAndCleansWorker(t *testing.T) {
 	}
 	if _, err := os.Stat(wtPath); !os.IsNotExist(err) {
 		t.Fatalf("worktree should be removed, err=%v", err)
+	}
+}
+
+func TestRunTaskArchiveBlocksPendingVerification(t *testing.T) {
+	app, dir := initTestApp(t)
+	record, err := internal.CreateTaskPackage(dir, "Archive Blocked", "backend", "", time.Date(2026, 3, 21, 10, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("CreateTaskPackage: %v", err)
+	}
+	if _, err := internal.BindTaskToWorker(dir, record.TaskID, "backend-001", time.Now().UTC()); err != nil {
+		t.Fatalf("BindTaskToWorker: %v", err)
+	}
+	if _, err := internal.MarkTaskDone(dir, record.TaskID, time.Now().UTC()); err != nil {
+		t.Fatalf("MarkTaskDone: %v", err)
+	}
+	if err := app.RunTaskArchive(record.TaskID, "deadbeef", false); err == nil {
+		t.Fatal("expected archive to fail for pending verification")
 	}
 }

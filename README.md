@@ -158,12 +158,17 @@ Available in `.agents/teams/`:
 - `agent-team reply-main "<msg>"`: Worker talks back to main.
 
 ### Task Artifacts
-Every task package now contains three standard artifacts under `.agent-team/task/<task-id>/`:
+Every active task package contains three standard artifacts under `.agent-team/task/<task-id>/`:
 - `task.yaml`: lifecycle metadata and status.
 - `context.md`: background, scope, constraints, and design input.
 - `verification.md`: acceptance contract, test scope boundary, performed checks, and final verification result.
 
 `verification.md` is created automatically with `agent-team task create`. Its default template keeps `E2E Required: no`, `Verified By: qa`, and a pending result so QA or human acceptance can complete the record later.
+
+Lifecycle summary:
+- `task done` now moves a task from `assigned` to `verifying`.
+- `task archive` reads `verification.md` and only archives tasks whose `## Result` passes the gate.
+- `task deprecated` moves unfinished or abandoned work into `.agent-team/deprecated/task/<task-id>/` while preserving the task package.
 
 </details>
 
@@ -172,11 +177,13 @@ Every task package now contains three standard artifacts under `.agent-team/task
 
 ```
 project-root/
-├── .agent-team/task/     <- Task packages (`task.yaml`, `context.md`, `verification.md`)
-├── .agents/teams/        <- Project-specific roles
-├── .worktrees/           <- Isolated worker workspaces
-├── roles-lock.json       <- Remote role version locking
-└── gemini-extension.json <- Extension manifest
+├── .agent-team/task/            <- Active task packages
+├── .agent-team/archive/task/    <- Archived task packages
+├── .agent-team/deprecated/task/ <- Deprecated task packages
+├── .agents/teams/               <- Project-specific roles
+├── .worktrees/                  <- Isolated worker workspaces
+├── roles-lock.json              <- Remote role version locking
+└── gemini-extension.json        <- Extension manifest
 ```
 
 </details>

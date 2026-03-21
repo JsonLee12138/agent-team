@@ -11,6 +11,11 @@
       "sourceType": "github",
       "computedHash": "d31e234f0c90694a670222cdd1dafa853e051d7066beda389f1097c22dadd461"
     },
+    "qa-expert": {
+      "source": "daymade/claude-code-skills",
+      "sourceType": "github",
+      "computedHash": "cb6fafeb55b7e3eeabb69568ca8b80c6ba828c66eeffb3bbcc301029117349d4"
+    },
     "systematic-debugging": {
       "source": "obra/superpowers",
       "sourceType": "github",

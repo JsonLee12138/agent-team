@@ -7,7 +7,7 @@ import (
 	"github.com/JsonLee12138/agent-team/internal"
 )
 
-func TestRunTaskDoneMarksAssignedTaskDone(t *testing.T) {
+func TestRunTaskDoneMarksAssignedTaskVerifying(t *testing.T) {
 	app, dir := initTestApp(t)
 	record, err := internal.CreateTaskPackage(dir, "Done Task", "backend", "", time.Date(2026, 3, 21, 10, 0, 0, 0, time.UTC))
 	if err != nil {
@@ -23,7 +23,7 @@ func TestRunTaskDoneMarksAssignedTaskDone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadTaskRecord: %v", err)
 	}
-	if loaded.Status != internal.TaskStatusDone {
+	if loaded.Status != internal.TaskStatusVerifying {
 		t.Fatalf("Status = %s", loaded.Status)
 	}
 }

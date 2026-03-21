@@ -10,11 +10,12 @@ func TestValidateTaskTransition(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "draft to assigned", from: TaskStatusDraft, to: TaskStatusAssigned},
-		{name: "assigned to done", from: TaskStatusAssigned, to: TaskStatusDone},
-		{name: "done to assigned", from: TaskStatusDone, to: TaskStatusAssigned},
-		{name: "done to archived", from: TaskStatusDone, to: TaskStatusArchived},
-		{name: "draft to done invalid", from: TaskStatusDraft, to: TaskStatusDone, wantErr: true},
-		{name: "archived terminal", from: TaskStatusArchived, to: TaskStatusDone, wantErr: true},
+		{name: "assigned to verifying", from: TaskStatusAssigned, to: TaskStatusVerifying},
+		{name: "verifying to assigned", from: TaskStatusVerifying, to: TaskStatusAssigned},
+		{name: "verifying to archived", from: TaskStatusVerifying, to: TaskStatusArchived},
+		{name: "draft to deprecated", from: TaskStatusDraft, to: TaskStatusDeprecated},
+		{name: "draft to verifying invalid", from: TaskStatusDraft, to: TaskStatusVerifying, wantErr: true},
+		{name: "archived terminal", from: TaskStatusArchived, to: TaskStatusVerifying, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

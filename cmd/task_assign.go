@@ -31,14 +31,14 @@ func newTaskAssignCmd() *cobra.Command {
 
 func (a *App) RunTaskAssign(taskID, requestedWorkerID, provider, model string, newWindow bool) error {
 	root := a.Git.Root()
-	record, archived, err := internal.LoadTaskRecord(root, taskID)
+	record, location, err := internal.LoadTaskRecord(root, taskID)
 	if err != nil {
 		return err
 	}
-	if archived {
-		return fmt.Errorf("task '%s' is archived", taskID)
+	if location != internal.TaskRecordLocationActive {
+		return fmt.Errorf("task '%s' is %s", taskID, location)
 	}
-	if record.Status != internal.TaskStatusDraft && record.Status != internal.TaskStatusAssigned && record.Status != internal.TaskStatusDone {
+	if record.Status != internal.TaskStatusDraft && record.Status != internal.TaskStatusAssigned && record.Status != internal.TaskStatusVerifying {
 		return fmt.Errorf("task '%s' cannot be assigned from status '%s'", taskID, record.Status)
 	}
 	if provider != "" {

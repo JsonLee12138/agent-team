@@ -17,12 +17,13 @@ func newTaskListCmd() *cobra.Command {
 			return GetApp(cmd).RunTaskList(archived)
 		},
 	}
-	cmd.Flags().BoolVar(&archived, "archived", false, "Include archived tasks")
+	cmd.Flags().BoolVar(&archived, "archived", false, "Include archived and deprecated tasks")
 	return cmd
 }
 
 func (a *App) RunTaskList(includeArchived bool) error {
-	tasks, err := internal.ListTasks(a.Git.Root(), !includeArchived)
+	root := a.Git.Root()
+	tasks, err := internal.ListTasks(root, !includeArchived)
 	if err != nil {
 		return err
 	}
@@ -31,14 +32,29 @@ func (a *App) RunTaskList(includeArchived bool) error {
 		return nil
 	}
 
-	fmt.Printf("%-32s %-12s %-20s %s\n", "Task", "Status", "Role", "Worker")
-	fmt.Printf("%-32s %-12s %-20s %s\n", "────────────────────────────────", "────────────", "────────────────────", "────────────────────────")
+	fmt.Printf("%-32s %-12s %-20s %-12s %-14s %s\n", "Task", "Status", "Role", "Verification", "Archive Ready", "Worker")
+	fmt.Printf("%-32s %-12s %-20s %-12s %-14s %s\n", "────────────────────────────────", "────────────", "────────────────────", "────────────", "──────────────", "────────────────────────")
 	for _, task := range tasks {
 		worker := task.WorkerID
 		if worker == "" {
 			worker = "-"
 		}
-		fmt.Printf("%-32s %-12s %-20s %s\n", task.TaskID, task.Status, task.Role, worker)
+		verification := internal.VerificationResultMissing
+		if result, err := internal.ReadTaskVerificationResult(root, task.TaskID, taskLocationForStatus(task.Status)); err == nil {
+			verification = result
+		}
+		fmt.Printf("%-32s %-12s %-20s %-12s %-14s %s\n", task.TaskID, task.Status, task.Role, verification, internal.ArchiveReadyLabel(verification), worker)
 	}
 	return nil
+}
+
+func taskLocationForStatus(status internal.TaskStatus) internal.TaskRecordLocation {
+	switch status {
+	case internal.TaskStatusArchived:
+		return internal.TaskRecordLocationArchived
+	case internal.TaskStatusDeprecated:
+		return internal.TaskRecordLocationDeprecated
+	default:
+		return internal.TaskRecordLocationActive
+	}
 }

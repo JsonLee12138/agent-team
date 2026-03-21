@@ -25,12 +25,20 @@ func TasksArchiveRootDir(root string) string {
 	return filepath.Join(AgentTeamDir(root), "archive", "task")
 }
 
+func TasksDeprecatedRootDir(root string) string {
+	return filepath.Join(AgentTeamDir(root), "deprecated", "task")
+}
+
 func TaskDir(root, taskID string) string {
 	return filepath.Join(TasksRootDir(root), taskID)
 }
 
 func TaskArchiveDir(root, taskID string) string {
 	return filepath.Join(TasksArchiveRootDir(root), taskID)
+}
+
+func TaskDeprecatedDir(root, taskID string) string {
+	return filepath.Join(TasksDeprecatedRootDir(root), taskID)
 }
 
 func TaskYAMLPath(root, taskID string) string {
@@ -57,12 +65,28 @@ func TaskArchiveVerificationPath(root, taskID string) string {
 	return filepath.Join(TaskArchiveDir(root, taskID), "verification.md")
 }
 
+func TaskDeprecatedYAMLPath(root, taskID string) string {
+	return filepath.Join(TaskDeprecatedDir(root, taskID), "task.yaml")
+}
+
+func TaskDeprecatedContextPath(root, taskID string) string {
+	return filepath.Join(TaskDeprecatedDir(root, taskID), "context.md")
+}
+
+func TaskDeprecatedVerificationPath(root, taskID string) string {
+	return filepath.Join(TaskDeprecatedDir(root, taskID), "verification.md")
+}
+
 func TaskRelPath(taskID string) string {
 	return filepath.ToSlash(filepath.Join(".agent-team", "task", taskID))
 }
 
 func TaskArchiveRelPath(taskID string) string {
 	return filepath.ToSlash(filepath.Join(".agent-team", "archive", "task", taskID))
+}
+
+func TaskDeprecatedRelPath(taskID string) string {
+	return filepath.ToSlash(filepath.Join(".agent-team", "deprecated", "task", taskID))
 }
 
 func GenerateTaskID(title string, now time.Time) string {
@@ -96,25 +120,32 @@ func CreateTaskPackage(root, title, role, design string, now time.Time) (*TaskRe
 	return record, nil
 }
 
-func LoadTaskRecord(root, taskID string) (*TaskRecord, bool, error) {
+func LoadTaskRecord(root, taskID string) (*TaskRecord, TaskRecordLocation, error) {
 	if record, err := loadTaskRecordFromDir(TaskDir(root, taskID)); err == nil {
-		return record, false, nil
+		return record, TaskRecordLocationActive, nil
 	}
-	record, err := loadTaskRecordFromDir(TaskArchiveDir(root, taskID))
+	if record, err := loadTaskRecordFromDir(TaskArchiveDir(root, taskID)); err == nil {
+		return record, TaskRecordLocationArchived, nil
+	}
+	record, err := loadTaskRecordFromDir(TaskDeprecatedDir(root, taskID))
 	if err != nil {
-		return nil, false, err
+		return nil, "", err
 	}
-	return record, true, nil
+	return record, TaskRecordLocationDeprecated, nil
 }
 
 func SaveTaskRecord(root string, record *TaskRecord) error {
 	if record == nil {
 		return fmt.Errorf("task record is nil")
 	}
+	record.LegacyDoneAt = ""
 	var dir string
-	if record.Status == TaskStatusArchived {
+	switch record.Status {
+	case TaskStatusArchived:
 		dir = TaskArchiveDir(root, record.TaskID)
-	} else {
+	case TaskStatusDeprecated:
+		dir = TaskDeprecatedDir(root, record.TaskID)
+	default:
 		dir = TaskDir(root, record.TaskID)
 	}
 	return saveTaskRecordAt(dir, record)
@@ -124,7 +155,7 @@ func ListTasks(root string, activeOnly bool) ([]*TaskRecord, error) {
 	var dirs []string
 	dirs = append(dirs, TasksRootDir(root))
 	if !activeOnly {
-		dirs = append(dirs, TasksArchiveRootDir(root))
+		dirs = append(dirs, TasksArchiveRootDir(root), TasksDeprecatedRootDir(root))
 	}
 
 	var tasks []*TaskRecord
@@ -144,7 +175,7 @@ func ListTasks(root string, activeOnly bool) ([]*TaskRecord, error) {
 			if err != nil {
 				continue
 			}
-			if activeOnly && record.Status == TaskStatusArchived {
+			if activeOnly && (record.Status == TaskStatusArchived || record.Status == TaskStatusDeprecated) {
 				continue
 			}
 			tasks = append(tasks, record)
@@ -158,16 +189,16 @@ func ListTasks(root string, activeOnly bool) ([]*TaskRecord, error) {
 }
 
 func BindTaskToWorker(root, taskID, workerID string, now time.Time) (*TaskRecord, error) {
-	record, archived, err := LoadTaskRecord(root, taskID)
+	record, location, err := LoadTaskRecord(root, taskID)
 	if err != nil {
 		return nil, err
 	}
-	if archived {
-		return nil, fmt.Errorf("task '%s' is archived", taskID)
+	if location != TaskRecordLocationActive {
+		return nil, fmt.Errorf("task '%s' is %s", taskID, location)
 	}
 
 	switch record.Status {
-	case TaskStatusDraft, TaskStatusDone:
+	case TaskStatusDraft, TaskStatusVerifying:
 		if err := ValidateTaskTransition(record.Status, TaskStatusAssigned); err != nil {
 			return nil, err
 		}
@@ -181,8 +212,9 @@ func BindTaskToWorker(root, taskID, workerID string, now time.Time) (*TaskRecord
 	record.WorkerID = workerID
 	record.TaskPath = TaskRelPath(taskID)
 	record.AssignedAt = now.UTC().Format(time.RFC3339)
-	record.DoneAt = ""
+	record.VerifyingAt = ""
 	record.ArchivedAt = ""
+	record.DeprecatedAt = ""
 	record.MergedSHA = ""
 	if err := SaveTaskRecord(root, record); err != nil {
 		return nil, err
@@ -191,68 +223,112 @@ func BindTaskToWorker(root, taskID, workerID string, now time.Time) (*TaskRecord
 }
 
 func MarkTaskDone(root, taskID string, now time.Time) (*TaskRecord, error) {
-	record, archived, err := LoadTaskRecord(root, taskID)
+	record, location, err := LoadTaskRecord(root, taskID)
 	if err != nil {
 		return nil, err
 	}
-	if archived {
-		return nil, fmt.Errorf("task '%s' is archived", taskID)
+	if location != TaskRecordLocationActive {
+		return nil, fmt.Errorf("task '%s' is %s", taskID, location)
 	}
-	if err := ValidateTaskTransition(record.Status, TaskStatusDone); err != nil {
+	if err := ValidateTaskTransition(record.Status, TaskStatusVerifying); err != nil {
 		return nil, err
 	}
-	record.Status = TaskStatusDone
-	record.DoneAt = now.UTC().Format(time.RFC3339)
+	record.Status = TaskStatusVerifying
+	record.VerifyingAt = now.UTC().Format(time.RFC3339)
 	if err := SaveTaskRecord(root, record); err != nil {
 		return nil, err
 	}
 	return record, nil
 }
 
-func ArchiveTask(root, taskID, mergedSHA string, now time.Time) (*TaskRecord, error) {
+func ArchiveTask(root, taskID, mergedSHA string, strict bool, now time.Time) (*TaskRecord, error) {
 	if strings.TrimSpace(mergedSHA) == "" {
 		return nil, fmt.Errorf("merged SHA is required")
 	}
-	record, archived, err := LoadTaskRecord(root, taskID)
+	record, location, err := LoadTaskRecord(root, taskID)
 	if err != nil {
 		return nil, err
 	}
-	if archived {
+	if location == TaskRecordLocationArchived {
 		return nil, fmt.Errorf("task '%s' is already archived", taskID)
+	}
+	if location == TaskRecordLocationDeprecated {
+		return nil, fmt.Errorf("task '%s' is deprecated", taskID)
 	}
 	if err := ValidateTaskTransition(record.Status, TaskStatusArchived); err != nil {
 		return nil, err
 	}
-
-	srcDir := TaskDir(root, taskID)
-	dstDir := TaskArchiveDir(root, taskID)
-	if err := os.MkdirAll(filepath.Dir(dstDir), 0755); err != nil {
-		return nil, fmt.Errorf("create archive parent directory: %w", err)
+	result, err := ReadTaskVerificationResult(root, taskID, TaskRecordLocationActive)
+	if err != nil {
+		return nil, err
 	}
-	if err := os.RemoveAll(dstDir); err != nil {
-		return nil, fmt.Errorf("clear archive destination: %w", err)
-	}
-	if err := os.Rename(srcDir, dstDir); err != nil {
-		return nil, fmt.Errorf("move task to archive: %w", err)
+	if err := ValidateArchiveReadiness(result, strict); err != nil {
+		return nil, err
 	}
 
-	originalPath := record.TaskPath
 	record.Status = TaskStatusArchived
 	record.TaskPath = TaskArchiveRelPath(taskID)
 	record.ArchivedAt = now.UTC().Format(time.RFC3339)
+	record.DeprecatedAt = ""
 	record.MergedSHA = mergedSHA
-	if err := saveTaskRecordAt(dstDir, record); err != nil {
-		record.Status = TaskStatusDone
-		record.TaskPath = originalPath
-		record.ArchivedAt = ""
-		record.MergedSHA = ""
-		if rollbackErr := os.Rename(dstDir, srcDir); rollbackErr != nil {
-			return nil, fmt.Errorf("write archived task metadata: %w (rollback failed: %v)", err, rollbackErr)
-		}
-		return nil, fmt.Errorf("write archived task metadata: %w", err)
+	return moveTaskPackage(root, record, TaskRecordLocationActive, TaskRecordLocationArchived)
+}
+
+func DeprecateTask(root, taskID string, now time.Time) (*TaskRecord, error) {
+	record, location, err := LoadTaskRecord(root, taskID)
+	if err != nil {
+		return nil, err
+	}
+	if location == TaskRecordLocationArchived {
+		return nil, fmt.Errorf("task '%s' is already archived", taskID)
+	}
+	if location == TaskRecordLocationDeprecated {
+		return nil, fmt.Errorf("task '%s' is already deprecated", taskID)
+	}
+	if err := ValidateTaskTransition(record.Status, TaskStatusDeprecated); err != nil {
+		return nil, err
 	}
 
+	record.Status = TaskStatusDeprecated
+	record.TaskPath = TaskDeprecatedRelPath(taskID)
+	record.DeprecatedAt = now.UTC().Format(time.RFC3339)
+	record.ArchivedAt = ""
+	record.MergedSHA = ""
+	return moveTaskPackage(root, record, TaskRecordLocationActive, TaskRecordLocationDeprecated)
+}
+
+func moveTaskPackage(root string, record *TaskRecord, from, to TaskRecordLocation) (*TaskRecord, error) {
+	srcDir := taskDirByLocation(root, record.TaskID, from)
+	dstDir := taskDirByLocation(root, record.TaskID, to)
+	if err := os.MkdirAll(filepath.Dir(dstDir), 0755); err != nil {
+		return nil, fmt.Errorf("create destination parent directory: %w", err)
+	}
+	if _, err := os.Stat(dstDir); err == nil {
+		return nil, fmt.Errorf("destination already exists: %s", dstDir)
+	} else if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("check destination: %w", err)
+	}
+	if err := os.Rename(srcDir, dstDir); err != nil {
+		return nil, fmt.Errorf("move task package: %w", err)
+	}
+	if err := saveTaskRecordAt(dstDir, record); err != nil {
+		if rollbackErr := os.Rename(dstDir, srcDir); rollbackErr != nil {
+			return nil, fmt.Errorf("write moved task metadata: %w (rollback failed: %v)", err, rollbackErr)
+		}
+		return nil, fmt.Errorf("write moved task metadata: %w", err)
+	}
 	return record, nil
+}
+
+func taskDirByLocation(root, taskID string, location TaskRecordLocation) string {
+	switch location {
+	case TaskRecordLocationArchived:
+		return TaskArchiveDir(root, taskID)
+	case TaskRecordLocationDeprecated:
+		return TaskDeprecatedDir(root, taskID)
+	default:
+		return TaskDir(root, taskID)
+	}
 }
 
 func loadTaskRecordFromDir(dir string) (*TaskRecord, error) {
@@ -264,6 +340,12 @@ func loadTaskRecordFromDir(dir string) (*TaskRecord, error) {
 	if err := yaml.Unmarshal(data, &record); err != nil {
 		return nil, fmt.Errorf("parse task.yaml: %w", err)
 	}
+	if record.Status == TaskStatus("done") {
+		record.Status = TaskStatusVerifying
+		if record.VerifyingAt == "" {
+			record.VerifyingAt = record.LegacyDoneAt
+		}
+	}
 	if !ValidTaskStatus(record.Status) {
 		return nil, fmt.Errorf("invalid task status: %s", record.Status)
 	}
@@ -274,6 +356,7 @@ func saveTaskRecordAtImpl(dir string, record *TaskRecord) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("create task directory: %w", err)
 	}
+	record.LegacyDoneAt = ""
 	data, err := yaml.Marshal(record)
 	if err != nil {
 		return fmt.Errorf("marshal task record: %w", err)

@@ -3,10 +3,11 @@ package internal
 import "fmt"
 
 var validTaskTransitions = map[TaskStatus][]TaskStatus{
-	TaskStatusDraft:    {TaskStatusAssigned},
-	TaskStatusAssigned: {TaskStatusDone},
-	TaskStatusDone:     {TaskStatusAssigned, TaskStatusArchived},
-	TaskStatusArchived: {},
+	TaskStatusDraft:     {TaskStatusAssigned, TaskStatusDeprecated},
+	TaskStatusAssigned:  {TaskStatusVerifying, TaskStatusDeprecated},
+	TaskStatusVerifying: {TaskStatusAssigned, TaskStatusArchived, TaskStatusDeprecated},
+	TaskStatusArchived:  {},
+	TaskStatusDeprecated: {},
 }
 
 func ValidateTaskTransition(from, to TaskStatus) error {
