@@ -23,13 +23,12 @@ A strategic compact pass is mandatory when any of the following are true:
 
 Use `phase-transition` around these controller actions when they meaningfully change what the main session must track:
 
-- `agent-team workflow state start`
-- `agent-team workflow state wait`
-- `agent-team workflow state block`
-- `agent-team workflow state complete`
-- `agent-team workflow state confirm`
+- `agent-team workflow plan generate`
+- `agent-team workflow plan approve`
+- `agent-team workflow plan activate`
+- `agent-team workflow plan close`
 
-Use `resume-after-pause` when the controller reopens an existing run-state and continues from `current_node`.
+Use `resume-after-pause` when the controller resumes governance planning after a pause or restart.
 
 Use `pre-large-read` before reading:
 

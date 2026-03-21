@@ -25,10 +25,12 @@ func (a *App) RunWorkerDelete(workerID string) error {
 	wtPath := internal.WtPath(root, a.WtBase, workerID)
 	configDir := internal.WorkerConfigDir(root, workerID)
 	configPath := internal.WorkerConfigPath(root, workerID)
+	localConfigPath := internal.WorkerYAMLPath(wtPath)
 
 	_, wtErr := os.Stat(wtPath)
 	_, cfgErr := os.Stat(configPath)
-	if os.IsNotExist(wtErr) && os.IsNotExist(cfgErr) {
+	_, localCfgErr := os.Stat(localConfigPath)
+	if os.IsNotExist(wtErr) && os.IsNotExist(cfgErr) && os.IsNotExist(localCfgErr) {
 		return fmt.Errorf("worker '%s' not found", workerID)
 	}
 
@@ -48,6 +50,7 @@ func (a *App) RunWorkerDelete(workerID string) error {
 	}
 
 	a.Git.DeleteBranch("team/" + workerID)
+	_ = os.Remove(localConfigPath)
 	_ = os.Remove(configPath)
 	_ = os.RemoveAll(configDir)
 

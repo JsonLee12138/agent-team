@@ -18,38 +18,6 @@ func NewService(root string) Service {
 	return Service{Root: root}
 }
 
-func (s Service) NewTemplate(name, preset, ctoRole, devRole, qaRole, executionMode string) (*internal.WorkflowTemplate, error) {
-	return internal.NewWorkflowTemplate(name, preset, ctoRole, devRole, qaRole, executionMode)
-}
-
-func (s Service) SaveTemplate(path string, wf *internal.WorkflowTemplate) error {
-	return internal.SaveWorkflowTemplate(path, wf)
-}
-
-func (s Service) LoadTemplate(path string) (*internal.WorkflowTemplate, error) {
-	return internal.LoadWorkflowTemplate(path)
-}
-
-func (s Service) ValidateTemplate(wf *internal.WorkflowTemplate) []string {
-	return internal.ValidateWorkflowTemplate(wf)
-}
-
-func (s Service) NewRunState(workflowFile string, wf *internal.WorkflowTemplate, runID string) *internal.WorkflowRunState {
-	return internal.NewWorkflowRunState(workflowFile, wf, runID)
-}
-
-func (s Service) LoadRunState(path string) (*internal.WorkflowRunState, error) {
-	return internal.LoadWorkflowRunState(path)
-}
-
-func (s Service) WorkflowRunPath(workflowName, runID string) string {
-	return internal.WorkflowRunPath(s.Root, workflowName, runID)
-}
-
-func (s Service) WorkflowTemplatePath(name string) string {
-	return internal.WorkflowTemplatePath(s.Root, name)
-}
-
 func (s Service) SaveWorkflowPlan(plan *governance.WorkflowPlan) error {
 	if plan == nil {
 		return fmt.Errorf("workflow plan is nil")
@@ -82,5 +50,5 @@ func (s Service) LoadWorkflowPlan(planID string) (*governance.WorkflowPlan, erro
 }
 
 func (s Service) workflowPlanPath(planID string) string {
-	return filepath.Join(internal.WorkflowDir(s.Root), "plans", fmt.Sprintf("%s.yaml", planID))
+	return filepath.Join(internal.ResolveAgentsDir(s.Root), "workflow", "plans", fmt.Sprintf("%s.yaml", planID))
 }

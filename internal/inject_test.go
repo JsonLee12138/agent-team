@@ -65,13 +65,13 @@ func TestInjectRolePromptWithPath_SlimMode(t *testing.T) {
 		}
 	}
 
-	// Slim mode should NOT contain legacy inline Git Rules or Task Completion Protocol
+	// Slim mode should NOT contain legacy inline Git Rules or Completion Protocol
 	mustNotContain := []string{
 		"git checkout",
 		"git switch",
 		"Task Completion Protocol",
 		"git add -A",
-		"agent-team task archive",
+		"agent-team reply-main \"Task completed: <summary>\"",
 	}
 	for _, s := range mustNotContain {
 		if strings.Contains(content, s) {
@@ -118,12 +118,11 @@ func TestInjectRolePromptWithPath_LegacyMode(t *testing.T) {
 	}
 	content := string(data)
 
-	// Legacy mode should contain inline Git Rules and Task Completion Protocol
+	// Legacy mode should contain inline Git Rules and Completion Protocol
 	legacyStrings := []string{
 		"Git Rules",
-		"Task Completion Protocol",
+		"Completion Protocol",
 		"git checkout",
-		"agent-team task archive",
 		"agent-team reply-main",
 		"Skill-First Workflow",
 	}

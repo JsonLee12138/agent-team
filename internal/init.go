@@ -609,9 +609,7 @@ Read the matching rule first:
 - ` + "`project-commands.md`" + `: before running any project command
 - ` + "`agent-team-commands.md`" + `: agent-team CLI boundaries, worker lifecycle commands
 - ` + "`merge-workflow.md`" + `: controller-side rebase, merge sequencing, generated file safety
-- ` + "`communication.md`" + `: ` + "`reply-main`" + `, blocker escalation, progress update
 - ` + "`context-management.md`" + `: context pressure, handoff, provider switch, compact
-- ` + "`task-protocol.md`" + `: task start, verify, completion, archive
 - ` + "`worktree.md`" + `: worktree safety, branch limits, ignored paths
 
 If unsure, MUST open this index.
@@ -655,7 +653,7 @@ Apply this rule whenever a worker session needs project workflow operations such
 ## Command Boundary
 
 - MUST use the ` + "`agent-team`" + ` CLI for worker lifecycle and task lifecycle operations when the repository provides it.
-- MUST NOT bypass ` + "`agent-team worker open`" + `, ` + "`agent-team worker assign`" + `, ` + "`agent-team task archive`" + `, or ` + "`agent-team reply-main`" + ` with ad hoc shell commands.
+- MUST NOT bypass ` + "`agent-team worker open`" + `, ` + "`agent-team worker assign`" + `, or ` + "`agent-team reply-main`" + ` with ad hoc shell commands.
 - MUST treat worker bootstrap files and provider prompt files as controller-managed artifacts.
 
 ## Generated File Safety
@@ -663,24 +661,6 @@ Apply this rule whenever a worker session needs project workflow operations such
 - MUST NOT commit generated worker-local prompt files such as ` + "`CLAUDE.md`" + `, ` + "`GEMINI.md`" + `, or ` + "`AGENTS.md`" + ` from a worker worktree.
 - MUST NOT commit worker-local metadata such as ` + "`.tasks/`" + `, ` + "`.claude/`" + `, ` + "`.codex/`" + `, ` + "`.gemini/`" + `, ` + "`.opencode/`" + `, or ` + "`worker.yaml`" + ` from a worker worktree.
 - MUST keep deliverable files in tracked repository paths managed by the assigned change.
-`,
-	"communication.md": `# Communication Rules
-
-## Trigger
-
-Apply this rule for all worker-to-controller updates, blockers, handoffs, and completion messages.
-
-## ` + "`reply-main`" + ` Format
-
-- MUST use ` + "`agent-team reply-main \"Task completed: <summary>; change archived: <change-name>\"`" + ` after a successful archive.
-- MUST use ` + "`agent-team reply-main \"Task completed: <summary>; archive failed for <change-name>: <error>\"`" + ` if archive fails.
-- MUST use ` + "`agent-team reply-main \"Need decision: <problem or options>\"`" + ` for blockers or ambiguity.
-- ALWAYS keep messages factual, single-purpose, and short enough to scan quickly.
-
-## Escalation Protocol
-
-- MUST report blockers immediately when progress depends on a user or controller decision.
-- NEVER hide failed verification, skipped checks, or archive errors.
 `,
 	"merge-workflow.md": `# Merge Workflow Rules
 
@@ -717,27 +697,6 @@ Apply this rule whenever context grows, the task changes phase, or a provider se
 
 - Claude MUST use ` + "`/compact`" + ` when any trigger above fires.
 - Codex and Gemini MUST create a manual summary of goal, constraints, changed files, verification state, and next step.
-`,
-	"task-protocol.md": `# Task Protocol Rules
-
-## Trigger
-
-Apply this rule when a change is assigned, implemented, verified, completed, or handed back to the controller.
-
-## Required Completion Chain
-
-- MUST finish implementation and run the required verification before preparing the final handoff.
-- MUST review ` + "`git status`" + ` and stage only task-scoped files.
-- MUST commit task-scoped changes before archive when uncommitted task work exists.
-- MUST run ` + "`agent-team task archive <worker-id> <change-name>`" + ` after the commit step.
-- MUST run ` + "`agent-team reply-main`" + ` after every archive attempt, including failure cases.
-- MUST NOT start another task before the completion message has been sent.
-
-## Failure Handling
-
-- MUST report verify failures explicitly and include the failing command or reason.
-- MUST report archive failures explicitly and still notify main with the failure details.
-- NEVER claim completion while the change is still uncommitted or unreported.
 `,
 	"worktree.md": `# Worktree Rules
 
@@ -854,8 +813,7 @@ func defaultProviderInstructions(root string) string {
 	b.WriteString("Use this file when working in Claude Code on this repository.\n\n")
 	b.WriteString("- MUST read `" + rulesRel + "/index.md` at task start and load the rule files required by the task.\n")
 	b.WriteString("- MUST call `/compact` whenever any trigger in `" + rulesRel + "/context-management.md` fires.\n")
-	b.WriteString("- MUST keep status updates concise and use `agent-team reply-main` formats from `" + rulesRel + "/communication.md`.\n")
-	b.WriteString("- MUST follow `" + rulesRel + "/task-protocol.md` before reporting completion.\n")
+	b.WriteString("- MUST keep status updates concise.\n")
 	b.WriteString("- MUST obey `" + rulesRel + "/worktree.md` for branch and git safety.\n")
 	b.WriteString("- MUST read `" + rulesRel + "/project-commands.md` before running any project command.\n")
 	b.WriteString("- MUST follow `" + rulesRel + "/agent-team-commands.md` for worker lifecycle and generated-file boundaries.\n")
@@ -866,9 +824,7 @@ func defaultProviderInstructions(root string) string {
 	b.WriteString("- `" + rulesRel + "/project-commands.md` before running any project command\n")
 	b.WriteString("- `" + rulesRel + "/agent-team-commands.md` for agent-team CLI boundaries and worker lifecycle operations\n")
 	b.WriteString("- `" + rulesRel + "/merge-workflow.md` for controller-side rebase, merge ordering, and generated file safety\n")
-	b.WriteString("- `" + rulesRel + "/communication.md` for `reply-main`, blocker escalation, and progress updates\n")
 	b.WriteString("- `" + rulesRel + "/context-management.md` for `/compact` decisions, handoff summaries, and provider-specific context control\n")
-	b.WriteString("- `" + rulesRel + "/task-protocol.md` for task execution, verify, commit, archive, and completion reporting\n")
 	b.WriteString("- `" + rulesRel + "/worktree.md` for branch safety, worktree limits, and ignored path handling\n")
 	return b.String()
 }

@@ -18,7 +18,7 @@ It should not carry provider-specific strategy branches or a full compact algori
 
 `skills/workflow/SKILL.md` should invoke or reference strategic compact at these points:
 
-- before/after a meaningful phase transition driven by `workflow state start|wait|block|complete|confirm`
+- before/after a meaningful phase transition driven by `workflow plan generate|approve|activate|close`
 - before the controller reads large workflow output, logs, test results, or diffs
 - when resuming an existing run-state after pause or restart
 

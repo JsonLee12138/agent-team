@@ -4,9 +4,9 @@ description: >
   AI team role and worker manager for multi-agent development workflows.
   Uses Role (skill package) + Worker (instance) model with git worktrees.
   Triggers: /agent-team, create a team, batch create roles, create a role,
-  create a worker, open worker session, assign task, show team status,
+  create a worker, open worker session, assign work, show team status,
   merge worker branch, search catalog, find role, install role,
-  check task status, role-hub, compact a session.
+  role-hub, compact a session.
 ---
 
 # agent-team
@@ -115,7 +115,7 @@ agent-team role list
 agent-team worker create <role-name> [--provider <provider>] [--model <model>]
 ```
 
-Creates worktree `.worktrees/<worker-id>/` with branch `team/<worker-id>`, writes `worker.yaml`, initializes `.tasks/` directory, syncs skills, and injects role prompt. Does **not** open a terminal session — use `worker open` to start the session. If `--provider` is omitted, `worker.yaml.provider` defaults to `claude`.
+Creates worker config and defers worktree bootstrap until first `worker open` / `worker assign`, syncs skills on open, and injects role prompt. Does **not** open a terminal session — use `worker open` to start the session. If `--provider` is omitted, `worker.yaml.provider` defaults to `claude`.
 
 > **AI Behavior (Skill Sync Warning)**: If skill installation emits a warning during `worker create`, surface the warning to the user and ask whether role skill bindings need adjustment. Do NOT auto-fix bindings.
 
@@ -129,19 +129,18 @@ Copies role + dependency skills into the worktree, regenerates provider instruct
 
 > **AI Behavior (Session Start)**: Ensure worker loads role context and is aware of pending tasks.
 
-### Assign a change
+### Assign work
 
 ```bash
-agent-team worker assign <worker-id> "<description>" [provider] [--proposal <file>] [--design <file>] [--verify-cmd <cmd>] [--new-window]
+agent-team worker assign <worker-id> "<description>" [provider] [--proposal <file>] [--design <file>] [--new-window]
 ```
 
-Creates a task change at `.tasks/changes/<timestamp>-<slug>/` and sends a `[New Change Assigned]` notification. The CLI auto-opens the worker session if not running.
+Sends a `[New Assignment]` notification. The CLI auto-opens the worker session if not running.
 
 **Before running this command**, the controller MUST:
 
 1. Complete the brainstorming process -> [references/brainstorming.md](references/brainstorming.md)
 2. Pass the Assign Readiness Gate -> [references/readiness.md](references/readiness.md)
-3. **Sync worktree with main**: If worker exists with no uncommitted changes, rebase/merge latest main. If uncommitted changes exist, ask user first.
 
 After a successful assign, the controller's default next state is `waiting for worker reply`.
 
@@ -194,33 +193,21 @@ Closes the running session, removes the worktree, deletes the branch, and cleans
 
 - Inform user when a worker is idle with pending tasks. Do NOT auto-assign.
 
-## Phase 4: Task & Monitoring
+## Phase 4: Delivery & Monitoring
 
-### Task Commands
+### Worker Delivery Cycle
 
-```bash
-agent-team task create <worker-id> "<description>" [--proposal <file>] [--design <file>] [--verify-cmd <cmd>] [--skip-verify]
-agent-team task list [--worker <worker-id>] [--status <status>]
-agent-team task show <worker-id> <change-name>
-agent-team task done <worker-id> <change-name> <task-id>
-agent-team task verify <worker-id> <change-name>
-agent-team task archive <worker-id> <change-name>
-```
-
-### Worker TDD Cycle
-
-Workers follow a TDD cycle upon receiving a `[New Change Assigned]` notification: read requirements -> write acceptance tests -> implement (marking tasks done) -> run verify -> notify main with result.
+Workers follow a delivery cycle upon receiving a `[New Assignment]` notification: understand scope -> define acceptance -> implement -> verify -> notify main.
 
 Full worker workflow details: [references/worker-workflow.md](references/worker-workflow.md)
 
 ### Worker Notification Formats
 
 Workers notify the controller using `reply-main` with one of:
-- `"Task completed: <summary>; change archived: <change-name>"`
-- `"Task completed: <summary>; archive failed for <change-name>: <error>"`
+- `"Task completed: <summary>"`
 - `"Need decision: <problem or options>"` (when blocked)
 
-> **AI Behavior (Task Completion)**: Treat worker `reply-main` as the default completion signal after assignment, surface the outcome to the user, and ask how to proceed. Do NOT auto-merge.
+> **AI Behavior (Completion)**: Treat worker `reply-main` as the default completion signal after assignment, surface the outcome to the user, and ask how to proceed. Do NOT auto-merge.
 
 ## Phase 5: Communication
 

@@ -1,9 +1,9 @@
-// cmd/task_show.go
 package cmd
 
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/JsonLee12138/agent-team/internal"
 	"github.com/spf13/cobra"
@@ -11,67 +11,52 @@ import (
 
 func newTaskShowCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "show <worker-id> <change-name>",
-		Short: "Show details of a task change",
-		Args:  cobra.ExactArgs(2),
+		Use:   "show <task-id>",
+		Short: "Show task package details",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return GetApp(cmd).RunTaskShow(args[0], args[1])
+			return GetApp(cmd).RunTaskShow(args[0])
 		},
 	}
-
 	return cmd
 }
 
-func (a *App) RunTaskShow(workerID, changeName string) error {
+func (a *App) RunTaskShow(taskID string) error {
 	root := a.Git.Root()
-	wtPath := internal.WtPath(root, a.WtBase, workerID)
-
-	if _, err := os.Stat(wtPath); os.IsNotExist(err) {
-		return fmt.Errorf("worker '%s' not found", workerID)
-	}
-
-	change, err := internal.LoadChange(wtPath, changeName)
+	record, archived, err := internal.LoadTaskRecord(root, taskID)
 	if err != nil {
-		return fmt.Errorf("load change: %w", err)
+		return err
+	}
+	contextPath := internal.TaskContextPath(root, taskID)
+	if archived {
+		contextPath = internal.TaskArchiveContextPath(root, taskID)
+	}
+	contextData, err := os.ReadFile(contextPath)
+	if err != nil {
+		return fmt.Errorf("read context.md: %w", err)
 	}
 
-	// Display change details
-	fmt.Printf("Change: %s\n", change.Name)
-	fmt.Printf("Description: %s\n", change.Description)
-	fmt.Printf("Status: %s\n", change.Status)
-	fmt.Printf("Created: %s\n", change.CreatedAt)
-	if change.AssignedTo != "" {
-		fmt.Printf("Assigned To: %s\n", change.AssignedTo)
+	fmt.Printf("Task: %s\n", record.TaskID)
+	fmt.Printf("Title: %s\n", record.Title)
+	fmt.Printf("Role: %s\n", record.Role)
+	fmt.Printf("Status: %s\n", record.Status)
+	fmt.Printf("Task Path: %s\n", record.TaskPath)
+	if record.WorkerID != "" {
+		fmt.Printf("Worker: %s\n", record.WorkerID)
 	}
-
-	// Display verify config
-	if change.Verify.Command != "" {
-		fmt.Printf("Verify Command: %s\n", change.Verify.Command)
-		fmt.Printf("Verify Timeout: %s\n", change.Verify.Timeout)
+	fmt.Printf("Created At: %s\n", record.CreatedAt)
+	if record.AssignedAt != "" {
+		fmt.Printf("Assigned At: %s\n", record.AssignedAt)
 	}
-	if change.Verify.Skip {
-		fmt.Printf("Verify: skipped\n")
+	if record.DoneAt != "" {
+		fmt.Printf("Done At: %s\n", record.DoneAt)
 	}
-
-	// Display tasks
-	if len(change.Tasks) > 0 {
-		fmt.Printf("\nTasks:\n")
-		for _, task := range change.Tasks {
-			fmt.Printf("  [%d] %s (%s)\n", task.ID, task.Title, task.Status)
-		}
+	if record.ArchivedAt != "" {
+		fmt.Printf("Archived At: %s\n", record.ArchivedAt)
 	}
-
-	// Display file list
-	fmt.Printf("\nFiles:\n")
-	changeDir := internal.ChangeDirPath(wtPath, changeName)
-	entries, err := os.ReadDir(changeDir)
-	if err == nil {
-		for _, e := range entries {
-			if !e.IsDir() {
-				fmt.Printf("  - %s\n", e.Name())
-			}
-		}
+	if record.MergedSHA != "" {
+		fmt.Printf("Merged SHA: %s\n", record.MergedSHA)
 	}
-
+	fmt.Printf("\n%s\n", strings.TrimSpace(string(contextData)))
 	return nil
 }

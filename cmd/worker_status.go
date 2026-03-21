@@ -27,7 +27,7 @@ func (a *App) RunWorkerStatus() error {
 		return nil
 	}
 
-	fmt.Printf("%-24s %-16s %-24s %-12s %s\n", "Worker", "Role", "Status", "Skills", "Changes")
+	fmt.Printf("%-24s %-16s %-24s %-12s %s\n", "Worker", "Role", "Status", "Skills", "Task")
 	fmt.Printf("%-24s %-16s %-24s %-12s %s\n", "────────────────────────", "────────────────", "────────────────────────", "────────────", "──────────────────────────")
 
 	for _, w := range workers {
@@ -57,18 +57,15 @@ func (a *App) RunWorkerStatus() error {
 			}
 		}
 
-		// Count changes
-		wtPath := internal.WtPath(root, a.WtBase, w.WorkerID)
-		active := 0
-		if w.Config != nil && w.Config.IsWorktreeCreated() {
-			active = internal.CountActiveChanges(wtPath)
-		}
-		changesSummary := "0"
-		if active > 0 {
-			changesSummary = fmt.Sprintf("%d active", active)
+		taskSummary := "-"
+		if w.Config != nil && w.Config.TaskID != "" {
+			taskSummary = w.Config.TaskID
+			if w.Config.Status != "" {
+				taskSummary = fmt.Sprintf("%s (%s)", w.Config.TaskID, w.Config.Status)
+			}
 		}
 
-		fmt.Printf("%-24s %-16s %-24s %-12s %s\n", w.WorkerID, w.Role, status, skillsSummary, changesSummary)
+		fmt.Printf("%-24s %-16s %-24s %-12s %s\n", w.WorkerID, w.Role, status, skillsSummary, taskSummary)
 	}
 	return nil
 }

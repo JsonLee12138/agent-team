@@ -11,17 +11,21 @@ import (
 
 // WorkerConfig represents an employee instance of a role.
 type WorkerConfig struct {
-	WorkerID         string `yaml:"worker_id"`
-	Role             string `yaml:"role"`
-	RoleScope        string `yaml:"role_scope,omitempty"`      // "project" | "global"
-	RolePath         string `yaml:"role_path,omitempty"`       // absolute path for global roles
-	Provider         string `yaml:"provider"`
-	DefaultModel     string `yaml:"default_model,omitempty"`
-	MainSessionID    string `yaml:"main_session_id,omitempty"`
-	PaneID           string `yaml:"pane_id"`
-	ControllerPaneID string `yaml:"controller_pane_id,omitempty"`
-	CreatedAt        string `yaml:"created_at"`
-	WorktreeCreated  *bool  `yaml:"worktree_created,omitempty"`
+	WorkerID         string     `yaml:"worker_id"`
+	Role             string     `yaml:"role"`
+	RoleScope        string     `yaml:"role_scope,omitempty"`      // "project" | "global"
+	RolePath         string     `yaml:"role_path,omitempty"`       // absolute path for global roles
+	Provider         string     `yaml:"provider"`
+	DefaultModel     string     `yaml:"default_model,omitempty"`
+	MainSessionID    string     `yaml:"main_session_id,omitempty"`
+	PaneID           string     `yaml:"pane_id"`
+	ControllerPaneID string     `yaml:"controller_pane_id,omitempty"`
+	TaskID           string     `yaml:"task_id,omitempty"`
+	TaskPath         string     `yaml:"task_path,omitempty"`
+	Status           TaskStatus `yaml:"status,omitempty"`
+	CreatedAt        string     `yaml:"created_at"`
+	UpdatedAt        string     `yaml:"updated_at,omitempty"`
+	WorktreeCreated  *bool      `yaml:"worktree_created,omitempty"`
 }
 
 // MainSessionConfig stores the project's main/controller pane metadata.
@@ -70,20 +74,28 @@ func (c *WorkerConfig) IsWorktreeCreated() bool {
 	return *c.WorktreeCreated
 }
 
-// LoadWorkerConfigByID loads worker config from the new centralized path first,
-// then falls back to the legacy worktree-local path.
+// LoadWorkerConfigByID loads worker config from the worktree-local path first,
+// then falls back to the centralized compatibility path.
 func LoadWorkerConfigByID(root, wtBase, workerID string) (*WorkerConfig, string, error) {
-	newPath := WorkerConfigPath(root, workerID)
-	if cfg, err := LoadWorkerConfig(newPath); err == nil {
-		return cfg, newPath, nil
+	localPath := WorkerYAMLPath(WtPath(root, wtBase, workerID))
+	if cfg, err := LoadWorkerConfig(localPath); err == nil {
+		return cfg, localPath, nil
 	}
 
-	legacyPath := WorkerYAMLPath(WtPath(root, wtBase, workerID))
-	cfg, err := LoadWorkerConfig(legacyPath)
+	compatPath := WorkerConfigPath(root, workerID)
+	cfg, err := LoadWorkerConfig(compatPath)
 	if err != nil {
-		return nil, "", fmt.Errorf("read centralized config %s or legacy config %s: %w", newPath, legacyPath, err)
+		return nil, "", fmt.Errorf("read local config %s or centralized config %s: %w", localPath, compatPath, err)
 	}
-	return cfg, legacyPath, nil
+	return cfg, compatPath, nil
+}
+
+func WorkerConfigWritePath(root, wtBase, workerID string) string {
+	wtPath := WtPath(root, wtBase, workerID)
+	if info, err := os.Stat(wtPath); err == nil && info.IsDir() {
+		return WorkerYAMLPath(wtPath)
+	}
+	return WorkerConfigPath(root, workerID)
 }
 
 func LoadMainSessionConfig(path string) (*MainSessionConfig, error) {

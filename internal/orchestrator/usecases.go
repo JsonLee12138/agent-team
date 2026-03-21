@@ -5,13 +5,11 @@ import (
 
 	"github.com/JsonLee12138/agent-team/internal/governance"
 	requirementmodule "github.com/JsonLee12138/agent-team/internal/modules/requirement"
-	taskmodule "github.com/JsonLee12138/agent-team/internal/modules/task"
 	workflowmodule "github.com/JsonLee12138/agent-team/internal/modules/workflow"
 )
 
 type Usecases struct {
 	Root              string
-	Task              taskmodule.Service
 	Requirement       requirementmodule.Service
 	Workflow          workflowmodule.Service
 	ExceptionRegistry governance.ArchivedExceptionRegistry
@@ -20,7 +18,6 @@ type Usecases struct {
 func NewUsecases(root string) *Usecases {
 	return &Usecases{
 		Root:              root,
-		Task:              taskmodule.NewService(root),
 		Requirement:       requirementmodule.NewService(root),
 		Workflow:          workflowmodule.NewService(root),
 		ExceptionRegistry: governance.NewInMemoryArchivedExceptionRegistry(),

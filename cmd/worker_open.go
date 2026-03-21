@@ -53,7 +53,8 @@ func (a *App) bootstrapWorkerWorktree(root, wtPath, workerID, sessionProvider st
 	}
 	worktreeCreated := true
 	cfg.WorktreeCreated = &worktreeCreated
-	configPath := internal.WorkerConfigPath(root, workerID)
+	cfg.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	configPath := internal.WorkerYAMLPath(wtPath)
 	if err := cfg.Save(configPath); err != nil {
 		return "", fmt.Errorf("save worker config: %w", err)
 	}
@@ -99,7 +100,12 @@ func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow, persist
 		cfg.DefaultModel = model
 		configChanged = true
 	}
-	if configChanged {
+
+	if cfg.IsWorktreeCreated() {
+		configPath = internal.WorkerConfigWritePath(root, a.WtBase, workerID)
+	}
+	if configChanged && cfg.IsWorktreeCreated() {
+		cfg.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 		if err := cfg.Save(configPath); err != nil {
 			return fmt.Errorf("save worker config: %w", err)
 		}
@@ -165,6 +171,7 @@ func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow, persist
 	} else if controllerPane := os.Getenv("TMUX_PANE"); controllerPane != "" {
 		cfg.ControllerPaneID = controllerPane
 	}
+	cfg.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	if err := cfg.Save(configPath); err != nil {
 		return fmt.Errorf("save worker config: %w", err)
 	}

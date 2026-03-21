@@ -63,7 +63,7 @@ List only already-resolved items that matter for the next step.
 State the next controller action as a concrete step.
 Examples:
 - `read worker diff, then decide review vs merge`
-- `run workflow state wait and pause for worker reply`
+- `run workflow plan activate and continue governance execution`
 
 ### Risks
 

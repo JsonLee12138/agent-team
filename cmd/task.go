@@ -1,14 +1,11 @@
-// cmd/task.go
 package cmd
 
-import (
-	"github.com/spf13/cobra"
-)
+import "github.com/spf13/cobra"
 
 func newTaskCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "task",
-		Short: "Manage task changes and verification",
+		Short: "Manage task packages",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
 		},
@@ -17,9 +14,8 @@ func newTaskCmd() *cobra.Command {
 	cmd.AddCommand(newTaskCreateCmd())
 	cmd.AddCommand(newTaskListCmd())
 	cmd.AddCommand(newTaskShowCmd())
-	cmd.AddCommand(newTaskVerifyCmd())
-	cmd.AddCommand(newTaskArchiveCmd())
+	cmd.AddCommand(newTaskAssignCmd())
 	cmd.AddCommand(newTaskDoneCmd())
-
+	cmd.AddCommand(newTaskArchiveCmd())
 	return cmd
 }

@@ -77,7 +77,7 @@ func TestListWorkers(t *testing.T) {
 	if len(workers) != 2 {
 		t.Fatalf("ListWorkers = %v, want 2 workers", workers)
 	}
-	if workers[0].WorkerID != "backend-001" || workers[0].Role != "backend" {
+	if workers[0].WorkerID != "backend-001" || workers[0].Role != "legacy-duplicate" {
 		t.Fatalf("workers[0] = %+v", workers[0])
 	}
 	if workers[1].WorkerID != "backend-002" || workers[1].Role != "backend" {
@@ -295,20 +295,17 @@ func TestInjectRolePromptLegacy(t *testing.T) {
 	if !strings.Contains(content, "team/dev-001") {
 		t.Error("CLAUDE.md should contain worker branch name")
 	}
-	if !strings.Contains(content, "Task Completion Protocol") {
+	if !strings.Contains(content, "Completion Protocol") {
 		t.Error("CLAUDE.md should contain task completion protocol (legacy)")
 	}
-	if !strings.Contains(content, "Reply to main controller (used by workers)") {
+	if !strings.Contains(content, "Use `agent-team reply-main` for worker-to-main communication") {
 		t.Error("CLAUDE.md should require reply-main protocol (legacy)")
 	}
 	if !strings.Contains(content, "Task completed: <summary>") {
 		t.Error("CLAUDE.md should contain completion reply example (legacy)")
 	}
-	if !strings.Contains(content, "After the archive attempt (success or failure)") {
-		t.Error("CLAUDE.md should require notification after archive attempt (legacy)")
-	}
-	if !strings.Contains(content, "agent-team task archive") {
-		t.Error("CLAUDE.md should contain task archive command (legacy)")
+	if !strings.Contains(content, "agent-team reply-main \"Task completed: <summary>\"") {
+		t.Error("CLAUDE.md should contain reply-main completion command (legacy)")
 	}
 	if !strings.Contains(content, "Need decision: <problem or options>") {
 		t.Error("CLAUDE.md should contain blocker/options reply example (legacy)")
@@ -333,7 +330,7 @@ func TestInjectRolePromptSlim(t *testing.T) {
 	// Create .agents/rules/ directory with index.md → triggers slim mode
 	rulesDir := filepath.Join(dir, ".agents", "rules")
 	os.MkdirAll(rulesDir, 0755)
-	os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("- `debugging.md`: bug, flaky test\n- `task-protocol.md`: task start, verify\n"), 0644)
+	os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("- `debugging.md`: bug, flaky test\n- `worktree.md`: task start, verify\n"), 0644)
 
 	err := InjectRolePrompt(wtPath, "dev-001", "dev", dir)
 	if err != nil {
@@ -358,15 +355,15 @@ func TestInjectRolePromptSlim(t *testing.T) {
 		if !strings.Contains(content, "Full-stack developer") {
 			t.Errorf("%s should contain description from role.yaml", name)
 		}
-		// Slim mode: Development Environment present but Git Rules / Task Completion Protocol NOT inlined
+		// Slim mode: Development Environment present but Git Rules / Completion Protocol NOT inlined
 		if !strings.Contains(content, "Development Environment") {
 			t.Errorf("%s should contain worktree context", name)
 		}
 		if strings.Contains(content, "### Git Rules") {
 			t.Errorf("%s should NOT inline Git Rules in slim mode", name)
 		}
-		if strings.Contains(content, "### Task Completion Protocol") {
-			t.Errorf("%s should NOT inline Task Completion Protocol in slim mode", name)
+		if strings.Contains(content, "### Completion Protocol") {
+			t.Errorf("%s should NOT inline Completion Protocol in slim mode", name)
 		}
 		// Rules index section present
 		if !strings.Contains(content, "Rules Reference") {
@@ -732,7 +729,7 @@ func TestBuildRulesIndexSection(t *testing.T) {
 		dir := t.TempDir()
 		rulesDir := filepath.Join(dir, ".agents", "rules")
 		os.MkdirAll(rulesDir, 0755)
-		os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("- `debugging.md`: bugs\n- `task-protocol.md`: tasks\n"), 0644)
+		os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("- `debugging.md`: bugs\n- `worktree.md`: tasks\n"), 0644)
 
 		section := buildRulesIndexSection(dir)
 		if !strings.Contains(section, "Rules Reference") {
@@ -741,7 +738,7 @@ func TestBuildRulesIndexSection(t *testing.T) {
 		if !strings.Contains(section, "debugging.md") {
 			t.Error("should contain rule file reference")
 		}
-		if !strings.Contains(section, "task-protocol.md") {
+		if !strings.Contains(section, "worktree.md") {
 			t.Error("should contain task-protocol reference")
 		}
 	})
@@ -800,7 +797,7 @@ func TestExtractSkillTrigger(t *testing.T) {
 }
 
 func TestInjectRolePromptSlimNoGitRulesOrTaskProtocol(t *testing.T) {
-	// Explicitly verify slim mode excludes Git Rules and Task Completion Protocol content
+	// Explicitly verify slim mode excludes Git Rules and Completion Protocol content
 	dir := t.TempDir()
 	wtPath := filepath.Join(dir, ".worktrees", "test-001")
 	os.MkdirAll(wtPath, 0755)
@@ -814,7 +811,7 @@ func TestInjectRolePromptSlimNoGitRulesOrTaskProtocol(t *testing.T) {
 	// Create rules dir → triggers slim mode
 	rulesDir := filepath.Join(dir, ".agents", "rules")
 	os.MkdirAll(rulesDir, 0755)
-	os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("- `task-protocol.md`: tasks\n"), 0644)
+	os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("- `worktree.md`: tasks\n"), 0644)
 
 	if err := InjectRolePrompt(wtPath, "test-001", "test", dir); err != nil {
 		t.Fatalf("InjectRolePrompt: %v", err)
@@ -826,9 +823,9 @@ func TestInjectRolePromptSlimNoGitRulesOrTaskProtocol(t *testing.T) {
 	// Should NOT contain legacy inline sections
 	forbiddenPhrases := []string{
 		"### Git Rules",
-		"### Task Completion Protocol",
+		"### Completion Protocol",
 		"git add -A",
-		"agent-team task archive",
+		"agent-team reply-main \"Task completed: <summary>\"",
 		"Reply to main controller",
 		"Need decision: <problem or options>",
 	}
@@ -843,7 +840,7 @@ func TestInjectRolePromptSlimNoGitRulesOrTaskProtocol(t *testing.T) {
 		"You are the test role",
 		"Development Environment",
 		"Rules Reference",
-		"task-protocol.md",
+		"worktree.md",
 	}
 	for _, phrase := range requiredPhrases {
 		if !strings.Contains(content, phrase) {
@@ -853,7 +850,7 @@ func TestInjectRolePromptSlimNoGitRulesOrTaskProtocol(t *testing.T) {
 }
 
 func TestInjectRolePromptLegacyContainsFullContent(t *testing.T) {
-	// Verify legacy mode (no rules dir) contains full inline Git Rules and Task Completion Protocol
+	// Verify legacy mode (no rules dir) contains full inline Git Rules and Completion Protocol
 	dir := t.TempDir()
 	wtPath := filepath.Join(dir, ".worktrees", "legacy-001")
 	os.MkdirAll(wtPath, 0755)
@@ -873,10 +870,9 @@ func TestInjectRolePromptLegacyContainsFullContent(t *testing.T) {
 	requiredPhrases := []string{
 		"# System Prompt: dev",
 		"### Git Rules",
-		"### Task Completion Protocol",
-		"agent-team task archive",
-		"Reply to main controller",
-		"git add -A",
+		"### Completion Protocol",
+		"agent-team reply-main \"Task completed: <summary>\"",
+		"Use `agent-team reply-main` for worker-to-main communication",
 		"Need decision: <problem or options>",
 	}
 	for _, phrase := range requiredPhrases {

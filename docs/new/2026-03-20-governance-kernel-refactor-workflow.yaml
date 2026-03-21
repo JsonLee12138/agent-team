@@ -1,0 +1,177 @@
+version: 1
+name: governance-kernel-refactor-mainline
+source_doc: docs/new/2026-03-20-governance-kernel-refactor-brainstorming.md
+goal: >
+  落地“治理内核中心化 + 模块实现层 + 编排层分离”，并以文本上下文作为开发/决策唯一输入基线。
+
+global_constraints:
+  - Public Rule > Module Rule > Task Rule
+  - Declared-Ref-Strict
+  - Index-First
+  - No-Owner-Signoff-No-Exit
+  - archived 默认不得用于开发/决策输入
+  - archived 仅允许 owner 单签一次性只读排障
+
+stages:
+  - id: P0
+    name: 治理骨架落地
+    owner_signoff_required: true
+    tasks: [P0-T01, P0-T02, P0-T03, P0-T04, P0-T05, P0-T06, P0-T07, P0-T08]
+    exit_criteria:
+      - governance 契约集中定义完成
+      - Workflow Plan 状态机可用
+      - 三类 blocker 与统一返回结构通过单测
+
+  - id: P1
+    name: 模块解耦迁移
+    owner_signoff_required: true
+    tasks: [P1-T09, P1-T10, P1-T11, P1-T12, P1-T13]
+    exit_criteria:
+      - modules 仅保留实现层职责
+      - orchestrator 成为唯一跨模块协同入口
+      - 新路径默认生效，旧路径只读兼容
+
+  - id: P2
+    name: 编排入口收敛
+    owner_signoff_required: true
+    tasks: [P2-T14, P2-T15, P2-T16, P2-T17, P2-T18]
+    exit_criteria:
+      - cmd 一命令一用例
+      - skills/agent-team 壳化完成
+      - 全链路回归+双层验收通过
+
+tasks:
+  - id: P0-T01
+    title: 建立 governance 目录与核心契约
+    depends_on: []
+    outputs: [governance contracts, package skeleton]
+    dod:
+      - Task Packet / Index / Gate Result / Workflow Plan 仅在 governance 定义
+
+  - id: P0-T02
+    title: 定义 Workflow Plan 单对象状态机
+    depends_on: [P0-T01]
+    outputs: [state model, transitions]
+    dod:
+      - 生命周期固定为 proposed->approved->active->closed
+      - proposed->approved 仅 Owner 可执行
+
+  - id: P0-T03
+    title: 实现 Index-First 机制
+    depends_on: [P0-T01]
+    outputs: [index write/read flow]
+    dod:
+      - 对象未入索引不可参与流程
+      - 根索引仅摘要+指针，正文在模块内
+
+  - id: P0-T04
+    title: 实现 Rule Loader 固定优先级装载
+    depends_on: [P0-T01]
+    outputs: [rule loader]
+    dod:
+      - Public > Module > Task 可重复验证
+
+  - id: P0-T05
+    title: 实现 Gate Engine 三类 blocker
+    depends_on: [P0-T04, P0-T03]
+    outputs: [gate checks, error model]
+    dod:
+      - declared_reference_not_found / rule_override_conflict / archived_blocked 全可触发
+      - 返回结构统一: code/level/message/context/next_action
+
+  - id: P0-T06
+    title: 实现 Archived Exception 票据机制
+    depends_on: [P0-T05]
+    outputs: [exception ticket flow]
+    dod:
+      - owner 单签、单 task、只读、首读失效
+      - 默认 archived 阻断开发/决策输入
+
+  - id: P0-T07
+    title: 实现 Advisor 生成 Workflow Plan
+    depends_on: [P0-T02, P0-T03, P0-T04]
+    outputs: [GenerateWorkflowPlan usecase]
+    dod:
+      - 输入仅来自文本工件(index/rules/task packet/evidence)
+      - 输出包含 status=input_refs=reasons
+
+  - id: P0-T08
+    title: 治理层单元测试
+    depends_on: [P0-T05, P0-T06, P0-T07]
+    outputs: [unit tests]
+    dod:
+      - rule-loader/gate-engine/advisor 核心路径单测通过
+
+  - id: P1-T09
+    title: memory/rules/task/workflow 模块降级为实现层
+    depends_on: [P0-T08]
+    outputs: [module refactor]
+    dod:
+      - 模块内不再定义治理语义或门禁判定
+
+  - id: P1-T10
+    title: 建立 orchestrator 用例化入口
+    depends_on: [P1-T09]
+    outputs: [orchestrator usecases]
+    dod:
+      - 跨模块协同仅经 orchestrator
+      - orchestrator 仅调用 governance 用例
+
+  - id: P1-T11
+    title: 接入审批与激活链路
+    depends_on: [P1-T10]
+    outputs: [approval/activation flow]
+    dod:
+      - proposed->approved->active 全程受 gate 约束
+      - No-Owner-Signoff-No-Exit 生效
+
+  - id: P1-T12
+    title: 用例层集成测试
+    depends_on: [P1-T11]
+    outputs: [integration tests]
+    dod:
+      - orchestrator->governance->modules 链路通过
+
+  - id: P1-T13
+    title: 双轨兼容与退场机制
+    depends_on: [P1-T12]
+    outputs: [migration switch, deprecation path]
+    dod:
+      - 新路径默认；旧路径只读兼容并限期退场
+
+  - id: P2-T14
+    title: cmd 层收敛为一命令一用例
+    depends_on: [P1-T13]
+    outputs: [cmd refactor]
+    dod:
+      - cmd 仅参数解析与调用，不含治理/业务判定
+
+  - id: P2-T15
+    title: skills/agent-team 壳化
+    depends_on: [P2-T14]
+    outputs: [skill orchestration shell]
+    dod:
+      - skills 仅编排，不承载治理或业务逻辑
+
+  - id: P2-T16
+    title: 旧路径正式退场
+    depends_on: [P2-T15]
+    outputs: [legacy path removal]
+    dod:
+      - 无生产流程依赖旧路径
+
+  - id: P2-T17
+    title: 全链路回归测试
+    depends_on: [P2-T16]
+    outputs: [e2e regression report]
+    dod:
+      - 生成/审批/执行/归档/例外读取全链路通过
+      - 文本上下文安全校验通过
+
+  - id: P2-T18
+    title: 双层验收与最终签署
+    depends_on: [P2-T17]
+    outputs: [auto acceptance + owner/reviewer signoff]
+    dod:
+      - 模块自动验收 PASS
+      - Owner/Reviewer 最终签署完成

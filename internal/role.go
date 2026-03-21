@@ -315,26 +315,10 @@ func ListAvailableRoles(root string) []string {
 	return roles
 }
 
-// ListWorkers scans centralized worker configs and legacy worktree-local configs.
+// ListWorkers scans worktree-local worker configs first, then centralized compatibility configs.
 func ListWorkers(root, wtBase string) []WorkerInfo {
 	seen := map[string]struct{}{}
 	var workers []WorkerInfo
-
-	workersDir := filepath.Join(ResolveAgentsDir(root), "workers")
-	if entries, err := os.ReadDir(workersDir); err == nil {
-		for _, e := range entries {
-			if !e.IsDir() {
-				continue
-			}
-			workerID := e.Name()
-			cfg, err := LoadWorkerConfig(WorkerConfigPath(root, workerID))
-			if err != nil {
-				continue
-			}
-			workers = append(workers, WorkerInfo{WorkerID: workerID, Role: cfg.Role, Config: cfg})
-			seen[workerID] = struct{}{}
-		}
-	}
 
 	wtDir := filepath.Join(root, wtBase)
 	if entries, err := os.ReadDir(wtDir); err == nil {
@@ -343,10 +327,26 @@ func ListWorkers(root, wtBase string) []WorkerInfo {
 				continue
 			}
 			workerID := e.Name()
+			cfg, err := LoadWorkerConfig(WorkerYAMLPath(filepath.Join(wtDir, workerID)))
+			if err != nil {
+				continue
+			}
+			workers = append(workers, WorkerInfo{WorkerID: workerID, Role: cfg.Role, Config: cfg})
+			seen[workerID] = struct{}{}
+		}
+	}
+
+	workersDir := filepath.Join(ResolveAgentsDir(root), "workers")
+	if entries, err := os.ReadDir(workersDir); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			workerID := e.Name()
 			if _, ok := seen[workerID]; ok {
 				continue
 			}
-			cfg, err := LoadWorkerConfig(WorkerYAMLPath(filepath.Join(wtDir, workerID)))
+			cfg, err := LoadWorkerConfig(WorkerConfigPath(root, workerID))
 			if err != nil {
 				continue
 			}
@@ -521,39 +521,24 @@ You are working in an **isolated git worktree**. All development MUST happen her
 
 The main controller will merge your branch back to main when ready.
 
-### Task Completion Protocol
+### Completion Protocol
 
-Use the ` + "`agent-team`" + ` skill's **Reply to main controller (used by workers)** protocol for worker-to-main communication.
-For EVERY completed task, you MUST send a completion message to main controller.
-When any task is done:
-1. **Commit all work** — Before reporting, ensure all task-related changes are committed. Do NOT use ` + "`git add -A`" + ` or ` + "`git add .`" + ` blindly. Instead:
-   - Run ` + "`git status`" + ` to review changed files
-   - Only stage files that are **within the scope of your task** (e.g., if the task modifies ` + "`src/auth/`" + `, only stage files under that path)
-   - Ignore untracked files that are not part of your work (build artifacts, temp files, etc.)
-   - Commit with a clear message summarizing the changes:
-     ` + "```bash" + `
-     git add <specific-files-or-directories>
-     git commit -m "<clear summary of changes>"
-     ` + "```" + `
-   - If there are no uncommitted task-related changes (already committed during development), skip this step
-2. Run ` + "`agent-team task archive <worker-id> <change-name>`" + ` to archive the completed change
-3. After the archive attempt (success or failure), ALWAYS notify main controller:
+Use ` + "`agent-team reply-main`" + ` for worker-to-main communication.
+When work is done:
+1. Commit task-scoped changes.
+2. Notify main controller:
    ` + "```bash" + `
-   agent-team reply-main "Task completed: <summary>; change archived: <change-name>"
+   agent-team reply-main "Task completed: <summary>"
    ` + "```" + `
-4. If archive fails, you may still report completion, but MUST include the failure details:
-   ` + "```bash" + `
-   agent-team reply-main "Task completed: <summary>; archive failed for <change-name>: <error>"
-   ` + "```" + `
-5. If you have blockers, questions, or implementation options, report them to main controller:
+3. If blocked, report immediately:
    ` + "```bash" + `
    agent-team reply-main "Need decision: <problem or options>"
    ` + "```" + `
-6. Do not start the next task until the completion summary has been sent.
+4. Do not start the next task until completion or blocker message has been sent.
 `))
 
 // slimRoleSectionTmpl is the slim template used when .agents/rules/ exists.
-// Git Rules and Task Completion Protocol are delegated to external rule files.
+// Completion details are delegated to external rule files.
 var slimRoleSectionTmpl = template.Must(template.New("slimRoleSection").Parse(`
 ## Skill-First Workflow
 
@@ -691,7 +676,7 @@ func buildSkillIndexSection(root, roleName, rolePath string) string {
 
 // buildRoleSectionFromPath builds the AGENT_TEAM section content from the role at rolePath.
 // When .agents/rules/ exists, uses slim mode (minimal identity + rules index + skill index).
-// Otherwise falls back to legacy mode (full system.md + inline Git Rules & Task Completion Protocol).
+// Otherwise falls back to legacy mode (full system.md + inline completion protocol).
 func buildRoleSectionFromPath(wtPath, workerID, roleName, rolePath, root string) (string, error) {
 	roleSystemPath := filepath.Join(rolePath, "system.md")
 	if _, err := os.Stat(roleSystemPath); err != nil {

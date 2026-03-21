@@ -17,8 +17,8 @@ import (
 var workerShellInitDelay = 3 * time.Second
 
 // defaultTaskSetup is the real task initialization function.
-var defaultTaskSetup = func(wtPath string) error {
-	return internal.InitTasksDir(wtPath)
+var defaultTaskSetup = func(_ string) error {
+	return nil
 }
 
 // taskSetup can be overridden in tests to skip task initialization.
@@ -33,7 +33,7 @@ func newWorkerCreateCmd() *cobra.Command {
 	var fresh bool
 	cmd := &cobra.Command{
 		Use:   "create <role-name> [--provider <provider>] [--model <model>]",
-		Short: "Create a new worker (use 'worker open' to start its session)",
+		Short: "Create a worker stub (task assign is preferred)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return GetApp(cmd).RunWorkerCreate(args[0], provider, model, fresh)
@@ -132,6 +132,7 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, fresh bool) erro
 	fmt.Printf("  → Provider: %s\n", provider)
 	fmt.Printf("  → Branch: %s\n", branch)
 	fmt.Printf("  → Worktree: deferred until first open/assign\n")
-	fmt.Printf("  → Run 'agent-team worker open %s' to create the worktree and start the session\n", workerID)
+	fmt.Printf("  → Preferred flow: create a task, then run 'agent-team task assign <task-id>'\n")
+	fmt.Printf("  → Compatibility flow: run 'agent-team worker open %s' to start this worker manually\n", workerID)
 	return nil
 }

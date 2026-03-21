@@ -1,66 +1,38 @@
-// cmd/task_archive.go
 package cmd
 
 import (
 	"fmt"
-	"os"
+	"time"
 
 	"github.com/JsonLee12138/agent-team/internal"
 	"github.com/spf13/cobra"
 )
 
 func newTaskArchiveCmd() *cobra.Command {
-	var dir string
-
+	var mergedSHA string
 	cmd := &cobra.Command{
-		Use:   "archive <worker-id> <change-name>",
-		Short: "Archive a task change",
-		Args:  cobra.ExactArgs(2),
+		Use:   "archive <task-id> --merged-sha <sha>",
+		Short: "Archive a done task after merge",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return GetApp(cmd).RunTaskArchive(args[0], args[1], dir)
+			return GetApp(cmd).RunTaskArchive(args[0], mergedSHA)
 		},
 	}
-
-	cmd.Flags().StringVar(&dir, "dir", "", "Override worker directory (for script use)")
-
+	cmd.Flags().StringVar(&mergedSHA, "merged-sha", "", "Merged commit SHA")
+	_ = cmd.MarkFlagRequired("merged-sha")
 	return cmd
 }
 
-func (a *App) RunTaskArchive(workerID, changeName, overrideDir string) error {
-	root := a.Git.Root()
-
-	// Allow script to override the worker directory
-	var wtPath string
-	if overrideDir != "" {
-		wtPath = overrideDir
-	} else {
-		wtPath = internal.WtPath(root, a.WtBase, workerID)
-	}
-
-	if _, err := os.Stat(wtPath); os.IsNotExist(err) {
-		return fmt.Errorf("worker directory '%s' not found", wtPath)
-	}
-
-	change, err := internal.LoadChange(wtPath, changeName)
+func (a *App) RunTaskArchive(taskID, mergedSHA string) error {
+	record, err := internal.ArchiveTask(a.Git.Root(), taskID, mergedSHA, time.Now().UTC())
 	if err != nil {
-		return fmt.Errorf("load change: %w", err)
+		return err
 	}
-
-	// Validate transition
-	if err := internal.ValidateChangeTransition(change.Status, internal.ChangeStatusArchived); err != nil {
-		return fmt.Errorf("cannot archive change in '%s' state: %w", change.Status, err)
+	if record.WorkerID != "" {
+		if err := a.RunWorkerDelete(record.WorkerID); err != nil {
+			return fmt.Errorf("archive task '%s' but cleanup worker '%s' failed: %w", taskID, record.WorkerID, err)
+		}
 	}
-
-	// Apply transition
-	if err := internal.ApplyChangeTransition(change, internal.ChangeStatusArchived); err != nil {
-		return fmt.Errorf("apply transition: %w", err)
-	}
-
-	// Save change
-	if err := internal.SaveChange(wtPath, change); err != nil {
-		return fmt.Errorf("save change: %w", err)
-	}
-
-	fmt.Printf("✓ Archived change: %s\n", changeName)
+	fmt.Printf("✓ Archived task '%s'\n", record.TaskID)
 	return nil
 }

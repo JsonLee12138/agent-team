@@ -447,7 +447,7 @@ func TestSyncRulesDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read index.md: %v", err)
 	}
-	for _, needle := range []string{"project-commands.md", "agent-team-commands.md", "merge-workflow.md"} {
+	for _, needle := range []string{"project-commands.md", "agent-team-commands.md", "merge-workflow.md", "worktree.md"} {
 		if !strings.Contains(string(indexData), needle) {
 			t.Fatalf("index.md should reference %s, got:\n%s", needle, string(indexData))
 		}
@@ -485,7 +485,7 @@ func TestInitProviderFiles(t *testing.T) {
 			if !strings.Contains(content, ".agents/rules/index.md") {
 				t.Errorf("%s should reference rules/index.md", name)
 			}
-			for _, needle := range []string{".agents/rules/project-commands.md", ".agents/rules/agent-team-commands.md", ".agents/rules/merge-workflow.md"} {
+			for _, needle := range []string{".agents/rules/project-commands.md", ".agents/rules/agent-team-commands.md", ".agents/rules/merge-workflow.md", ".agents/rules/worktree.md"} {
 				if !strings.Contains(content, needle) {
 					t.Errorf("%s should reference %s", name, needle)
 				}

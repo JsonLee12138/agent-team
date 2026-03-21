@@ -111,7 +111,6 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(newReplyCmd())
 	rootCmd.AddCommand(newReplyMainCmd())
 	rootCmd.AddCommand(newCompactCmd())
-	rootCmd.AddCommand(newTaskCmd())
 	rootCmd.AddCommand(newMigrateCmd())
 	rootCmd.AddCommand(newInjectRolePromptCmd())
 	rootCmd.AddCommand(newRecordMainPaneCmd())
@@ -121,5 +120,5 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(newCatalogCmd())
 	rootCmd.AddCommand(newSkillCmd())
 	rootCmd.AddCommand(newWorkflowCmd())
-	rootCmd.AddCommand(newReqCmd())
+	rootCmd.AddCommand(newTaskCmd())
 }

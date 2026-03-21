@@ -1,4 +1,3 @@
-// cmd/task_list.go
 package cmd
 
 import (
@@ -9,83 +8,37 @@ import (
 )
 
 func newTaskListCmd() *cobra.Command {
-	var status string
-	var worker string
-
+	var archived bool
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all task changes",
+		Short: "List tasks",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return GetApp(cmd).RunTaskList(worker, status)
+			return GetApp(cmd).RunTaskList(archived)
 		},
 	}
-
-	cmd.Flags().StringVar(&status, "status", "", "Filter by status (draft|assigned|implementing|verifying|done|archived)")
-	cmd.Flags().StringVarP(&worker, "worker", "w", "", "Filter by worker ID")
-
+	cmd.Flags().BoolVar(&archived, "archived", false, "Include archived tasks")
 	return cmd
 }
 
-func (a *App) RunTaskList(workerID, statusFilter string) error {
-	root := a.Git.Root()
-
-	// Determine which worker(s) to list
-	var workers []internal.WorkerInfo
-	if workerID != "" {
-		cfg, _, err := internal.LoadWorkerConfigByID(root, a.WtBase, workerID)
-		if err != nil {
-			return fmt.Errorf("load worker config: %w", err)
-		}
-		workers = append(workers, internal.WorkerInfo{
-			WorkerID: workerID,
-			Config:   cfg,
-		})
-	} else {
-		workers = internal.ListWorkers(root, a.WtBase)
+func (a *App) RunTaskList(includeArchived bool) error {
+	tasks, err := internal.ListTasks(a.Git.Root(), !includeArchived)
+	if err != nil {
+		return err
 	}
-
-	if len(workers) == 0 {
-		fmt.Println("No workers found.")
+	if len(tasks) == 0 {
+		fmt.Println("No tasks found.")
 		return nil
 	}
 
-	fmt.Printf("%-36s %-16s %-16s %-12s %s\n", "Change", "Status", "Worker", "Tasks", "CreatedAt")
-	fmt.Printf("%-36s %-16s %-16s %-12s %s\n",
-		"────────────────────────────────────",
-		"────────────────",
-		"────────────────",
-		"────────────",
-		"──────────────────────")
-
-	for _, worker := range workers {
-		if worker.Config == nil {
-			continue
+	fmt.Printf("%-32s %-12s %-20s %s\n", "Task", "Status", "Role", "Worker")
+	fmt.Printf("%-32s %-12s %-20s %s\n", "────────────────────────────────", "────────────", "────────────────────", "────────────────────────")
+	for _, task := range tasks {
+		worker := task.WorkerID
+		if worker == "" {
+			worker = "-"
 		}
-		wtPath := internal.WtPath(root, a.WtBase, worker.WorkerID)
-
-		changes, err := internal.ListChanges(wtPath)
-		if err != nil {
-			continue
-		}
-
-		for _, change := range changes {
-			// Filter by status if specified
-			if statusFilter != "" && string(change.Status) != statusFilter {
-				continue
-			}
-
-			taskCount := len(change.Tasks)
-			tasksSummary := fmt.Sprintf("%d", taskCount)
-
-			fmt.Printf("%-36s %-16s %-16s %-12s %s\n",
-				change.Name,
-				change.Status,
-				worker.WorkerID,
-				tasksSummary,
-				change.CreatedAt)
-		}
+		fmt.Printf("%-32s %-12s %-20s %s\n", task.TaskID, task.Status, task.Role, worker)
 	}
-
 	return nil
 }

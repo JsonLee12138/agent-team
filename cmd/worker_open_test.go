@@ -57,7 +57,7 @@ func TestRunWorkerOpenPersistsExplicitOverrides(t *testing.T) {
 		DefaultModel: "sonnet",
 		PaneID:       "",
 	}
-	if err := cfg.Save(internal.WorkerConfigPath(dir, "backend-001")); err != nil {
+	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 
@@ -65,7 +65,7 @@ func TestRunWorkerOpenPersistsExplicitOverrides(t *testing.T) {
 		t.Fatalf("RunWorkerOpen: %v", err)
 	}
 
-	reloaded, err := internal.LoadWorkerConfig(internal.WorkerConfigPath(dir, "backend-001"))
+	reloaded, _, err := internal.LoadWorkerConfigByID(dir, ".worktrees", "backend-001")
 	if err != nil {
 		t.Fatalf("LoadWorkerConfig: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestRunWorkerOpenWithoutFlagsUsesPersistedConfig(t *testing.T) {
 		Provider:     "codex",
 		DefaultModel: "gpt-5",
 	}
-	if err := cfg.Save(internal.WorkerConfigPath(dir, "backend-001")); err != nil {
+	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 
@@ -124,7 +124,7 @@ func TestRunWorkerOpenWithoutFlagsUsesPersistedConfig(t *testing.T) {
 		t.Fatalf("RunWorkerOpen: %v", err)
 	}
 
-	reloaded, err := internal.LoadWorkerConfig(internal.WorkerConfigPath(dir, "backend-001"))
+	reloaded, _, err := internal.LoadWorkerConfigByID(dir, ".worktrees", "backend-001")
 	if err != nil {
 		t.Fatalf("LoadWorkerConfig: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestRunWorkerOpenCompatProviderFallbackDoesNotPersist(t *testing.T) {
 		WorkerID: "backend-001",
 		Role:     "backend",
 	}
-	if err := cfg.Save(internal.WorkerConfigPath(dir, "backend-001")); err != nil {
+	if err := cfg.Save(internal.WorkerYAMLPath(wtPath)); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
 
@@ -181,7 +181,7 @@ func TestRunWorkerOpenCompatProviderFallbackDoesNotPersist(t *testing.T) {
 		t.Fatalf("RunWorkerOpen: %v", err)
 	}
 
-	reloaded, err := internal.LoadWorkerConfig(internal.WorkerConfigPath(dir, "backend-001"))
+	reloaded, _, err := internal.LoadWorkerConfigByID(dir, ".worktrees", "backend-001")
 	if err != nil {
 		t.Fatalf("LoadWorkerConfig: %v", err)
 	}
@@ -231,11 +231,12 @@ func TestRunWorkerOpenBootstrapsDeferredWorktree(t *testing.T) {
 		Provider:        "claude",
 		WorktreeCreated: &falseValue,
 	}
-	if err := cfg.Save(internal.WorkerConfigPath(dir, "backend-001")); err != nil {
-		t.Fatalf("save worker config: %v", err)
-	}
 
 	wtPath := filepath.Join(dir, ".worktrees", "backend-001")
+	compatPath := internal.WorkerConfigPath(dir, "backend-001")
+	if err := cfg.Save(compatPath); err != nil {
+		t.Fatalf("save worker config: %v", err)
+	}
 	if _, err := os.Stat(wtPath); !os.IsNotExist(err) {
 		t.Fatalf("worktree should not exist before open, err=%v", err)
 	}
@@ -247,9 +248,9 @@ func TestRunWorkerOpenBootstrapsDeferredWorktree(t *testing.T) {
 	if _, err := os.Stat(wtPath); err != nil {
 		t.Fatalf("expected bootstrapped worktree: %v", err)
 	}
-	reloaded, err := internal.LoadWorkerConfig(internal.WorkerConfigPath(dir, "backend-001"))
+	reloaded, err := internal.LoadWorkerConfig(internal.WorkerYAMLPath(wtPath))
 	if err != nil {
-		t.Fatalf("LoadWorkerConfig: %v", err)
+		t.Fatalf("LoadWorkerConfig local: %v", err)
 	}
 	if !reloaded.IsWorktreeCreated() {
 		t.Fatal("WorktreeCreated should be true after bootstrap")
