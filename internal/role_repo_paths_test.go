@@ -12,7 +12,7 @@ func TestRoleRepoPaths_ProjectScope(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveRoleRepoInstallRoot: %v", err)
 	}
-	if !strings.HasSuffix(install, filepath.Join(".agents", "teams")) {
+	if !strings.HasSuffix(install, filepath.Join(".agent-team", "teams")) {
 		t.Fatalf("project install root = %q", install)
 	}
 

@@ -41,7 +41,7 @@ func TestReadRoleSkills(t *testing.T) {
 	})
 
 	t.Run("reads skills list", func(t *testing.T) {
-		roleDir := filepath.Join(dir, ".agents", "teams", "dev", "references")
+		roleDir := filepath.Join(dir, ".agent-team", "teams", "dev", "references")
 		os.MkdirAll(roleDir, 0755)
 		content := "name: dev\nskills:\n  - vite\n  - antfu/skills@vitest\n"
 		os.WriteFile(filepath.Join(roleDir, "role.yaml"), []byte(content), 0644)
@@ -59,7 +59,7 @@ func TestReadRoleSkills(t *testing.T) {
 	})
 
 	t.Run("empty skills returns empty", func(t *testing.T) {
-		roleDir := filepath.Join(dir, ".agents", "teams", "empty-role", "references")
+		roleDir := filepath.Join(dir, ".agent-team", "teams", "empty-role", "references")
 		os.MkdirAll(roleDir, 0755)
 		content := "name: empty-role\nskills: []\n"
 		os.WriteFile(filepath.Join(roleDir, "role.yaml"), []byte(content), 0644)
@@ -84,8 +84,8 @@ func TestFindSkillPath(t *testing.T) {
 		}
 	})
 
-	t.Run("finds in .agents/teams/", func(t *testing.T) {
-		teamDir := filepath.Join(dir, ".agents", "teams", "my-role")
+	t.Run("finds in .agent-team/teams/", func(t *testing.T) {
+		teamDir := filepath.Join(dir, ".agent-team", "teams", "my-role")
 		os.MkdirAll(teamDir, 0755)
 
 		got := findSkillPath(dir, "my-role")
@@ -104,13 +104,13 @@ func TestFindSkillPath(t *testing.T) {
 		}
 	})
 
-	t.Run("finds in .agents/.cache/skills/", func(t *testing.T) {
-		skillDir := filepath.Join(dir, ".agents", ".cache", "skills", "local-cached-skill")
+	t.Run("finds in .agent-team/.cache/skills/", func(t *testing.T) {
+		skillDir := filepath.Join(dir, ".agent-team", ".cache", "skills", "local-cached-skill")
 		os.MkdirAll(skillDir, 0755)
 
 		got := findSkillPath(dir, "local-cached-skill")
 		if got != skillDir {
-			t.Errorf("findSkillPath(.agents/.cache) = %q, want %q", got, skillDir)
+			t.Errorf("findSkillPath(.agent-team/.cache) = %q, want %q", got, skillDir)
 		}
 	})
 
@@ -124,15 +124,15 @@ func TestFindSkillPath(t *testing.T) {
 		}
 	})
 
-	t.Run(".agents/teams takes priority over skills/", func(t *testing.T) {
-		teamDir := filepath.Join(dir, ".agents", "teams", "dual")
+	t.Run(".agent-team/teams takes priority over skills/", func(t *testing.T) {
+		teamDir := filepath.Join(dir, ".agent-team", "teams", "dual")
 		os.MkdirAll(teamDir, 0755)
 		skillDir := filepath.Join(dir, "skills", "dual")
 		os.MkdirAll(skillDir, 0755)
 
 		got := findSkillPath(dir, "dual")
 		if got != teamDir {
-			t.Errorf("findSkillPath should prefer .agents/teams/, got %q", got)
+			t.Errorf("findSkillPath should prefer .agent-team/teams/, got %q", got)
 		}
 	})
 }
@@ -164,7 +164,7 @@ func TestCopySkillsToWorktree(t *testing.T) {
 	os.MkdirAll(wtPath, 0755)
 
 	// Create role skill
-	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "dev")
 	refDir := filepath.Join(roleDir, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# dev\n"), 0644)
@@ -236,7 +236,7 @@ func TestCopySkillsToWorktreeScopedName(t *testing.T) {
 	os.MkdirAll(wtPath, 0755)
 
 	// Create role with scoped skill dependency
-	roleDir := filepath.Join(dir, ".agents", "teams", "arch")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "arch")
 	refDir := filepath.Join(roleDir, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# arch\n"), 0644)
@@ -331,7 +331,7 @@ func TestInstallSkillsForWorkerLocalOnly(t *testing.T) {
 	os.MkdirAll(wtPath, 0755)
 
 	// Create role skill
-	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "dev")
 	refDir := filepath.Join(roleDir, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# dev\n"), 0644)
@@ -369,7 +369,7 @@ func TestInstallSkillsForWorkerCodexProvider(t *testing.T) {
 	os.MkdirAll(wtPath, 0755)
 
 	// Create role skill
-	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "dev")
 	refDir := filepath.Join(roleDir, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# dev\n"), 0644)
@@ -456,10 +456,10 @@ func TestProjectSkillPath(t *testing.T) {
 	tests := []struct {
 		root, provider, skillName, wantSuffix string
 	}{
-		{"/project", "claude", "vite", filepath.Join(".agents", ".cache", "skills", "vite")},
-		{"/project", "codex", "vitest", filepath.Join(".agents", ".cache", "skills", "vitest")},
-		{"/project", "opencode", "eslint", filepath.Join(".agents", ".cache", "skills", "eslint")},
-		{"/project", "gemini", "prettier", filepath.Join(".agents", ".cache", "skills", "prettier")},
+		{"/project", "claude", "vite", filepath.Join(".agent-team", ".cache", "skills", "vite")},
+		{"/project", "codex", "vitest", filepath.Join(".agent-team", ".cache", "skills", "vitest")},
+		{"/project", "opencode", "eslint", filepath.Join(".agent-team", ".cache", "skills", "eslint")},
+		{"/project", "gemini", "prettier", filepath.Join(".agent-team", ".cache", "skills", "prettier")},
 	}
 	for _, tt := range tests {
 		got := projectSkillPath(tt.root, tt.provider, tt.skillName)
@@ -506,7 +506,7 @@ func TestInstallSkillsForWorkerSymlink(t *testing.T) {
 	os.MkdirAll(wtPath, 0755)
 
 	// Create role skill
-	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "dev")
 	refDir := filepath.Join(roleDir, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# dev\n"), 0644)
@@ -559,7 +559,7 @@ func TestFreshFlag(t *testing.T) {
 	os.MkdirAll(wtPath, 0755)
 
 	// Create role skill (no dependencies, just test fresh on role itself)
-	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "dev")
 	refDir := filepath.Join(roleDir, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# v1\n"), 0644)
@@ -597,7 +597,7 @@ func TestFindCachedSkillUsage(t *testing.T) {
 	wtBase := ".worktrees"
 
 	// Create cache with two skills
-	cacheDir := filepath.Join(dir, ".agents", ".cache", "skills")
+	cacheDir := filepath.Join(dir, ".agent-team", ".cache", "skills")
 	os.MkdirAll(filepath.Join(cacheDir, "vite"), 0755)
 	os.WriteFile(filepath.Join(cacheDir, "vite", "SKILL.md"), []byte("# vite\n"), 0644)
 	os.MkdirAll(filepath.Join(cacheDir, "vitest"), 0755)
@@ -646,7 +646,7 @@ func TestFindCachedSkillUsageNonSymlink(t *testing.T) {
 	wtBase := ".worktrees"
 
 	// Create cache
-	cacheDir := filepath.Join(dir, ".agents", ".cache", "skills")
+	cacheDir := filepath.Join(dir, ".agent-team", ".cache", "skills")
 	os.MkdirAll(filepath.Join(cacheDir, "eslint"), 0755)
 
 	// Create worktree with a regular directory (not symlink) named "eslint"

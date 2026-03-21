@@ -18,23 +18,29 @@ func TestRulesSyncCmdHasRebuildFlag(t *testing.T) {
 
 func TestRulesSyncRefreshesStaticRulesAndProjectCommands(t *testing.T) {
 	_, dir := initTestApp(t)
-	prevRebuild := rebuildProjectCommands
-	rebuildProjectCommands = func(root string) (*internal.BuildScriptScan, error) {
-		path := filepath.Join(root, ".agents", "rules", "project-commands.md")
-		if err := os.WriteFile(path, []byte("# Project Commands Rules\n\nSynced from tests.\n"), 0644); err != nil {
+	prevRebuild := rebuildProjectRules
+	rebuildProjectRules = func(root string) (*internal.BuildScriptScan, error) {
+		projectDir := filepath.Join(root, ".agent-team", "rules", "project")
+		if err := os.MkdirAll(projectDir, 0755); err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(filepath.Join(projectDir, "project-commands.md"), []byte("# Project Commands Rules\n\nSynced from tests.\n"), 0644); err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(filepath.Join(projectDir, "project-constraints.md"), []byte("# Project Constraints\n\nSynced from tests.\n"), 0644); err != nil {
 			return nil, err
 		}
 		return &internal.BuildScriptScan{}, nil
 	}
-	t.Cleanup(func() { rebuildProjectCommands = prevRebuild })
+	t.Cleanup(func() { rebuildProjectRules = prevRebuild })
 
-	if err := os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, ".agent-team", "rules"), 0755); err != nil {
 		t.Fatalf("mkdir rules dir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".agents", "rules", "index.md"), []byte("# stale\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".agent-team", "rules", "index.md"), []byte("# stale\n"), 0644); err != nil {
 		t.Fatalf("write stale index: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".agents", "rules", "build-verification.md"), []byte("legacy\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".agent-team", "rules", "build-verification.md"), []byte("legacy\n"), 0644); err != nil {
 		t.Fatalf("write legacy build-verification.md: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "Makefile"), []byte("build:\n\tgo build ./...\n\ntest:\n\tgo test ./...\n"), 0644); err != nil {
@@ -57,23 +63,23 @@ func TestRulesSyncRefreshesStaticRulesAndProjectCommands(t *testing.T) {
 		t.Fatalf("rules sync: %v", err)
 	}
 
-	indexData, err := os.ReadFile(filepath.Join(dir, ".agents", "rules", "index.md"))
+	indexData, err := os.ReadFile(filepath.Join(dir, ".agent-team", "rules", "index.md"))
 	if err != nil {
 		t.Fatalf("read index.md: %v", err)
 	}
-	if !strings.Contains(string(indexData), "project-commands.md") {
-		t.Fatalf("index.md = %q, want project-commands reference", string(indexData))
+	if !strings.Contains(string(indexData), "project/") {
+		t.Fatalf("index.md = %q, want project directory reference", string(indexData))
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, ".agents", "rules", "project-commands.md"))
+	data, err := os.ReadFile(filepath.Join(dir, ".agent-team", "rules", "project/project-commands.md"))
 	if err != nil {
-		t.Fatalf("read project-commands.md: %v", err)
+		t.Fatalf("read project/project-commands.md: %v", err)
 	}
 	content := string(data)
 	if !strings.Contains(content, "Synced from tests.") {
-		t.Fatalf("project-commands.md = %q, want regenerated content", content)
+		t.Fatalf("project/project-commands.md = %q, want regenerated content", content)
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".agents", "rules", "build-verification.md")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(dir, ".agent-team", "rules", "build-verification.md")); !os.IsNotExist(err) {
 		t.Fatalf("legacy build-verification.md should be removed, err=%v", err)
 	}
 
@@ -82,8 +88,8 @@ func TestRulesSyncRefreshesStaticRulesAndProjectCommands(t *testing.T) {
 		t.Fatalf("read AGENTS.md: %v", err)
 	}
 	contentAGENTS := string(agentData)
-	if !strings.Contains(contentAGENTS, ".agents/rules/project-commands.md") {
-		t.Fatalf("AGENTS.md should reference project-commands.md, got:\n%s", contentAGENTS)
+	if !strings.Contains(contentAGENTS, ".agent-team/rules/project/") {
+		t.Fatalf("AGENTS.md should reference .agent-team/rules/project/, got:\n%s", contentAGENTS)
 	}
 	if strings.Contains(contentAGENTS, "MUST call `/compact`") {
 		t.Fatalf("AGENTS.md should not require /compact, got:\n%s", contentAGENTS)

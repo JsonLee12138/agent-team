@@ -12,7 +12,7 @@ import (
 )
 
 // TestPersistentPreRunE_UninitializedProject tests the initialization check
-// in PersistentPreRunE when .agents/rules/ does not exist.
+// in PersistentPreRunE when .agent-team/rules/ does not exist.
 func TestPersistentPreRunE_UninitializedProject(t *testing.T) {
 	runPreRun := func(t *testing.T, branch string) error {
 		t.Helper()
@@ -50,9 +50,9 @@ func TestPersistentPreRunE_UninitializedProject(t *testing.T) {
 	t.Run("main branch requires initialization", func(t *testing.T) {
 		err := runPreRun(t, "main")
 		if err == nil {
-			t.Fatal("Expected error when .agents/rules/ not found on main branch")
+			t.Fatal("Expected error when .agent-team/rules/ not found on main branch")
 		}
-		if !contains(err.Error(), ".agents/rules/ not found") {
+		if !contains(err.Error(), ".agent-team/rules/ not found") {
 			t.Errorf("Expected initialization error, got: %v", err)
 		}
 	})
@@ -67,9 +67,9 @@ func TestPersistentPreRunE_UninitializedProject(t *testing.T) {
 	t.Run("non-team branch still requires initialization", func(t *testing.T) {
 		err := runPreRun(t, "feature/foo")
 		if err == nil {
-			t.Fatal("Expected error when .agents/rules/ not found on non-team branch")
+			t.Fatal("Expected error when .agent-team/rules/ not found on non-team branch")
 		}
-		if !contains(err.Error(), ".agents/rules/ not found") {
+		if !contains(err.Error(), ".agent-team/rules/ not found") {
 			t.Errorf("Expected initialization error, got: %v", err)
 		}
 	})
@@ -78,14 +78,14 @@ func TestPersistentPreRunE_UninitializedProject(t *testing.T) {
 // TestPersistentPreRunE_InitializedProject tests that Initialized project
 // passes PersistentPreRunE without error.
 func TestPersistentPreRunE_InitializedProject(t *testing.T) {
-	t.Run("passes when .agents/rules/ exists", func(t *testing.T) {
+	t.Run("passes when .agent-team/rules/ exists", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		// Initialize git repo
 		runGitCommand(t, tmpDir, "init")
 
-		// Create .agents/rules/ directory
-		rulesDir := filepath.Join(tmpDir, ".agents", "rules")
+		// Create .agent-team/rules/ directory
+		rulesDir := filepath.Join(tmpDir, ".agent-team", "rules")
 		if err := os.MkdirAll(rulesDir, 0755); err != nil {
 			t.Fatalf("create rules dir: %v", err)
 		}
@@ -109,7 +109,7 @@ func TestPersistentPreRunE_InitializedProject(t *testing.T) {
 		// It might fail later in the command execution, which is fine
 		if err != nil {
 			// Check if error is NOT about initialization
-			if contains(err.Error(), ".agents/rules/") {
+			if contains(err.Error(), ".agent-team/rules/") {
 				t.Errorf("Should pass initialization check, got: %v", err)
 			}
 		}
@@ -118,21 +118,21 @@ func TestPersistentPreRunE_InitializedProject(t *testing.T) {
 
 // TestHasRulesDir_Integration tests HasRulesDir helper in various scenarios.
 func TestHasRulesDir_Integration(t *testing.T) {
-	t.Run("returns true when .agents/rules/ exists", func(t *testing.T) {
+	t.Run("returns true when .agent-team/rules/ exists", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		rulesDir := filepath.Join(tmpDir, ".agents", "rules")
+		rulesDir := filepath.Join(tmpDir, ".agent-team", "rules")
 		if err := os.MkdirAll(rulesDir, 0755); err != nil {
 			t.Fatalf("create rules dir: %v", err)
 		}
 
 		if !internal.HasRulesDir(tmpDir) {
-			t.Error("HasRulesDir should return true when .agents/rules/ exists")
+			t.Error("HasRulesDir should return true when .agent-team/rules/ exists")
 		}
 	})
 
-	t.Run("returns false when .agents/ exists but rules/ does not", func(t *testing.T) {
+	t.Run("returns false when .agent-team/ exists but rules/ does not", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		agentsDir := filepath.Join(tmpDir, ".agents")
+		agentsDir := filepath.Join(tmpDir, ".agent-team")
 		if err := os.MkdirAll(agentsDir, 0755); err != nil {
 			t.Fatalf("create agents dir: %v", err)
 		}
@@ -142,17 +142,17 @@ func TestHasRulesDir_Integration(t *testing.T) {
 		}
 	})
 
-	t.Run("returns false when .agents/ does not exist", func(t *testing.T) {
+	t.Run("returns false when .agent-team/ does not exist", func(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		if internal.HasRulesDir(tmpDir) {
-			t.Error("HasRulesDir should return false when .agents/ does not exist")
+			t.Error("HasRulesDir should return false when .agent-team/ does not exist")
 		}
 	})
 
 	t.Run("returns false when rules is a file not a directory", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		agentsDir := filepath.Join(tmpDir, ".agents")
+		agentsDir := filepath.Join(tmpDir, ".agent-team")
 		if err := os.MkdirAll(agentsDir, 0755); err != nil {
 			t.Fatalf("create agents dir: %v", err)
 		}

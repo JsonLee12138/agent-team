@@ -33,7 +33,7 @@ func TestListAvailableRoles(t *testing.T) {
 	}
 
 	// create a role with SKILL.md
-	roleDir := filepath.Join(dir, ".agents", "teams", "backend")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "backend")
 	os.MkdirAll(roleDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# backend\n"), 0644)
 
@@ -46,7 +46,7 @@ func TestListAvailableRoles(t *testing.T) {
 func TestListWorkers(t *testing.T) {
 	dir := t.TempDir()
 	wtBase := ".worktrees"
-	os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".agent-team"), 0755)
 
 	// empty → no workers
 	workers := ListWorkers(dir, wtBase)
@@ -88,7 +88,7 @@ func TestListWorkers(t *testing.T) {
 func TestNextWorkerID(t *testing.T) {
 	dir := t.TempDir()
 	wtBase := ".worktrees"
-	os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".agent-team"), 0755)
 
 	// no workers → 001
 	got := NextWorkerID(dir, wtBase, "frontend-dev")
@@ -270,8 +270,8 @@ func TestInjectRolePromptLegacy(t *testing.T) {
 	wtPath := filepath.Join(dir, ".worktrees", "dev-001")
 	os.MkdirAll(wtPath, 0755)
 
-	// Create role system.md in .agents/teams/dev/ (NO .agents/rules/ → legacy mode)
-	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	// Create role system.md in .agent-team/teams/dev/ (NO .agent-team/rules/ → legacy mode)
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "dev")
 	os.MkdirAll(roleDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# System Prompt: dev\n\nA developer role.\n"), 0644)
 
@@ -318,7 +318,7 @@ func TestInjectRolePromptSlim(t *testing.T) {
 	os.MkdirAll(wtPath, 0755)
 
 	// Create role with system.md and role.yaml
-	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "dev")
 	refDir := filepath.Join(roleDir, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# System Prompt: dev\n\nA developer role.\n"), 0644)
@@ -327,8 +327,8 @@ func TestInjectRolePromptSlim(t *testing.T) {
 	// Create SKILL.md with frontmatter trigger
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("---\nname: dev\ndescription: >\n  Full-stack dev skill.\n  Use when the user asks for dev work.\n---\n# dev\n"), 0644)
 
-	// Create .agents/rules/ directory with index.md → triggers slim mode
-	rulesDir := filepath.Join(dir, ".agents", "rules")
+	// Create .agent-team/rules/ directory with index.md → triggers slim mode
+	rulesDir := filepath.Join(dir, ".agent-team", "rules")
 	os.MkdirAll(rulesDir, 0755)
 	os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("- `debugging.md`: bug, flaky test\n- `worktree.md`: task start, verify\n"), 0644)
 
@@ -386,7 +386,7 @@ func TestInjectRolePromptSlimShorterThanLegacy(t *testing.T) {
 	dir := t.TempDir()
 
 	// Setup role
-	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "dev")
 	refDir := filepath.Join(roleDir, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# System Prompt: dev\n\nA developer role.\n"), 0644)
@@ -403,7 +403,7 @@ func TestInjectRolePromptSlimShorterThanLegacy(t *testing.T) {
 	legacyLen := len(legacyData)
 
 	// Now create rules dir and build slim content
-	rulesDir := filepath.Join(dir, ".agents", "rules")
+	rulesDir := filepath.Join(dir, ".agent-team", "rules")
 	os.MkdirAll(rulesDir, 0755)
 	os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("- `debugging.md`: bug\n"), 0644)
 
@@ -440,28 +440,28 @@ func TestInjectRolePromptNoSource(t *testing.T) {
 func TestResolveAgentsDir(t *testing.T) {
 	t.Run("returns .agents/ when exists", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
+		os.MkdirAll(filepath.Join(dir, ".agent-team"), 0755)
 		got := ResolveAgentsDir(dir)
-		if got != filepath.Join(dir, ".agents") {
+		if got != filepath.Join(dir, ".agent-team") {
 			t.Errorf("ResolveAgentsDir = %q, want .agents/", got)
 		}
 	})
 
-	t.Run("falls back to agents/ when .agents/ missing", func(t *testing.T) {
+	t.Run("ignores legacy agents/ and still returns .agent-team", func(t *testing.T) {
 		dir := t.TempDir()
 		os.MkdirAll(filepath.Join(dir, "agents"), 0755)
 		got := ResolveAgentsDir(dir)
-		if got != filepath.Join(dir, "agents") {
-			t.Errorf("ResolveAgentsDir = %q, want agents/", got)
+		if got != filepath.Join(dir, ".agent-team") {
+			t.Errorf("ResolveAgentsDir = %q, want .agent-team/", got)
 		}
 	})
 
 	t.Run("prefers .agents/ over agents/ when both exist", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
+		os.MkdirAll(filepath.Join(dir, ".agent-team"), 0755)
 		os.MkdirAll(filepath.Join(dir, "agents"), 0755)
 		got := ResolveAgentsDir(dir)
-		if got != filepath.Join(dir, ".agents") {
+		if got != filepath.Join(dir, ".agent-team") {
 			t.Errorf("ResolveAgentsDir = %q, want .agents/ (priority)", got)
 		}
 	})
@@ -469,7 +469,7 @@ func TestResolveAgentsDir(t *testing.T) {
 	t.Run("returns .agents/ when neither exists", func(t *testing.T) {
 		dir := t.TempDir()
 		got := ResolveAgentsDir(dir)
-		if got != filepath.Join(dir, ".agents") {
+		if got != filepath.Join(dir, ".agent-team") {
 			t.Errorf("ResolveAgentsDir = %q, want .agents/ (default)", got)
 		}
 	})
@@ -478,9 +478,9 @@ func TestResolveAgentsDir(t *testing.T) {
 func TestRolePathFunctions(t *testing.T) {
 	// Use a temp dir with .agents/ so ResolveAgentsDir returns .agents/
 	root := t.TempDir()
-	os.MkdirAll(filepath.Join(root, ".agents"), 0755)
+	os.MkdirAll(filepath.Join(root, ".agent-team"), 0755)
 
-	if got := RoleDir(root, "frontend-dev"); got != filepath.Join(root, ".agents", "teams", "frontend-dev") {
+	if got := RoleDir(root, "frontend-dev"); got != filepath.Join(root, ".agent-team", "teams", "frontend-dev") {
 		t.Errorf("RoleDir = %q", got)
 	}
 }
@@ -515,7 +515,7 @@ func TestResolveRole_ProjectFirst(t *testing.T) {
 	t.Setenv("HOME", home)
 
 	// Create role in both project and global
-	projectRole := filepath.Join(root, ".agents", "teams", "my-role")
+	projectRole := filepath.Join(root, ".agent-team", "teams", "my-role")
 	os.MkdirAll(projectRole, 0755)
 	os.WriteFile(filepath.Join(projectRole, "SKILL.md"), []byte("# skill\n"), 0644)
 
@@ -540,7 +540,7 @@ func TestResolveRole_FallbackGlobal(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
-	os.MkdirAll(filepath.Join(root, ".agents"), 0755)
+	os.MkdirAll(filepath.Join(root, ".agent-team"), 0755)
 
 	// Only global role exists
 	globalRole := filepath.Join(home, ".agents", "roles", "my-role")
@@ -564,7 +564,7 @@ func TestResolveRole_NotFound(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
-	os.MkdirAll(filepath.Join(root, ".agents"), 0755)
+	os.MkdirAll(filepath.Join(root, ".agent-team"), 0755)
 
 	_, err := ResolveRole(root, "nonexistent-role")
 	if err == nil {
@@ -665,17 +665,17 @@ func TestListGlobalRoles_DirNotExists(t *testing.T) {
 }
 
 func TestHasRulesDir(t *testing.T) {
-	t.Run("returns true when .agents/rules/ exists", func(t *testing.T) {
+	t.Run("returns true when .agent-team/rules/ exists", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
+		os.MkdirAll(filepath.Join(dir, ".agent-team", "rules"), 0755)
 		if !HasRulesDir(dir) {
 			t.Error("HasRulesDir should return true")
 		}
 	})
 
-	t.Run("returns false when .agents/rules/ missing", func(t *testing.T) {
+	t.Run("returns false when .agent-team/rules/ missing", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
+		os.MkdirAll(filepath.Join(dir, ".agent-team"), 0755)
 		if HasRulesDir(dir) {
 			t.Error("HasRulesDir should return false")
 		}
@@ -683,8 +683,8 @@ func TestHasRulesDir(t *testing.T) {
 
 	t.Run("returns false when rules is a file not dir", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
-		os.WriteFile(filepath.Join(dir, ".agents", "rules"), []byte("not a dir"), 0644)
+		os.MkdirAll(filepath.Join(dir, ".agent-team"), 0755)
+		os.WriteFile(filepath.Join(dir, ".agent-team", "rules"), []byte("not a dir"), 0644)
 		if HasRulesDir(dir) {
 			t.Error("HasRulesDir should return false when rules is a file")
 		}
@@ -693,7 +693,7 @@ func TestHasRulesDir(t *testing.T) {
 
 func TestBuildRoleIdentity(t *testing.T) {
 	dir := t.TempDir()
-	roleDir := filepath.Join(dir, ".agents", "teams", "qa-tester")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "qa-tester")
 	refDir := filepath.Join(roleDir, "references")
 	os.MkdirAll(refDir, 0755)
 
@@ -711,7 +711,7 @@ func TestBuildRoleIdentity(t *testing.T) {
 
 func TestBuildRoleIdentityNoDescription(t *testing.T) {
 	dir := t.TempDir()
-	roleDir := filepath.Join(dir, ".agents", "teams", "minimal")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "minimal")
 	os.MkdirAll(roleDir, 0755)
 	// No references/role.yaml
 
@@ -727,7 +727,7 @@ func TestBuildRoleIdentityNoDescription(t *testing.T) {
 func TestBuildRulesIndexSection(t *testing.T) {
 	t.Run("returns content when index.md exists", func(t *testing.T) {
 		dir := t.TempDir()
-		rulesDir := filepath.Join(dir, ".agents", "rules")
+		rulesDir := filepath.Join(dir, ".agent-team", "rules")
 		os.MkdirAll(rulesDir, 0755)
 		os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("- `debugging.md`: bugs\n- `worktree.md`: tasks\n"), 0644)
 
@@ -745,7 +745,7 @@ func TestBuildRulesIndexSection(t *testing.T) {
 
 	t.Run("returns empty when index.md missing", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
+		os.MkdirAll(filepath.Join(dir, ".agent-team", "rules"), 0755)
 		// No index.md
 
 		section := buildRulesIndexSection(dir)
@@ -802,14 +802,14 @@ func TestInjectRolePromptSlimNoGitRulesOrTaskProtocol(t *testing.T) {
 	wtPath := filepath.Join(dir, ".worktrees", "test-001")
 	os.MkdirAll(wtPath, 0755)
 
-	roleDir := filepath.Join(dir, ".agents", "teams", "test")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "test")
 	refDir := filepath.Join(roleDir, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# System Prompt: test\n"), 0644)
 	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte("name: test\ndescription: Test role\n"), 0644)
 
 	// Create rules dir → triggers slim mode
-	rulesDir := filepath.Join(dir, ".agents", "rules")
+	rulesDir := filepath.Join(dir, ".agent-team", "rules")
 	os.MkdirAll(rulesDir, 0755)
 	os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("- `worktree.md`: tasks\n"), 0644)
 
@@ -855,11 +855,11 @@ func TestInjectRolePromptLegacyContainsFullContent(t *testing.T) {
 	wtPath := filepath.Join(dir, ".worktrees", "legacy-001")
 	os.MkdirAll(wtPath, 0755)
 
-	roleDir := filepath.Join(dir, ".agents", "teams", "dev")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "dev")
 	os.MkdirAll(roleDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# System Prompt: dev\nA developer.\n"), 0644)
 
-	// No .agents/rules/ → legacy mode
+	// No .agent-team/rules/ → legacy mode
 	if err := InjectRolePrompt(wtPath, "legacy-001", "dev", dir); err != nil {
 		t.Fatalf("InjectRolePrompt: %v", err)
 	}
@@ -893,7 +893,7 @@ func TestInjectRolePromptWithPathExplicit(t *testing.T) {
 	wtPath := filepath.Join(dir, ".worktrees", "wp-001")
 	os.MkdirAll(wtPath, 0755)
 
-	// Place role outside the standard .agents/teams/ location
+	// Place role outside the standard .agent-team/teams/ location
 	customRolePath := filepath.Join(dir, "custom-roles", "my-role")
 	os.MkdirAll(customRolePath, 0755)
 	os.WriteFile(filepath.Join(customRolePath, "system.md"), []byte("# System Prompt: my-role\nCustom location.\n"), 0644)
@@ -919,7 +919,7 @@ func TestInjectRolePromptAllThreeProviderFiles(t *testing.T) {
 	wtPath := filepath.Join(dir, ".worktrees", "multi-001")
 	os.MkdirAll(wtPath, 0755)
 
-	roleDir := filepath.Join(dir, ".agents", "teams", "multi")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "multi")
 	os.MkdirAll(roleDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# System Prompt: multi\n"), 0644)
 

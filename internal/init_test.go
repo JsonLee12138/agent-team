@@ -189,9 +189,9 @@ func TestInitProject(t *testing.T) {
 		t.Fatalf("InitProject: %v", err)
 	}
 
-	teamsDir := filepath.Join(dir, ".agents", "teams")
+	teamsDir := filepath.Join(dir, ".agent-team", "teams")
 	if _, err := os.Stat(teamsDir); os.IsNotExist(err) {
-		t.Error(".agents/teams/ should be created")
+		t.Error(".agent-team/teams/ should be created")
 	}
 
 	gitkeep := filepath.Join(teamsDir, ".gitkeep")
@@ -297,8 +297,8 @@ func TestRebuildProjectCommands(t *testing.T) {
 	dir := t.TempDir()
 	stubProjectCommandsGenerator(t, "# Project Commands Rules\n\nGenerated for tests.\n")
 
-	if err := os.MkdirAll(filepath.Join(dir, ".agents"), 0755); err != nil {
-		t.Fatalf("mkdir .agents: %v", err)
+	if err := os.MkdirAll(filepath.Join(dir, ".agent-team"), 0755); err != nil {
+		t.Fatalf("mkdir .agent-team: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "Makefile"), []byte("build:\n\tgo build ./...\n\ntest:\n\tgo test ./...\n"), 0644); err != nil {
 		t.Fatalf("write Makefile: %v", err)
@@ -315,10 +315,10 @@ func TestRebuildProjectCommands(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, ".build-hash"), []byte("legacy\n"), 0644); err != nil {
 		t.Fatalf("write .build-hash: %v", err)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755); err != nil {
-		t.Fatalf("mkdir .agents/rules: %v", err)
+	if err := os.MkdirAll(filepath.Join(dir, ".agent-team", "rules", "core"), 0755); err != nil {
+		t.Fatalf("mkdir .agent-team/rules: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".agents", "rules", "build-verification.md"), []byte("legacy\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".agent-team", "rules", "build-verification.md"), []byte("legacy\n"), 0644); err != nil {
 		t.Fatalf("write build-verification.md: %v", err)
 	}
 
@@ -327,7 +327,7 @@ func TestRebuildProjectCommands(t *testing.T) {
 		t.Fatalf("RebuildProjectCommands: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, ".agents", "rules", projectCommandsFileName))
+	data, err := os.ReadFile(filepath.Join(dir, ".agent-team", "rules", "project", projectCommandsFileName))
 	if err != nil {
 		t.Fatalf("read %s: %v", projectCommandsFileName, err)
 	}
@@ -346,7 +346,7 @@ func TestRebuildProjectCommands(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, ".build-hash")); !os.IsNotExist(err) {
 		t.Fatalf(".build-hash should be removed, err=%v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".agents", "rules", "build-verification.md")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(dir, ".agent-team", "rules", "build-verification.md")); !os.IsNotExist(err) {
 		t.Fatalf("legacy build-verification.md should be removed, err=%v", err)
 	}
 }
@@ -354,26 +354,30 @@ func TestRebuildProjectCommands(t *testing.T) {
 func TestInitRulesDir(t *testing.T) {
 	t.Run("creates all default rule files", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
+		os.MkdirAll(filepath.Join(dir, ".agent-team"), 0755)
 
 		created, err := InitRulesDir(dir)
 		if err != nil {
 			t.Fatalf("InitRulesDir: %v", err)
 		}
-		if created != len(defaultRuleFiles) {
-			t.Errorf("created %d files, want %d", created, len(defaultRuleFiles))
+		wantCreated := len(defaultRuleFiles) + len(defaultCoreRuleFiles)
+		if created != wantCreated {
+			t.Errorf("created %d files, want %d", created, wantCreated)
 		}
 
 		// Check all files exist
-		rulesDir := filepath.Join(dir, ".agents", "rules")
-		for name := range defaultRuleFiles {
-			fp := filepath.Join(rulesDir, name)
+		rulesDir := filepath.Join(dir, ".agent-team", "rules")
+		if _, err := os.Stat(filepath.Join(rulesDir, "index.md")); os.IsNotExist(err) {
+			t.Error("expected index.md to exist")
+		}
+		for name := range defaultCoreRuleFiles {
+			fp := filepath.Join(rulesDir, "core", name)
 			if _, err := os.Stat(fp); os.IsNotExist(err) {
-				t.Errorf("expected %s to exist", name)
+				t.Errorf("expected core/%s to exist", name)
 			}
 		}
-		if _, err := os.Stat(filepath.Join(rulesDir, projectCommandsFileName)); !os.IsNotExist(err) {
-			t.Error("project-commands.md should not be created by InitRulesDir")
+		if _, err := os.Stat(filepath.Join(rulesDir, "project", projectCommandsFileName)); !os.IsNotExist(err) {
+			t.Error("project/project-commands.md should not be created by InitRulesDir")
 		}
 		if _, err := os.Stat(filepath.Join(dir, ".build-hash")); !os.IsNotExist(err) {
 			t.Error(".build-hash should not exist after InitRulesDir")
@@ -382,23 +386,24 @@ func TestInitRulesDir(t *testing.T) {
 
 	t.Run("idempotent - does not overwrite existing files", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
+		os.MkdirAll(filepath.Join(dir, ".agent-team", "rules", "core"), 0755)
 
-		// Write a custom index.md
+		// Write a custom core rule file
 		customContent := "# Custom rules\n"
-		os.WriteFile(filepath.Join(dir, ".agents", "rules", "index.md"), []byte(customContent), 0644)
+		os.WriteFile(filepath.Join(dir, ".agent-team", "rules", "core", "debugging.md"), []byte(customContent), 0644)
 
 		created, err := InitRulesDir(dir)
 		if err != nil {
 			t.Fatalf("InitRulesDir: %v", err)
 		}
-		// Should create all files except index.md
-		if created != len(defaultRuleFiles)-1 {
-			t.Errorf("created %d files, want %d", created, len(defaultRuleFiles)-1)
+		// Should create index.md plus all missing core files except the customized one
+		wantCreated := len(defaultRuleFiles) + len(defaultCoreRuleFiles) - 1
+		if created != wantCreated {
+			t.Errorf("created %d files, want %d", created, wantCreated)
 		}
 
 		// Verify custom content is preserved
-		data, _ := os.ReadFile(filepath.Join(dir, ".agents", "rules", "index.md"))
+		data, _ := os.ReadFile(filepath.Join(dir, ".agent-team", "rules", "core", "debugging.md"))
 		if string(data) != customContent {
 			t.Errorf("custom content should be preserved, got %q", string(data))
 		}
@@ -406,7 +411,7 @@ func TestInitRulesDir(t *testing.T) {
 
 	t.Run("second run creates zero files", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
+		os.MkdirAll(filepath.Join(dir, ".agent-team"), 0755)
 
 		InitRulesDir(dir)
 		created, err := InitRulesDir(dir)
@@ -421,7 +426,7 @@ func TestInitRulesDir(t *testing.T) {
 
 func TestSyncRulesDir(t *testing.T) {
 	dir := t.TempDir()
-	rulesDir := filepath.Join(dir, ".agents", "rules")
+	rulesDir := filepath.Join(dir, ".agent-team", "rules")
 	if err := os.MkdirAll(rulesDir, 0755); err != nil {
 		t.Fatalf("mkdir rules dir: %v", err)
 	}
@@ -439,15 +444,16 @@ func TestSyncRulesDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SyncRulesDir: %v", err)
 	}
-	if written != len(defaultRuleFiles) {
-		t.Fatalf("written %d files, want %d", written, len(defaultRuleFiles))
+	wantWritten := len(defaultRuleFiles) + len(defaultCoreRuleFiles)
+	if written != wantWritten {
+		t.Fatalf("written %d files, want %d", written, wantWritten)
 	}
 
 	indexData, err := os.ReadFile(filepath.Join(rulesDir, "index.md"))
 	if err != nil {
 		t.Fatalf("read index.md: %v", err)
 	}
-	for _, needle := range []string{"project-commands.md", "agent-team-commands.md", "merge-workflow.md", "context cleanup", "worktree.md"} {
+	for _, needle := range []string{"core/debugging.md", "core/agent-team-commands.md", "core/merge-workflow.md", "project/", "worktree.md"} {
 		if !strings.Contains(string(indexData), needle) {
 			t.Fatalf("index.md should reference %s, got:\n%s", needle, string(indexData))
 		}
@@ -463,7 +469,7 @@ func TestSyncRulesDir(t *testing.T) {
 func TestInitProviderFiles(t *testing.T) {
 	t.Run("creates new provider files", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
+		os.MkdirAll(filepath.Join(dir, ".agent-team", "rules", "core"), 0755)
 
 		err := InitProviderFiles(dir)
 		if err != nil {
@@ -482,13 +488,13 @@ func TestInitProviderFiles(t *testing.T) {
 			if !strings.Contains(content, "Rules Reference") {
 				t.Errorf("%s should contain Rules Reference", name)
 			}
-			if !strings.Contains(content, ".agents/rules/index.md") {
+			if !strings.Contains(content, ".agent-team/rules/index.md") {
 				t.Errorf("%s should reference rules/index.md", name)
 			}
 			if strings.Contains(content, "MUST call `/compact`") {
 				t.Errorf("%s should not require /compact", name)
 			}
-			for _, needle := range []string{"context-cleanup", "index-first recovery", ".agents/rules/context-management.md", ".agents/rules/project-commands.md", ".agents/rules/agent-team-commands.md", ".agents/rules/merge-workflow.md", ".agents/rules/worktree.md"} {
+			for _, needle := range []string{"context-cleanup", "index-first recovery", ".agent-team/rules/core/context-management.md", ".agent-team/rules/project/", ".agent-team/rules/core/agent-team-commands.md", ".agent-team/rules/core/merge-workflow.md", ".agent-team/rules/core/worktree.md"} {
 				if !strings.Contains(content, needle) {
 					t.Errorf("%s should reference %s", name, needle)
 				}
@@ -510,7 +516,7 @@ func TestInitProviderFiles(t *testing.T) {
 
 	t.Run("preserves user content when updating", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
+		os.MkdirAll(filepath.Join(dir, ".agent-team", "rules", "core"), 0755)
 
 		// Write custom CLAUDE.md with user content
 		userContent := "# My Custom Project\n\nThis is my project.\n"
@@ -533,7 +539,7 @@ func TestInitProviderFiles(t *testing.T) {
 
 	t.Run("updates only tag section on re-run", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
+		os.MkdirAll(filepath.Join(dir, ".agent-team", "rules", "core"), 0755)
 
 		// First run
 		InitProviderFiles(dir)
@@ -561,7 +567,7 @@ func TestInitProviderFiles(t *testing.T) {
 
 	t.Run("merges settings.local hooks without clobbering existing config", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
+		os.MkdirAll(filepath.Join(dir, ".agent-team", "rules", "core"), 0755)
 		if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0755); err != nil {
 			t.Fatalf("mkdir .claude: %v", err)
 		}

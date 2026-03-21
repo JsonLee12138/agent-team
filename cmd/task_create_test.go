@@ -8,7 +8,7 @@ import (
 
 func TestRunTaskCreateCreatesTaskPackage(t *testing.T) {
 	app, dir := initTestApp(t)
-	roleDir := filepath.Join(dir, ".agents", "teams", "backend")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "backend")
 	if err := os.MkdirAll(roleDir, 0755); err != nil {
 		t.Fatalf("mkdir role dir: %v", err)
 	}

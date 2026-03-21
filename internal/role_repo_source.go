@@ -59,6 +59,13 @@ func ParseRolePathFromYAMLPath(p string) (roleName string, rolePath string, ok b
 		return parts[1], strings.Join(parts[:2], "/"), true
 	}
 
+	if len(parts) == 5 && parts[0] == ".agent-team" && parts[1] == "teams" && parts[3] == "references" && parts[4] == "role.yaml" {
+		if parts[2] == "" {
+			return "", "", false
+		}
+		return parts[2], strings.Join(parts[:3], "/"), true
+	}
+
 	if len(parts) == 5 && parts[0] == ".agents" && parts[1] == "teams" && parts[3] == "references" && parts[4] == "role.yaml" {
 		if parts[2] == "" {
 			return "", "", false

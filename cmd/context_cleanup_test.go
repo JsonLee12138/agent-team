@@ -44,7 +44,7 @@ func TestRunContextCleanupControllerUsesRulesIndex(t *testing.T) {
 		}
 	})
 
-	if !strings.Contains(out, filepath.Join(dir, ".agents", "rules", "index.md")) {
+	if !strings.Contains(out, filepath.Join(dir, ".agent-team", "rules", "index.md")) {
 		t.Fatalf("output should mention rules index first, got:\n%s", out)
 	}
 	if !strings.Contains(out, "not context compression") {

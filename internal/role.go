@@ -9,29 +9,14 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"text/template"
 
 	"gopkg.in/yaml.v3"
 )
 
-var deprecatedOnce sync.Once
-
-// ResolveAgentsDir 优先返回 .agents/，回退到 agents/（加 deprecation 警告）
+// ResolveAgentsDir returns the project-local agent-team directory.
 func ResolveAgentsDir(root string) string {
-	newPath := filepath.Join(root, ".agents")
-	if _, err := os.Stat(newPath); err == nil {
-		return newPath
-	}
-	oldPath := filepath.Join(root, "agents")
-	if _, err := os.Stat(oldPath); err == nil {
-		deprecatedOnce.Do(func() {
-			fmt.Fprintln(os.Stderr,
-				"[DEPRECATED] Using agents/ directory. Run 'agent-team migrate' to update to .agents/")
-		})
-		return oldPath
-	}
-	return newPath // 两者都不存在时返回新路径（将由命令创建）
+	return AgentTeamDir(root)
 }
 
 var SupportedProviders = map[string]bool{
@@ -60,7 +45,7 @@ func FindWtBase(root string) string {
 
 // --- v2 path functions ---
 
-// RoleDir returns the path to a role definition: .agents/teams/<role-name>/
+// RoleDir returns the path to a role definition: .agent-team/teams/<role-name>/
 func RoleDir(root, roleName string) string {
 	return filepath.Join(ResolveAgentsDir(root), "teams", roleName)
 }
@@ -189,7 +174,7 @@ func matchesKeywords(dirName string, ry roleYAMLFull, keywords []string) bool {
 }
 
 // ResolveRole looks up a role by name with project-first priority.
-// Search order: .agents/teams/<role> → ~/.agents/roles/<role>
+// Search order: .agent-team/teams/<role> → ~/.agents/roles/<role>
 func ResolveRole(root, roleName string) (*RoleMatch, error) {
 	// 1. Project-level
 	projectDir := RoleDir(root, roleName)
@@ -221,7 +206,7 @@ func ResolveRole(root, roleName string) (*RoleMatch, error) {
 		}, nil
 	}
 
-	return nil, fmt.Errorf("role '%s' not found in .agents/teams/ or ~/.agents/roles/.\nCreate it first using the role-creator skill", roleName)
+	return nil, fmt.Errorf("role '%s' not found in .agent-team/teams/ or ~/.agents/roles/.\nCreate it first using the role-creator skill", roleName)
 }
 
 // SearchGlobalRoles searches global roles by exact name match and keyword matching.
@@ -294,7 +279,7 @@ func ListGlobalRoles() ([]RoleMatch, error) {
 	return roles, nil
 }
 
-// ListAvailableRoles scans .agents/teams/ for directories containing SKILL.md.
+// ListAvailableRoles scans .agent-team/teams/ for directories containing SKILL.md.
 func ListAvailableRoles(root string) []string {
 	teamsDir := filepath.Join(ResolveAgentsDir(root), "teams")
 	entries, err := os.ReadDir(teamsDir)
@@ -315,9 +300,8 @@ func ListAvailableRoles(root string) []string {
 	return roles
 }
 
-// ListWorkers scans worktree-local worker configs first, then centralized compatibility configs.
+// ListWorkers scans worktree-local worker configs.
 func ListWorkers(root, wtBase string) []WorkerInfo {
-	seen := map[string]struct{}{}
 	var workers []WorkerInfo
 
 	wtDir := filepath.Join(root, wtBase)
@@ -328,25 +312,6 @@ func ListWorkers(root, wtBase string) []WorkerInfo {
 			}
 			workerID := e.Name()
 			cfg, err := LoadWorkerConfig(WorkerYAMLPath(filepath.Join(wtDir, workerID)))
-			if err != nil {
-				continue
-			}
-			workers = append(workers, WorkerInfo{WorkerID: workerID, Role: cfg.Role, Config: cfg})
-			seen[workerID] = struct{}{}
-		}
-	}
-
-	workersDir := filepath.Join(ResolveAgentsDir(root), "workers")
-	if entries, err := os.ReadDir(workersDir); err == nil {
-		for _, e := range entries {
-			if !e.IsDir() {
-				continue
-			}
-			workerID := e.Name()
-			if _, ok := seen[workerID]; ok {
-				continue
-			}
-			cfg, err := LoadWorkerConfig(WorkerConfigPath(root, workerID))
 			if err != nil {
 				continue
 			}
@@ -381,15 +346,6 @@ func NextWorkerID(root, wtBase, roleName string) string {
 		}
 		if num > maxNum {
 			maxNum = num
-		}
-	}
-
-	workersDir := filepath.Join(ResolveAgentsDir(root), "workers")
-	if entries, err := os.ReadDir(workersDir); err == nil {
-		for _, e := range entries {
-			if e.IsDir() {
-				consider(e.Name())
-			}
 		}
 	}
 
@@ -481,7 +437,7 @@ type roleSectionData struct {
 	Skills   []string
 }
 
-// legacyRoleSectionTmpl is the full template used when .agents/rules/ does not exist (backward compatible).
+// legacyRoleSectionTmpl is the full template used when .agent-team/rules/ does not exist (backward compatible).
 var legacyRoleSectionTmpl = template.Must(template.New("legacyRoleSection").Parse(`
 ## Skill-First Workflow
 
@@ -537,7 +493,7 @@ When work is done:
 4. Do not start the next task until completion or blocker message has been sent.
 `))
 
-// slimRoleSectionTmpl is the slim template used when .agents/rules/ exists.
+// slimRoleSectionTmpl is the slim template used when .agent-team/rules/ exists.
 // Completion details are delegated to external rule files.
 var slimRoleSectionTmpl = template.Must(template.New("slimRoleSection").Parse(`
 ## Skill-First Workflow
@@ -570,7 +526,7 @@ You are working in an **isolated git worktree**. All development MUST happen her
 The main controller will merge your branch back to main when ready.
 `))
 
-// HasRulesDir checks if .agents/rules/ directory exists at the project root.
+// HasRulesDir checks if .agent-team/rules/ directory exists at the project root.
 func HasRulesDir(root string) bool {
 	rulesDir := filepath.Join(ResolveAgentsDir(root), "rules")
 	info, err := os.Stat(rulesDir)
@@ -588,7 +544,7 @@ func buildRoleIdentity(roleName, rolePath string) string {
 	return b.String()
 }
 
-// buildRulesIndexSection reads .agents/rules/index.md and returns its content.
+// buildRulesIndexSection reads .agent-team/rules/index.md and returns its content.
 // Returns empty string if the file does not exist.
 func buildRulesIndexSection(root string) string {
 	indexPath := filepath.Join(ResolveAgentsDir(root), "rules", "index.md")
@@ -596,7 +552,7 @@ func buildRulesIndexSection(root string) string {
 	if err != nil {
 		return ""
 	}
-	return "\n## Rules Reference\n\nLoad `.agents/rules/index.md` at task start, then load only the matching rule files:\n\n" + string(data)
+	return "\n## Rules Reference\n\nLoad `.agent-team/rules/index.md` at task start, then load only the matching rule files:\n\n" + string(data)
 }
 
 // skillIndexEntry holds a skill's name and trigger description for slim injection.
@@ -675,7 +631,7 @@ func buildSkillIndexSection(root, roleName, rolePath string) string {
 }
 
 // buildRoleSectionFromPath builds the AGENT_TEAM section content from the role at rolePath.
-// When .agents/rules/ exists, uses slim mode (minimal identity + rules index + skill index).
+// When .agent-team/rules/ exists, uses slim mode (minimal identity + rules index + skill index).
 // Otherwise falls back to legacy mode (full system.md + inline completion protocol).
 func buildRoleSectionFromPath(wtPath, workerID, roleName, rolePath, root string) (string, error) {
 	roleSystemPath := filepath.Join(rolePath, "system.md")

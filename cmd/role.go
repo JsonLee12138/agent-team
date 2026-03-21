@@ -21,7 +21,7 @@ func newRoleCmd() *cobra.Command {
 func newRoleListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "List available roles in agents/teams/",
+		Short: "List available roles in .agent-team/teams/",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return GetApp(cmd).RunRoleList()
@@ -43,7 +43,7 @@ func (a *App) RunRoleList() error {
 	}
 
 	if len(projectRoles) > 0 {
-		fmt.Println("Project roles (.agents/teams/):")
+		fmt.Println("Project roles (.agent-team/teams/):")
 		fmt.Printf("  %-24s %s\n", "Role", "Path")
 		fmt.Printf("  %-24s %s\n", "────────────────────────", "──────────────────────────")
 		for _, role := range projectRoles {

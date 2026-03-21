@@ -336,8 +336,8 @@ func CreateOrUpdateRole(
 	}
 
 	var baseDir string
-	if targetDirName == ".agents/teams" {
-		baseDir = filepath.Join(repoRoot, ".agents", "teams")
+	if targetDirName == ".agent-team/teams" {
+		baseDir = filepath.Join(ResolveAgentsDir(repoRoot), "teams")
 	} else {
 		baseDir = filepath.Join(repoRoot, targetDirName)
 	}

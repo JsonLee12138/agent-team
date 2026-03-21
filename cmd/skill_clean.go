@@ -21,7 +21,7 @@ func newSkillCleanCmd() *cobra.Command {
 			root := GetApp(cmd).Git.Root()
 			wtBase := internal.FindWtBase(root)
 
-			dir := filepath.Join(root, ".agents", ".cache", "skills")
+			dir := filepath.Join(internal.ResolveAgentsDir(root), ".cache", "skills")
 			entries, err := os.ReadDir(dir)
 			if err != nil || len(entries) == 0 {
 				fmt.Println("No cached skills found.")

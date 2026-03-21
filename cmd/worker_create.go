@@ -49,12 +49,14 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, fresh bool) erro
 	_ = fresh
 	root := a.Git.Root()
 
-	projectCommandsPath := filepath.Join(internal.ResolveAgentsDir(root), "rules", "project-commands.md")
-	if _, err := os.Stat(projectCommandsPath); err != nil {
+	projectRulesDir := filepath.Join(internal.ResolveAgentsDir(root), "rules", "project")
+	if info, err := os.Stat(projectRulesDir); err != nil || !info.IsDir() {
 		if os.IsNotExist(err) {
-			fmt.Fprintln(os.Stderr, "Warning: project command rules are missing. Run 'agent-team rules sync' to generate .agents/rules/project-commands.md before assigning command-heavy work.")
+			fmt.Fprintln(os.Stderr, "Warning: project rules are missing. Run 'agent-team rules sync' to generate .agent-team/rules/project/ before assigning command-heavy work.")
+		} else if err == nil {
+			fmt.Fprintf(os.Stderr, "Warning: %s exists but is not a directory\n", projectRulesDir)
 		} else {
-			fmt.Fprintf(os.Stderr, "Warning: could not inspect %s: %v\n", projectCommandsPath, err)
+			fmt.Fprintf(os.Stderr, "Warning: could not inspect %s: %v\n", projectRulesDir, err)
 		}
 	}
 
@@ -98,27 +100,33 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, fresh bool) erro
 	if _, err := os.Stat(wtPath); err == nil {
 		return fmt.Errorf("worker '%s' already exists at %s", workerID, wtPath)
 	}
-	if _, err := os.Stat(configPath); err == nil {
-		return fmt.Errorf("worker '%s' already exists at %s", workerID, configPath)
+	if a.Git.BranchExists(branch) {
+		return fmt.Errorf("worker '%s' already exists on branch %s", workerID, branch)
 	}
 
 	fmt.Printf("Creating worker '%s' (role: %s, provider: %s)...\n", workerID, roleName, provider)
 
-	// 4. Create and save centralized worker config only.
 	now := time.Now().UTC().Format("2006-01-02T15:04:05Z")
-	worktreeCreated := false
+	worktreeCreated := true
 	cfg := &internal.WorkerConfig{
 		WorkerID:        workerID,
 		Role:            roleName,
-		Provider:        provider,
-		DefaultModel:    model,
-		PaneID:          "",
-		CreatedAt:       now,
+		Provider:       provider,
+		DefaultModel:   model,
+		PaneID:         "",
+		CreatedAt:      now,
 		WorktreeCreated: &worktreeCreated,
 	}
 	if roleScope == "global" {
 		cfg.RoleScope = roleScope
 		cfg.RolePath = rolePath
+	}
+
+	if err := a.Git.WorktreeAdd(wtPath, branch); err != nil {
+		return err
+	}
+	if err := internal.WriteWorktreeGitignore(wtPath); err != nil {
+		return fmt.Errorf("write .gitignore: %w", err)
 	}
 	if err := cfg.Save(configPath); err != nil {
 		return fmt.Errorf("save worker config: %w", err)
@@ -131,7 +139,7 @@ func (a *App) RunWorkerCreate(roleName, provider, model string, fresh bool) erro
 	}
 	fmt.Printf("  → Provider: %s\n", provider)
 	fmt.Printf("  → Branch: %s\n", branch)
-	fmt.Printf("  → Worktree: deferred until first open/assign\n")
+	fmt.Printf("  → Worktree: %s\n", wtPath)
 	fmt.Printf("  → Preferred flow: create a task, then run 'agent-team task assign <task-id>'\n")
 	fmt.Printf("  → Compatibility flow: run 'agent-team worker open %s' to start this worker manually\n", workerID)
 	return nil

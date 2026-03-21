@@ -391,11 +391,11 @@ func TestCreateOrUpdateRole_TargetDirVariants(t *testing.T) {
 			OutOfScope:  []string{"Frontend work"},
 			Skills:      []string{"vitest"},
 		}
-		result, err := CreateOrUpdateRole(repoRoot, config, "ask", nil, ".agents/teams")
+		result, err := CreateOrUpdateRole(repoRoot, config, "ask", nil, ".agent-team/teams")
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := filepath.Join(repoRoot, ".agents", "teams", "backend-dev")
+		want := filepath.Join(repoRoot, ".agent-team", "teams", "backend-dev")
 		if result.TargetDir != want {
 			t.Errorf("TargetDir = %q, want %q", result.TargetDir, want)
 		}

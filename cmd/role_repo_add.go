@@ -42,8 +42,8 @@ func (a *App) RunRoleRepoAdd(in io.Reader, out io.Writer, sourceArg string, role
 	if !scopeExplicit && !listOnly && isInteractiveInput(in) {
 		choice, err := promptSingleChoice(in, out,
 			"Install scope:",
-			[]string{"Project (.agents/teams/)", "Global (~/.agents/roles/)"},
-			"Project (.agents/teams/)",
+			[]string{"Project (.agent-team/teams/)", "Global (~/.agents/roles/)"},
+			"Project (.agent-team/teams/)",
 		)
 		if err != nil {
 			return err
@@ -76,7 +76,7 @@ func (a *App) RunRoleRepoAdd(in io.Reader, out io.Writer, sourceArg string, role
 		return err
 	}
 	if len(roles) == 0 {
-		return fmt.Errorf("no valid roles found; accepted paths are skills/<role>/references/role.yaml and .agents/teams/<role>/references/role.yaml")
+		return fmt.Errorf("no valid roles found; accepted paths are skills/<role>/references/role.yaml and .agent-team/teams/<role>/references/role.yaml")
 	}
 
 	selected, err := internal.SelectRoleRepoRemotes(roles, roleNames)

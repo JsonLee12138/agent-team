@@ -205,7 +205,7 @@ func CatalogStats(catalog RoleRepoCatalog) map[RoleRepoCatalogStatus]int {
 
 // ResolveCatalogPath returns the catalog file path for a given project root.
 func ResolveCatalogPath(root string) string {
-	return filepath.Join(root, ".agents", "catalog.json")
+	return filepath.Join(AgentTeamDir(root), "catalog.json")
 }
 
 func containsInsensitive(s, substr string) bool {

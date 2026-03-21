@@ -10,19 +10,19 @@ import (
 
 // --- 3B-4: Worker injection verification ---
 
-// TestInjectRolePromptWithPath_SlimMode verifies that when .agents/rules/ exists,
+// TestInjectRolePromptWithPath_SlimMode verifies that when .agent-team/rules/ exists,
 // the injected CLAUDE.md uses slim mode (minimal content, rules reference).
 func TestInjectRolePromptWithPath_SlimMode(t *testing.T) {
 	root := t.TempDir()
 
-	// Create .agents/rules/ with index.md
-	rulesDir := filepath.Join(root, ".agents", "rules")
+	// Create .agent-team/rules/ with index.md
+	rulesDir := filepath.Join(root, ".agent-team", "rules")
 	os.MkdirAll(rulesDir, 0755)
 	os.WriteFile(filepath.Join(rulesDir, "index.md"),
-		[]byte("# Rules Index\n\n- `debugging.md`: bugs\n- `project-commands.md`: repo commands\n"), 0644)
+		[]byte("# Rules Index\n\n- `core/debugging.md`: bugs\n- `core/worktree.md`: worktree safety\n- `project/`: repo commands\n"), 0644)
 
 	// Create role with system.md
-	rolePath := filepath.Join(root, ".agents", "teams", "test-dev")
+	rolePath := filepath.Join(root, ".agent-team", "teams", "test-dev")
 	refDir := filepath.Join(rolePath, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(rolePath, "system.md"),
@@ -57,7 +57,8 @@ func TestInjectRolePromptWithPath_SlimMode(t *testing.T) {
 		"Skill-First Workflow",
 		"team/test-dev-001",
 		"Rules Reference",
-		".agents/rules/index.md",
+		".agent-team/rules/index.md",
+		"core/debugging.md",
 	}
 	for _, s := range mustContain {
 		if !strings.Contains(content, s) {
@@ -67,11 +68,8 @@ func TestInjectRolePromptWithPath_SlimMode(t *testing.T) {
 
 	// Slim mode should NOT contain legacy inline Git Rules or Completion Protocol
 	mustNotContain := []string{
-		"git checkout",
-		"git switch",
 		"Task Completion Protocol",
 		"git add -A",
-		"agent-team reply-main \"Task completed: <summary>\"",
 	}
 	for _, s := range mustNotContain {
 		if strings.Contains(content, s) {
@@ -87,15 +85,15 @@ func TestInjectRolePromptWithPath_SlimMode(t *testing.T) {
 	}
 }
 
-// TestInjectRolePromptWithPath_LegacyMode verifies that when .agents/rules/ does NOT exist,
+// TestInjectRolePromptWithPath_LegacyMode verifies that when .agent-team/rules/ does NOT exist,
 // the full legacy template with inline Git Rules is used.
 func TestInjectRolePromptWithPath_LegacyMode(t *testing.T) {
 	root := t.TempDir()
 
-	// No .agents/rules/ directory — legacy mode
+	// No .agent-team/rules/ directory — legacy mode
 
 	// Create role with system.md
-	rolePath := filepath.Join(root, ".agents", "teams", "legacy-dev")
+	rolePath := filepath.Join(root, ".agent-team", "teams", "legacy-dev")
 	refDir := filepath.Join(rolePath, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(rolePath, "system.md"),
@@ -143,7 +141,7 @@ func TestInjectRolePromptWithPath_LegacyMode(t *testing.T) {
 func TestInjectRolePromptWithPath_NoSystemMd(t *testing.T) {
 	root := t.TempDir()
 
-	rolePath := filepath.Join(root, ".agents", "teams", "empty-role")
+	rolePath := filepath.Join(root, ".agent-team", "teams", "empty-role")
 	os.MkdirAll(rolePath, 0755)
 	// No system.md
 
@@ -166,12 +164,12 @@ func TestInjectRolePromptWithPath_NoSystemMd(t *testing.T) {
 func TestInjectRolePromptWithPath_RulesIndexInContent(t *testing.T) {
 	root := t.TempDir()
 
-	rulesDir := filepath.Join(root, ".agents", "rules")
+	rulesDir := filepath.Join(root, ".agent-team", "rules")
 	os.MkdirAll(rulesDir, 0755)
 	indexContent := "# Custom Rules\n\n- `my-rule.md`: custom stuff\n- `other-rule.md`: other things\n"
 	os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte(indexContent), 0644)
 
-	rolePath := filepath.Join(root, ".agents", "teams", "my-role")
+	rolePath := filepath.Join(root, ".agent-team", "teams", "my-role")
 	refDir := filepath.Join(rolePath, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(rolePath, "system.md"),
@@ -200,11 +198,11 @@ func TestInjectRolePromptWithPath_RulesIndexInContent(t *testing.T) {
 func TestInjectRolePromptWithPath_DependencySkillsListed(t *testing.T) {
 	root := t.TempDir()
 
-	rulesDir := filepath.Join(root, ".agents", "rules")
+	rulesDir := filepath.Join(root, ".agent-team", "rules")
 	os.MkdirAll(rulesDir, 0755)
 	os.WriteFile(filepath.Join(rulesDir, "index.md"), []byte("# Rules\n"), 0644)
 
-	rolePath := filepath.Join(root, ".agents", "teams", "full-role")
+	rolePath := filepath.Join(root, ".agent-team", "teams", "full-role")
 	refDir := filepath.Join(rolePath, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(rolePath, "system.md"),
@@ -232,23 +230,23 @@ func TestInjectRolePromptWithPath_DependencySkillsListed(t *testing.T) {
 func TestHasRulesDirInit(t *testing.T) {
 	t.Run("exists", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, ".agents", "rules"), 0755)
+		os.MkdirAll(filepath.Join(dir, ".agent-team", "rules"), 0755)
 		if !HasRulesDir(dir) {
-			t.Error("HasRulesDir should return true when .agents/rules/ exists")
+			t.Error("HasRulesDir should return true when .agent-team/rules/ exists")
 		}
 	})
 
 	t.Run("not exists", func(t *testing.T) {
 		dir := t.TempDir()
 		if HasRulesDir(dir) {
-			t.Error("HasRulesDir should return false when .agents/rules/ does not exist")
+			t.Error("HasRulesDir should return false when .agent-team/rules/ does not exist")
 		}
 	})
 
 	t.Run("file not dir", func(t *testing.T) {
 		dir := t.TempDir()
-		os.MkdirAll(filepath.Join(dir, ".agents"), 0755)
-		os.WriteFile(filepath.Join(dir, ".agents", "rules"), []byte("not a dir"), 0644)
+		os.MkdirAll(filepath.Join(dir, ".agent-team"), 0755)
+		os.WriteFile(filepath.Join(dir, ".agent-team", "rules"), []byte("not a dir"), 0644)
 		if HasRulesDir(dir) {
 			t.Error("HasRulesDir should return false when rules is a file not a dir")
 		}

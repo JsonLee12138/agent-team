@@ -50,17 +50,17 @@ func NewRootCmd() *cobra.Command {
 		}
 		requiresInitialization := !strings.HasPrefix(branch, "team/")
 
-		// Check if .agents/rules/ exists (initialization check)
+		// Check if .agent-team/rules/ exists (initialization check)
 		if requiresInitialization && !internal.HasRulesDir(gc.Root()) {
 			// Check if running in non-interactive mode
 			nonInteractive := os.Getenv("AGENT_TEAM_NONINTERACTIVE") == "1"
 
 			if nonInteractive {
-				return fmt.Errorf(".agents/rules/ not found. Run 'agent-team init' first (or set AGENT_TEAM_NONINTERACTIVE=0 for interactive mode)")
+				return fmt.Errorf(".agent-team/rules/ not found. Run 'agent-team init' first (or set AGENT_TEAM_NONINTERACTIVE=0 for interactive mode)")
 			}
 
 			// Interactive mode: prompt user to run init
-			fmt.Println("⚠️  .agents/rules/ not found. This project has not been initialized for agent-team.")
+			fmt.Println("⚠️  .agent-team/rules/ not found. This project has not been initialized for agent-team.")
 			fmt.Print("Run agent-team init now? [Y/n] ")
 
 			reader := bufio.NewReader(os.Stdin)

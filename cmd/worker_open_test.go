@@ -38,7 +38,7 @@ func TestRunWorkerOpenPersistsExplicitOverrides(t *testing.T) {
 	}
 	app.Session = mock
 
-	roleDir := filepath.Join(dir, ".agents", "teams", "backend")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "backend")
 	if err := os.MkdirAll(roleDir, 0755); err != nil {
 		t.Fatalf("mkdir role dir: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestRunWorkerOpenWithoutFlagsUsesPersistedConfig(t *testing.T) {
 	}
 	app.Session = mock
 
-	roleDir := filepath.Join(dir, ".agents", "teams", "backend")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "backend")
 	if err := os.MkdirAll(roleDir, 0755); err != nil {
 		t.Fatalf("mkdir role dir: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestRunWorkerOpenCompatProviderFallbackDoesNotPersist(t *testing.T) {
 	}
 	app.Session = mock
 
-	roleDir := filepath.Join(dir, ".agents", "teams", "backend")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "backend")
 	if err := os.MkdirAll(roleDir, 0755); err != nil {
 		t.Fatalf("mkdir role dir: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestRunWorkerOpenCompatProviderFallbackDoesNotPersist(t *testing.T) {
 	}
 }
 
-func TestRunWorkerOpenBootstrapsDeferredWorktree(t *testing.T) {
+func TestRunWorkerOpenUsesExistingWorktreeConfig(t *testing.T) {
 	skillInstaller = func(_, _, _, _, _ string, _ bool) error { return nil }
 	taskSetup = func(string) error { return nil }
 	workerShellInitDelay = 0
@@ -213,7 +213,7 @@ func TestRunWorkerOpenBootstrapsDeferredWorktree(t *testing.T) {
 	}
 	app.Session = mock
 
-	roleDir := filepath.Join(dir, ".agents", "teams", "backend")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "backend")
 	if err := os.MkdirAll(roleDir, 0755); err != nil {
 		t.Fatalf("mkdir role dir: %v", err)
 	}
@@ -224,36 +224,32 @@ func TestRunWorkerOpenBootstrapsDeferredWorktree(t *testing.T) {
 		t.Fatalf("write system.md: %v", err)
 	}
 
-	falseValue := false
+	trueValue := true
 	cfg := &internal.WorkerConfig{
 		WorkerID:        "backend-001",
 		Role:            "backend",
 		Provider:        "claude",
-		WorktreeCreated: &falseValue,
+		WorktreeCreated: &trueValue,
 	}
 
 	wtPath := filepath.Join(dir, ".worktrees", "backend-001")
-	compatPath := internal.WorkerConfigPath(dir, "backend-001")
-	if err := cfg.Save(compatPath); err != nil {
+	configPath := internal.WorkerConfigPath(dir, "backend-001")
+	if err := os.MkdirAll(wtPath, 0755); err != nil {
+		t.Fatalf("mkdir worktree: %v", err)
+	}
+	if err := cfg.Save(configPath); err != nil {
 		t.Fatalf("save worker config: %v", err)
 	}
-	if _, err := os.Stat(wtPath); !os.IsNotExist(err) {
-		t.Fatalf("worktree should not exist before open, err=%v", err)
-	}
-
 	if err := app.RunWorkerOpen("backend-001", "", "", false, false, false); err != nil {
 		t.Fatalf("RunWorkerOpen: %v", err)
 	}
 
-	if _, err := os.Stat(wtPath); err != nil {
-		t.Fatalf("expected bootstrapped worktree: %v", err)
-	}
-	reloaded, err := internal.LoadWorkerConfig(internal.WorkerYAMLPath(wtPath))
+		reloaded, err := internal.LoadWorkerConfig(internal.WorkerYAMLPath(wtPath))
 	if err != nil {
 		t.Fatalf("LoadWorkerConfig local: %v", err)
 	}
 	if !reloaded.IsWorktreeCreated() {
-		t.Fatal("WorktreeCreated should be true after bootstrap")
+		t.Fatal("WorktreeCreated should remain true")
 	}
 	if len(mock.SentTexts) == 0 {
 		t.Fatal("expected launch command to be sent")
@@ -263,7 +259,7 @@ func TestRunWorkerOpenBootstrapsDeferredWorktree(t *testing.T) {
 	}
 }
 
-func TestRunWorkerOpenFallsBackToLegacyConfig(t *testing.T) {
+func TestRunWorkerOpenUsesLocalConfig(t *testing.T) {
 	skillInstaller = func(_, _, _, _, _ string, _ bool) error { return nil }
 	workerShellInitDelay = 0
 	t.Cleanup(func() {
@@ -278,7 +274,7 @@ func TestRunWorkerOpenFallsBackToLegacyConfig(t *testing.T) {
 	}
 	app.Session = mock
 
-	roleDir := filepath.Join(dir, ".agents", "teams", "backend")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "backend")
 	if err := os.MkdirAll(roleDir, 0755); err != nil {
 		t.Fatalf("mkdir role dir: %v", err)
 	}

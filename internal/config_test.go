@@ -129,13 +129,13 @@ func TestWorkerConfigRoleScopeOmitEmpty(t *testing.T) {
 
 func TestWorkerConfigPathHelpers(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, ".agents"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, ".worktrees", "dev-001"), 0755); err != nil {
 		t.Fatalf("mkdir .agents: %v", err)
 	}
-	if got := WorkerConfigDir(dir, "dev-001"); got != filepath.Join(dir, ".agents", "workers", "dev-001") {
+	if got := WorkerConfigDir(dir, "dev-001"); got != filepath.Join(dir, ".worktrees", "dev-001") {
 		t.Fatalf("WorkerConfigDir = %q", got)
 	}
-	if got := WorkerConfigPath(dir, "dev-001"); got != filepath.Join(dir, ".agents", "workers", "dev-001", "worker.yaml") {
+	if got := WorkerConfigPath(dir, "dev-001"); got != filepath.Join(dir, ".worktrees", "dev-001", "worker.yaml") {
 		t.Fatalf("WorkerConfigPath = %q", got)
 	}
 }
@@ -156,15 +156,11 @@ func TestWorkerConfigIsWorktreeCreatedCompatibility(t *testing.T) {
 
 func TestLoadWorkerConfigByIDPrefersLocalPath(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, ".agents"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, ".worktrees", "dev-001"), 0755); err != nil {
 		t.Fatalf("mkdir .agents: %v", err)
 	}
 	localCfg := &WorkerConfig{WorkerID: "dev-001", Role: "local-role"}
-	compatCfg := &WorkerConfig{WorkerID: "dev-001", Role: "compat-role"}
-	if err := compatCfg.Save(WorkerConfigPath(dir, "dev-001")); err != nil {
-		t.Fatalf("save compat config: %v", err)
-	}
-	localPath := WorkerYAMLPath(filepath.Join(dir, ".worktrees", "dev-001"))
+		localPath := WorkerYAMLPath(filepath.Join(dir, ".worktrees", "dev-001"))
 	if err := localCfg.Save(localPath); err != nil {
 		t.Fatalf("save local config: %v", err)
 	}
@@ -180,22 +176,22 @@ func TestLoadWorkerConfigByIDPrefersLocalPath(t *testing.T) {
 	}
 }
 
-func TestLoadWorkerConfigByIDFallsBackToCentralizedPath(t *testing.T) {
+func TestLoadWorkerConfigByIDUsesLocalPathOnly(t *testing.T) {
 	dir := t.TempDir()
-	compatPath := WorkerConfigPath(dir, "dev-001")
-	compatCfg := &WorkerConfig{WorkerID: "dev-001", Role: "compat-role"}
-	if err := compatCfg.Save(compatPath); err != nil {
-		t.Fatalf("save compat config: %v", err)
+	localPath := WorkerYAMLPath(filepath.Join(dir, ".worktrees", "dev-001"))
+	localCfg := &WorkerConfig{WorkerID: "dev-001", Role: "local-role"}
+	if err := localCfg.Save(localPath); err != nil {
+		t.Fatalf("save local config: %v", err)
 	}
 	loaded, path, err := LoadWorkerConfigByID(dir, ".worktrees", "dev-001")
 	if err != nil {
 		t.Fatalf("LoadWorkerConfigByID: %v", err)
 	}
-	if loaded.Role != "compat-role" {
-		t.Fatalf("Role = %q, want compat-role", loaded.Role)
+	if loaded.Role != "local-role" {
+		t.Fatalf("Role = %q, want local-role", loaded.Role)
 	}
-	if path != compatPath {
-		t.Fatalf("path = %q, want %q", path, compatPath)
+	if path != localPath {
+		t.Fatalf("path = %q, want %q", path, localPath)
 	}
 }
 

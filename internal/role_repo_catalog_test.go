@@ -276,7 +276,7 @@ func TestGroupCatalogByRepo(t *testing.T) {
 
 func TestResolveCatalogPath(t *testing.T) {
 	path := ResolveCatalogPath("/tmp/project")
-	expected := filepath.Join("/tmp/project", ".agents", "catalog.json")
+	expected := filepath.Join("/tmp/project", ".agent-team", "catalog.json")
 	if path != expected {
 		t.Fatalf("expected %s, got %s", expected, path)
 	}

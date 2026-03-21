@@ -82,7 +82,7 @@ func (a *App) RunRoleRepoList(globalOnly bool, jsonOut bool) error {
 	}
 
 	if !globalOnly && len(projectEntries) > 0 {
-		fmt.Println("Project roles (.agents/teams/):")
+		fmt.Println("Project roles (.agent-team/teams/):")
 		printRoleTable(projectEntries)
 		fmt.Println()
 	}

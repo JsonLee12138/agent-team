@@ -41,7 +41,7 @@ func newRoleCreateCmd() *cobra.Command {
 			}
 
 			// Check global roles for duplicates (unless --force)
-			if !force && (targetDir == "skills" || targetDir == ".agents/teams") {
+			if !force && (targetDir == "skills" || targetDir == ".agent-team/teams") {
 				matches, searchErr := internal.SearchGlobalRoles(validName)
 				if searchErr == nil && len(matches) > 0 {
 					fmt.Fprintf(cmd.OutOrStdout(), "Found matching global role(s):\n")
@@ -131,7 +131,7 @@ func newRoleCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&addSkills, "add-skills", "", "Skills to add (comma-separated)")
 	cmd.Flags().StringVar(&removeSkills, "remove-skills", "", "Skills to remove from the candidate list")
 	cmd.Flags().StringVar(&manualSkills, "manual-skills", "", "Manual fallback when recommendation is unavailable or empty")
-	cmd.Flags().StringVar(&targetDir, "target-dir", "skills", "Target directory (skills | .agents/teams | custom path)")
+	cmd.Flags().StringVar(&targetDir, "target-dir", "skills", "Target directory (skills | .agent-team/teams | custom path)")
 	cmd.Flags().StringVar(&overwrite, "overwrite", "ask", "Overwrite mode: ask/yes/no")
 	cmd.Flags().StringVar(&repoRoot, "repo-root", ".", "Repository root path")
 	cmd.Flags().BoolVar(&force, "force", false, "Skip global duplicate check")

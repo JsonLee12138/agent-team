@@ -40,7 +40,7 @@ func TestParseRolePathFromYAMLPath(t *testing.T) {
 		wantAcceptPath bool
 	}{
 		{"skills/frontend/references/role.yaml", "frontend", "skills/frontend", true},
-		{".agents/teams/backend/references/role.yaml", "backend", ".agents/teams/backend", true},
+		{".agent-team/teams/backend/references/role.yaml", "backend", ".agent-team/teams/backend", true},
 		{"skills/frontend/role.yaml", "", "", false},
 		{"agents/teams/backend/references/role.yaml", "", "", false},
 	}

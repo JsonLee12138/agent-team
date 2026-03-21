@@ -55,7 +55,13 @@ func (a *App) RunTaskAssign(taskID, requestedWorkerID, provider, model string, n
 		} else {
 			workerID = internal.NextWorkerID(root, a.WtBase, record.Role)
 			now := time.Now().UTC().Format(time.RFC3339)
-			worktreeCreated := false
+			if err := a.Git.WorktreeAdd(internal.WtPath(root, a.WtBase, workerID), "team/"+workerID); err != nil {
+				return err
+			}
+			if err := internal.WriteWorktreeGitignore(internal.WtPath(root, a.WtBase, workerID)); err != nil {
+				return fmt.Errorf("write .gitignore: %w", err)
+			}
+			worktreeCreated := true
 			cfg = &internal.WorkerConfig{
 				WorkerID:        workerID,
 				Role:            record.Role,

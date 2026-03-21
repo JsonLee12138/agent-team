@@ -8,17 +8,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var rebuildProjectRules = internal.RebuildProjectRules
 var rebuildProjectCommands = internal.RebuildProjectCommands
 
 func newInitCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize agent-team for this project",
-		Long: `Creates project-level structure: .agents/teams/, .agents/rules/ (with built-in rule files),
-regenerates .agents/rules/project-commands.md, and updates root provider files
-(CLAUDE.md, AGENTS.md, GEMINI.md).
+		Long: `Creates project-level structure under .agent-team/, including .agent-team/teams/ and .agent-team/rules/.
+It writes the fixed rules entry/core files, regenerates AI-based project rule files under
+.agent-team/rules/project/, and updates root provider files (CLAUDE.md, AGENTS.md, GEMINI.md).
 
-Built-in rule files are created if missing. project-commands.md is regenerated on each run.
+Built-in entry/core rule files are created if missing. Project rules are regenerated on each run.
 Provider files only update the tagged section.
 
 For global environment setup (provider detection, plugin role installation),
@@ -40,32 +41,32 @@ func runInit() error {
 		return fmt.Errorf("get working directory: %w", err)
 	}
 
-	// Step 1: Initialize project structure (.agents/teams/)
+	// Step 1: Initialize project structure (.agent-team/teams/)
 	if err := internal.InitProject(cwd); err != nil {
 		return err
 	}
-	fmt.Println("✓ .agents/teams/ ready")
+	fmt.Println("✓ .agent-team/teams/ ready")
 
-	// Step 2: Initialize built-in rules directory (.agents/rules/)
-	created, err := internal.InitRulesDir(cwd)
+	// Step 2: Initialize fixed rules entry/core files
+	created, err := internal.InitRulesDirV2(cwd)
 	if err != nil {
 		return err
 	}
 	if created > 0 {
-		fmt.Printf("✓ .agents/rules/ ready (%d built-in rule files created)\n", created)
+		fmt.Printf("✓ .agent-team/rules/ ready (%d entry/core rule files created)\n", created)
 	} else {
-		fmt.Println("✓ .agents/rules/ already exists (built-in files preserved)")
+		fmt.Println("✓ .agent-team/rules/ already exists (entry/core files preserved)")
 	}
 
-	// Step 3: Generate/update project command rules
-	scan, err := rebuildProjectCommands(cwd)
+	// Step 3: Generate/update project rules
+	scan, err := rebuildProjectRules(cwd)
 	if err != nil {
 		return err
 	}
 	if len(scan.Files) > 0 {
-		fmt.Printf("✓ %s regenerated from %d detected command file(s)\n", "project-commands.md", len(scan.Files))
+		fmt.Printf("✓ project rules regenerated from %d detected command file(s)\n", len(scan.Files))
 	} else {
-		fmt.Printf("✓ %s regenerated (no known command files detected)\n", "project-commands.md")
+		fmt.Println("✓ project rules regenerated (no known command files detected)")
 	}
 
 	// Step 4: Generate/update provider files
@@ -73,6 +74,12 @@ func runInit() error {
 		return err
 	}
 	fmt.Println("✓ Provider files updated (CLAUDE.md, AGENTS.md, GEMINI.md)")
+
+	// Step 5: Validate generated rules after writing
+	if err := internal.ValidateRules(cwd); err != nil {
+		return err
+	}
+	fmt.Println("✓ Rules validation passed")
 
 	// Step 5: Hint about setup if plugin roles might be needed
 	fmt.Println()

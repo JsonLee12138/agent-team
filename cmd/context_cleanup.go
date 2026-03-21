@@ -40,7 +40,7 @@ func (a *App) RunContextCleanup(workerID string) error {
 }
 
 func (a *App) runControllerContextCleanup() error {
-	rulesIndex := filepath.Join(a.Git.Root(), ".agents", "rules", "index.md")
+	rulesIndex := filepath.Join(a.Git.Root(), ".agent-team", "rules", "index.md")
 	fmt.Printf("context-cleanup (controller)\n")
 	fmt.Printf("1. Reset the session context.\n")
 	fmt.Printf("2. Read %s first.\n", rulesIndex)

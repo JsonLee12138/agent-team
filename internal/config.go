@@ -40,19 +40,19 @@ func WorkerYAMLPath(wtPath string) string {
 	return filepath.Join(wtPath, "worker.yaml")
 }
 
-// WorkerConfigDir returns the path to the centralized worker config directory.
+// WorkerConfigDir returns the worker config directory in the worker worktree.
 func WorkerConfigDir(root, workerID string) string {
-	return filepath.Join(ResolveAgentsDir(root), "workers", workerID)
+	return filepath.Dir(WorkerConfigPath(root, workerID))
 }
 
-// WorkerConfigPath returns the path to the centralized worker config file.
+// WorkerConfigPath returns the worker config file in the worker worktree.
 func WorkerConfigPath(root, workerID string) string {
-	return filepath.Join(WorkerConfigDir(root, workerID), "worker.yaml")
+	return WorkerYAMLPath(WtPath(root, FindWtBase(root), workerID))
 }
 
 // MainSessionYAMLPath returns the path to the project-local main pane config.
 func MainSessionYAMLPath(root string) string {
-	return filepath.Join(root, ".agent-team", "main-session.yaml")
+	return filepath.Join(AgentTeamDir(root), "main-session.yaml")
 }
 
 func LoadWorkerConfig(path string) (*WorkerConfig, error) {
@@ -74,28 +74,18 @@ func (c *WorkerConfig) IsWorktreeCreated() bool {
 	return *c.WorktreeCreated
 }
 
-// LoadWorkerConfigByID loads worker config from the worktree-local path first,
-// then falls back to the centralized compatibility path.
+// LoadWorkerConfigByID loads worker config from the worktree-local path only.
 func LoadWorkerConfigByID(root, wtBase, workerID string) (*WorkerConfig, string, error) {
 	localPath := WorkerYAMLPath(WtPath(root, wtBase, workerID))
-	if cfg, err := LoadWorkerConfig(localPath); err == nil {
-		return cfg, localPath, nil
-	}
-
-	compatPath := WorkerConfigPath(root, workerID)
-	cfg, err := LoadWorkerConfig(compatPath)
+	cfg, err := LoadWorkerConfig(localPath)
 	if err != nil {
-		return nil, "", fmt.Errorf("read local config %s or centralized config %s: %w", localPath, compatPath, err)
+		return nil, "", fmt.Errorf("read local config %s: %w", localPath, err)
 	}
-	return cfg, compatPath, nil
+	return cfg, localPath, nil
 }
 
 func WorkerConfigWritePath(root, wtBase, workerID string) string {
-	wtPath := WtPath(root, wtBase, workerID)
-	if info, err := os.Stat(wtPath); err == nil && info.IsDir() {
-		return WorkerYAMLPath(wtPath)
-	}
-	return WorkerConfigPath(root, workerID)
+	return WorkerYAMLPath(WtPath(root, wtBase, workerID))
 }
 
 func LoadMainSessionConfig(path string) (*MainSessionConfig, error) {

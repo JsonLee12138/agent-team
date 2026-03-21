@@ -64,7 +64,7 @@ func TestRunWorkerCreateDefaultsProviderAndPersistsModel(t *testing.T) {
 	}
 	app.Session = mock
 
-	roleDir := filepath.Join(dir, ".agents", "teams", "backend")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "backend")
 	if err := os.MkdirAll(roleDir, 0755); err != nil {
 		t.Fatalf("mkdir role dir: %v", err)
 	}
@@ -86,11 +86,11 @@ func TestRunWorkerCreateDefaultsProviderAndPersistsModel(t *testing.T) {
 	if cfg.DefaultModel != "gpt-5" {
 		t.Fatalf("DefaultModel = %q, want gpt-5", cfg.DefaultModel)
 	}
-	if cfg.WorktreeCreated == nil || *cfg.WorktreeCreated != false {
-		t.Fatalf("WorktreeCreated = %#v, want false", cfg.WorktreeCreated)
+	if cfg.WorktreeCreated == nil || *cfg.WorktreeCreated != true {
+		t.Fatalf("WorktreeCreated = %#v, want true", cfg.WorktreeCreated)
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".worktrees", "backend-001")); !os.IsNotExist(err) {
-		t.Fatalf("worktree should not exist after create, err=%v", err)
+	if _, err := os.Stat(filepath.Join(dir, ".worktrees", "backend-001")); err != nil {
+		t.Fatalf("worktree should exist after create, err=%v", err)
 	}
 	// create no longer spawns a pane or sends launch commands
 	if cfg.PaneID != "" {
@@ -116,7 +116,7 @@ func TestRunWorkerCreatePersistsExplicitProvider(t *testing.T) {
 	}
 	app.Session = mock
 
-	roleDir := filepath.Join(dir, ".agents", "teams", "backend")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "backend")
 	if err := os.MkdirAll(roleDir, 0755); err != nil {
 		t.Fatalf("mkdir role dir: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestRunWorkerCreateSkillsSyncWarningDoesNotFail(t *testing.T) {
 	app, dir := initTestApp(t)
 	app.Session = &MockBackend{AlivePanes: map[string]bool{}}
 
-	roleDir := filepath.Join(dir, ".agents", "teams", "backend")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "backend")
 	os.MkdirAll(roleDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# backend\n"), 0644)
 
@@ -174,7 +174,7 @@ func TestRunWorkerCreateWarnsWhenProjectCommandsAreMissing(t *testing.T) {
 	app, dir := initTestApp(t)
 	app.Session = &MockBackend{AlivePanes: map[string]bool{}}
 
-	roleDir := filepath.Join(dir, ".agents", "teams", "backend")
+	roleDir := filepath.Join(dir, ".agent-team", "teams", "backend")
 	if err := os.MkdirAll(roleDir, 0755); err != nil {
 		t.Fatalf("mkdir role dir: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestRunWorkerCreateWarnsWhenProjectCommandsAreMissing(t *testing.T) {
 		}
 	})
 
-	if !strings.Contains(stderr, "project command rules are missing") {
+	if !strings.Contains(stderr, "project rules are missing") {
 		t.Fatalf("stderr = %q, want missing project command rules warning", stderr)
 	}
 	if !strings.Contains(stderr, "agent-team rules sync") {

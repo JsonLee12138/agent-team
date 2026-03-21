@@ -136,7 +136,7 @@ func findSkillPath(root, skillName string) string {
 
 	// 远程下载回退（仅 scoped 格式）
 	if shortName != skillName {
-		targetDir := filepath.Join(root, ".agents", ".cache", "skills")
+		targetDir := filepath.Join(ResolveAgentsDir(root), ".cache", "skills")
 		if downloaded := tryRemoteDownload(skillName, targetDir, shortName); downloaded != "" {
 			return downloaded
 		}
@@ -159,9 +159,9 @@ func buildSearchDirs(root string) []string {
 	if d := pluginSkillsDir(); d != "" {
 		dirs = append(dirs, d) // 层 1: Plugin 内置
 	}
-	dirs = append(dirs, filepath.Join(ResolveAgentsDir(root), "teams")) // 层 2: .agents/teams
+	dirs = append(dirs, filepath.Join(ResolveAgentsDir(root), "teams")) // 层 2: .agent-team/teams
 	dirs = append(dirs, filepath.Join(root, "skills"))                  // 层 3: project/skills
-	dirs = append(dirs, filepath.Join(root, ".agents", ".cache", "skills")) // 层 4: project cache
+	dirs = append(dirs, filepath.Join(ResolveAgentsDir(root), ".cache", "skills")) // 层 4: project cache
 	if home, err := os.UserHomeDir(); err == nil {
 		dirs = append(dirs, filepath.Join(home, ".claude", "skills")) // 层 5: ~/.claude/skills
 	}
@@ -403,10 +403,10 @@ func skillTargetSuffix(provider string) string {
 }
 
 // projectSkillPath returns the project-level skill cache path for a given skill.
-// e.g. <root>/.agents/.cache/skills/<skillName>
+// e.g. <root>/.agent-team/.cache/skills/<skillName>
 // The provider parameter is kept for call-site compatibility but ignored internally.
 func projectSkillPath(root, provider, skillName string) string {
-	return filepath.Join(root, ".agents", ".cache", "skills", skillName)
+	return filepath.Join(ResolveAgentsDir(root), ".cache", "skills", skillName)
 }
 
 // symlinkSkill creates a symlink in the worktree pointing to targetPath.
@@ -438,13 +438,13 @@ func symlinkSkill(wtPath, provider, skillName, targetPath string) error {
 	return nil
 }
 
-// moveNpxResultToCache moves the skill installed by npx from <root>/.agents/skills/<name>
-// to the project cache at <root>/.agents/.cache/skills/<name>.
-// npx skills add installs real files to <cwd>/.agents/skills/ and creates symlinks
+// moveNpxResultToCache moves the skill installed by npx from <root>/.agent-team/skills/<name>
+// to the project cache at <root>/.agent-team/.cache/skills/<name>.
+// npx skills add installs real files to <cwd>/.agent-team/skills/ and creates symlinks
 // in <cwd>/.<provider>/skills/. We relocate the real files and clean up the symlinks.
 func moveNpxResultToCache(root, provider, shortName string) error {
-	// npx installs real files to .agents/skills/<name>
-	npxPath := filepath.Join(root, ".agents", "skills", shortName)
+	// npx installs real files to .agent-team/skills/<name>
+	npxPath := filepath.Join(ResolveAgentsDir(root), "skills", shortName)
 	cachePath := projectSkillPath(root, provider, shortName)
 
 	if _, err := os.Stat(npxPath); err != nil {
@@ -491,7 +491,7 @@ type CachedSkillUsage struct {
 // FindCachedSkillUsage scans all worktrees to find which cached skills are actively
 // symlinked from worker skill directories. Returns a map of skill name → worker IDs.
 func FindCachedSkillUsage(root, wtBase string) map[string][]string {
-	cacheDir := filepath.Join(root, ".agents", ".cache", "skills")
+	cacheDir := filepath.Join(ResolveAgentsDir(root), ".cache", "skills")
 	absCacheDir, err := filepath.Abs(cacheDir)
 	if err != nil {
 		return nil

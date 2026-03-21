@@ -14,9 +14,9 @@ func TestWorkerFlowSkillSurvival(t *testing.T) {
 	// 1. Create a real git repository
 	repoDir := initTestRepo(t)
 
-	// 2. Set up role definition in agents/teams/dev-role/
+	// 2. Set up role definition in .agent-team/teams/dev-role/
 	roleName := "dev-role"
-	roleDir := filepath.Join(repoDir, "agents", "teams", roleName)
+	roleDir := filepath.Join(repoDir, ".agent-team", "teams", roleName)
 	refDir := filepath.Join(roleDir, "references")
 	if err := os.MkdirAll(refDir, 0755); err != nil {
 		t.Fatalf("mkdir role: %v", err)
@@ -248,7 +248,7 @@ func TestWorkerFlowGlobalSkillCopy(t *testing.T) {
 
 	// Set up role
 	roleName := "test-role"
-	roleDir := filepath.Join(repoDir, "agents", "teams", roleName)
+	roleDir := filepath.Join(repoDir, ".agent-team", "teams", roleName)
 	refDir := filepath.Join(roleDir, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# test-role\n"), 0644)
@@ -309,7 +309,7 @@ func TestWorkerFlowMissingSkillWarning(t *testing.T) {
 	repoDir := initTestRepo(t)
 
 	roleName := "partial-role"
-	roleDir := filepath.Join(repoDir, "agents", "teams", roleName)
+	roleDir := filepath.Join(repoDir, ".agent-team", "teams", roleName)
 	refDir := filepath.Join(roleDir, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("# partial-role\n"), 0644)

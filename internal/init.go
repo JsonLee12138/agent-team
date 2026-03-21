@@ -151,11 +151,11 @@ func InstallPluginRoleToGlobal(candidate PluginRoleCandidate, globalDir string) 
 	return InstallActionInstalled, nil
 }
 
-// InitProject creates the .agents/teams/ directory with a .gitkeep file.
+// InitProject creates the .agent-team/teams/ directory with a .gitkeep file.
 func InitProject(root string) error {
-	teamsDir := filepath.Join(root, ".agents", "teams")
+	teamsDir := filepath.Join(ResolveAgentsDir(root), "teams")
 	if err := os.MkdirAll(teamsDir, 0755); err != nil {
-		return fmt.Errorf("create .agents/teams/: %w", err)
+		return fmt.Errorf("create .agent-team/teams/: %w", err)
 	}
 	gitkeep := filepath.Join(teamsDir, ".gitkeep")
 	if _, err := os.Stat(gitkeep); os.IsNotExist(err) {
@@ -187,19 +187,6 @@ func FormatProviderList(providers []DetectedProvider) string {
 	return strings.Join(names, ", ")
 }
 
-const projectCommandsFileName = "project-commands.md"
-
-type ProjectCommandsGenerator func(root string, scan *BuildScriptScan) (string, error)
-
-var projectCommandsGenerator ProjectCommandsGenerator = generateProjectCommandsWithCodex
-
-func SetProjectCommandsGenerator(fn ProjectCommandsGenerator) func() {
-	prev := projectCommandsGenerator
-	projectCommandsGenerator = fn
-	return func() {
-		projectCommandsGenerator = prev
-	}
-}
 
 type BuildCommand struct {
 	Name    string
@@ -282,177 +269,6 @@ func DetectProjectBuildScripts(root string) (*BuildScriptScan, error) {
 	return scan, nil
 }
 
-// RebuildProjectCommands regenerates project-commands.md using the configured AI generator.
-func RebuildProjectCommands(root string) (*BuildScriptScan, error) {
-	rulesDir := filepath.Join(ResolveAgentsDir(root), "rules")
-	if err := os.MkdirAll(rulesDir, 0755); err != nil {
-		return nil, fmt.Errorf("create .agents/rules/: %w", err)
-	}
-	if projectCommandsGenerator == nil {
-		return nil, fmt.Errorf("generate %s: no generator configured", projectCommandsFileName)
-	}
-
-	scan, err := DetectProjectBuildScripts(root)
-	if err != nil {
-		return nil, err
-	}
-
-	content, err := projectCommandsGenerator(root, scan)
-	if err != nil {
-		return nil, err
-	}
-
-	normalized, err := normalizeProjectCommandsContent(content)
-	if err != nil {
-		return nil, err
-	}
-
-	projectCommandsPath := filepath.Join(rulesDir, projectCommandsFileName)
-	if err := os.WriteFile(projectCommandsPath, []byte(normalized), 0644); err != nil {
-		return nil, fmt.Errorf("write %s: %w", projectCommandsFileName, err)
-	}
-	if err := cleanupLegacyRuleArtifacts(root); err != nil {
-		return nil, err
-	}
-
-	return scan, nil
-}
-
-func normalizeProjectCommandsContent(content string) (string, error) {
-	trimmed := strings.TrimSpace(content)
-	if trimmed == "" {
-		return "", fmt.Errorf("generate %s: empty response", projectCommandsFileName)
-	}
-
-	if strings.HasPrefix(trimmed, "```") {
-		lines := strings.Split(trimmed, "\n")
-		if len(lines) >= 3 && strings.HasPrefix(lines[len(lines)-1], "```") {
-			trimmed = strings.TrimSpace(strings.Join(lines[1:len(lines)-1], "\n"))
-			trimmed = strings.TrimPrefix(trimmed, "markdown\n")
-			trimmed = strings.TrimPrefix(trimmed, "md\n")
-			trimmed = strings.TrimSpace(trimmed)
-		}
-	}
-
-	if idx := strings.Index(trimmed, "# Project Commands Rules"); idx >= 0 {
-		trimmed = strings.TrimSpace(trimmed[idx:])
-	}
-	if !strings.HasPrefix(trimmed, "# Project Commands Rules") {
-		return "", fmt.Errorf("generate %s: response missing '# Project Commands Rules' header", projectCommandsFileName)
-	}
-	if !strings.HasSuffix(trimmed, "\n") {
-		trimmed += "\n"
-	}
-	return trimmed, nil
-}
-
-func generateProjectCommandsWithCodex(root string, scan *BuildScriptScan) (string, error) {
-	outputFile, err := os.CreateTemp("", "agent-team-project-commands-*.md")
-	if err != nil {
-		return "", fmt.Errorf("create temp output for %s: %w", projectCommandsFileName, err)
-	}
-	outputPath := outputFile.Name()
-	if err := outputFile.Close(); err != nil {
-		return "", fmt.Errorf("close temp output for %s: %w", projectCommandsFileName, err)
-	}
-	defer os.Remove(outputPath)
-
-	prompt := buildProjectCommandsPrompt(scan)
-	cmd := exec.Command(
-		"codex", "exec",
-		"--full-auto",
-		"--ephemeral",
-		"--sandbox", "read-only",
-		"--skip-git-repo-check",
-		"-C", root,
-		"-o", outputPath,
-		prompt,
-	)
-	cmd.Env = os.Environ()
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("generate %s with codex exec: %w\n%s", projectCommandsFileName, err, strings.TrimSpace(string(output)))
-	}
-
-	data, err := os.ReadFile(outputPath)
-	if err != nil {
-		return "", fmt.Errorf("read generated %s: %w", projectCommandsFileName, err)
-	}
-	return string(data), nil
-}
-
-func buildProjectCommandsPrompt(scan *BuildScriptScan) string {
-	var b strings.Builder
-	b.WriteString("Generate the full markdown content for `.agents/rules/project-commands.md` for the current repository.\n\n")
-	b.WriteString("Output requirements:\n")
-	b.WriteString("- Return markdown only. Do not wrap the answer in code fences.\n")
-	b.WriteString("- The title must be exactly `# Project Commands Rules`.\n")
-	b.WriteString("- State clearly near the top that this file is AI-generated for the current project and is regenerated by `agent-team init` and `agent-team rules sync`.\n")
-	b.WriteString("- This file must tell AI workers to read it before running any project command.\n")
-	b.WriteString("- Cover the current project's real command entry points for build, test, lint, dev, format, codegen, and any other detected workflows.\n")
-	b.WriteString("- If a command fails, require the AI to inspect the repository and determine the correct command, working directory, prerequisites, or alternative entry point before retrying.\n")
-	b.WriteString("- If rule drift is confirmed, require the AI to ask the user whether to update `project-commands.md`.\n")
-	b.WriteString("- Do not invent commands that are not grounded in the repository. If something is unclear, say how to inspect it instead of guessing.\n\n")
-	b.WriteString("Repository command signals already detected:\n")
-	if len(scan.Files) == 0 {
-		b.WriteString("- No Makefile, go.mod, or package.json files were detected by the CLI scan.\n")
-	} else {
-		for _, file := range scan.Files {
-			b.WriteString("- `" + file + "`\n")
-		}
-	}
-	if len(scan.MakeTargets) > 0 {
-		b.WriteString("- Make targets:\n")
-		for _, target := range scan.MakeTargets {
-			b.WriteString("  - `make " + target + "`\n")
-		}
-	}
-	if len(scan.GoModules) > 0 {
-		b.WriteString("- Go modules:\n")
-		for _, mod := range scan.GoModules {
-			label := mod.Path
-			if label == "go.mod" {
-				label = "repo root"
-			}
-			if mod.Module != "" || mod.GoVersion != "" {
-				var meta []string
-				if mod.Module != "" {
-					meta = append(meta, "module `"+mod.Module+"`")
-				}
-				if mod.GoVersion != "" {
-					meta = append(meta, "go `"+mod.GoVersion+"`")
-				}
-				b.WriteString("  - `" + label + "`: " + strings.Join(meta, ", ") + "\n")
-			} else {
-				b.WriteString("  - `" + label + "`\n")
-			}
-		}
-	}
-	if len(scan.NodePackages) > 0 {
-		b.WriteString("- Node package scripts:\n")
-		for _, pkg := range scan.NodePackages {
-			label := pkg.Path
-			if pkg.Name != "" {
-				label += " (" + pkg.Name + ")"
-			}
-			b.WriteString("  - `" + label + "`\n")
-			for _, script := range pkg.Scripts {
-				prefix := "npm"
-				if pkg.Path != "package.json" {
-					prefix = "npm --prefix " + filepath.Dir(pkg.Path)
-				}
-				b.WriteString("    - `" + prefix + " run " + script.Name + "`")
-				if script.Command != "" {
-					b.WriteString(" -> `" + script.Command + "`")
-				}
-				b.WriteString("\n")
-			}
-		}
-	}
-	b.WriteString("\nInspect the repository directly before finalizing the rule file. Ground the document in the current repo only.\n")
-	return b.String()
-}
 
 func collectBuildScriptFiles(root string) ([]string, error) {
 	var files []string
@@ -600,194 +416,14 @@ func uniqueStrings(values []string) []string {
 
 // --- Rules directory initialization ---
 
-// defaultRuleFiles maps filename to default content for .agents/rules/.
-var defaultRuleFiles = map[string]string{
-	"index.md": `# Level 0 Rules Index
-
-Read the matching rule first:
-- ` + "`debugging.md`" + `: bug, flaky test, runtime error
-- ` + "`project-commands.md`" + `: before running any project command
-- ` + "`agent-team-commands.md`" + `: agent-team CLI boundaries, worker lifecycle commands
-- ` + "`merge-workflow.md`" + `: controller-side rebase, merge sequencing, generated file safety
-- ` + "`context-management.md`" + `: context cleanup, handoff, provider switch, index-first recovery
-- ` + "`worktree.md`" + `: worktree safety, branch limits, ignored paths
-
-If unsure, MUST open this index.
-`,
-	"debugging.md": `# Debugging Rules
-
-## Trigger
-
-Apply this rule for any bug, flaky test, runtime error, build failure, or unexpected behavior.
-
-## Required Flow
-
-MUST follow the ` + "`systematic-debugging`" + ` workflow in order. ALWAYS reproduce, inspect, isolate, test, then validate.
-
-### 1. Reproduce First
-
-- MUST capture the exact command, input, environment, and full error text before changing code.
-- MUST retry intermittent failures at least 3 times to confirm the pattern.
-
-### 2. Check Logs and Evidence
-
-- ALWAYS read the full stack trace, build output, and related logs before forming a hypothesis.
-- ALWAYS inspect recent relevant changes with ` + "`git diff`" + ` and ` + "`git log`" + ` when regression is possible.
-
-### 3. Isolate the Cause
-
-- MUST reduce the issue to the smallest reproducible case.
-- MUST change one variable at a time when testing a hypothesis.
-
-### 4. Validate the Fix
-
-- MUST rerun the original reproduction steps after the fix.
-- MUST run the targeted verification commands for the affected scope.
-`,
-	"agent-team-commands.md": `# Agent-Team Commands Rules
-
-## Trigger
-
-Apply this rule whenever a worker session needs project workflow operations such as create, open, assign, archive, reply, or other ` + "`agent-team`" + ` CLI actions.
-
-## Command Boundary
-
-- MUST use the ` + "`agent-team`" + ` CLI for worker lifecycle and task lifecycle operations when the repository provides it.
-- MUST NOT bypass ` + "`agent-team worker open`" + `, ` + "`agent-team worker assign`" + `, or ` + "`agent-team reply-main`" + ` with ad hoc shell commands.
-- MUST treat worker bootstrap files and provider prompt files as controller-managed artifacts.
-
-## Generated File Safety
-
-- MUST NOT commit generated worker-local prompt files such as ` + "`CLAUDE.md`" + `, ` + "`GEMINI.md`" + `, or ` + "`AGENTS.md`" + ` from a worker worktree.
-- MUST NOT commit worker-local metadata such as ` + "`.tasks/`" + `, ` + "`.claude/`" + `, ` + "`.codex/`" + `, ` + "`.gemini/`" + `, ` + "`.opencode/`" + `, or ` + "`worker.yaml`" + ` from a worker worktree.
-- MUST keep deliverable files in tracked repository paths managed by the assigned change.
-`,
-	"merge-workflow.md": `# Merge Workflow Rules
-
-## Trigger
-
-Apply this rule when preparing a worker branch for assignment, merge, or controller-side synchronization.
-
-## Controller-Side Synchronization
-
-- MUST keep worker-side sessions free of ` + "`git rebase`" + ` and ` + "`git merge`" + ` inside the worker worktree.
-- MUST perform any required rebase from the controller side before assignment when the worker is idle.
-- MUST stop and surface conflicts immediately if controller-side rebase fails.
-
-## Merge Safety
-
-- MUST merge worker branches back through the controller workflow.
-- MUST review generated files and ignore-only artifacts before merge so worker-local prompts or metadata do not enter commits.
-- MUST preserve the repository's tracked deliverables while excluding controller-managed bootstrap files.
-`,
-	"context-management.md": `# Context Management Rules
-
-## Trigger
-
-Apply this rule whenever context grows, the task changes phase, or resumed work needs a recovery anchor.
-
-## Context-Cleanup Triggers
-
-1. MUST enter context cleanup before starting a new logical phase after finishing the current one.
-2. MUST enter context cleanup before reading or pasting large outputs, logs, replies, or diffs that may displace the current working context.
-3. MUST enter context cleanup when the active thread can no longer hold the task goal, constraints, and next actions clearly.
-4. MUST enter context cleanup before resumed work after a long pause, restart, handoff, or provider switch.
-
-## Required Recovery Model
-
-- Context cleanup resets session context; it MUST NOT rewrite, compress, or discard file artifacts.
-- Context cleanup is NOT a synonym for ` + "`/compact`" + `.
-- Controller/main MUST read ` + "`.agents/rules/index.md`" + ` first, then open only the matching rule files, then the current workflow/task artifacts.
-- Worker MUST read ` + "`worker.yaml`" + ` first, then ` + "`task.yaml`" + `, and only then read ` + "`context.md`" + ` or referenced materials when needed.
-- NEVER jump directly to rule bodies, ` + "`context.md`" + `, or other detail files before reading the required entry file.
-- NEVER default to scanning every context file; expand only what the index or current task explicitly requires.
-
-## Provider Handling
-
-- Claude, Codex, Gemini, and other providers MUST follow the same context-cleanup and index-first recovery strategy.
-- Provider-specific prompt injections MUST point to this rule instead of requiring ` + "`/compact`" + `.
-`,
-	"worktree.md": `# Worktree Rules
-
-## Trigger
-
-Apply this rule for any git command, branch action, file placement decision, or task work inside a worker worktree.
-
-## Branch and Worktree Safety
-
-- MUST work only inside the assigned worktree.
-- MUST keep all task commits on the current ` + "`team/<worker-id>`" + ` branch.
-- NEVER run ` + "`git checkout`" + `, ` + "`git switch`" + `, ` + "`git merge`" + `, or ` + "`git rebase`" + ` inside the worker worktree.
-
-## File Placement
-
-- MUST keep deliverables in tracked repository paths.
-- MUST NOT place task outputs in ignored locations.
-
-## Staging and Commit Scope
-
-- MUST inspect ` + "`git status`" + ` before staging changes.
-- MUST stage only files required for the assigned change.
-- NEVER use blanket staging commands that may capture unrelated work.
-`,
-}
-
-// InitRulesDir creates .agents/rules/ with default rule files.
-// Idempotent: does not overwrite existing files.
+// InitRulesDir keeps the legacy public name but now delegates to the v2 rules layout.
 func InitRulesDir(root string) (created int, err error) {
-	rulesDir := filepath.Join(ResolveAgentsDir(root), "rules")
-	if err := os.MkdirAll(rulesDir, 0755); err != nil {
-		return 0, fmt.Errorf("create .agents/rules/: %w", err)
-	}
-
-	for name, content := range defaultRuleFiles {
-		fp := filepath.Join(rulesDir, name)
-		if _, err := os.Stat(fp); err == nil {
-			continue // already exists, skip
-		}
-		if err := os.WriteFile(fp, []byte(content), 0644); err != nil {
-			return created, fmt.Errorf("write %s: %w", name, err)
-		}
-		created++
-	}
-	if err := cleanupLegacyRuleArtifacts(root); err != nil {
-		return created, err
-	}
-	return created, nil
+	return InitRulesDirV2(root)
 }
 
-// SyncRulesDir overwrites the built-in static rule files with the current templates.
+// SyncRulesDir keeps the legacy public name but now delegates to the v2 rules layout.
 func SyncRulesDir(root string) (written int, err error) {
-	rulesDir := filepath.Join(ResolveAgentsDir(root), "rules")
-	if err := os.MkdirAll(rulesDir, 0755); err != nil {
-		return 0, fmt.Errorf("create .agents/rules/: %w", err)
-	}
-
-	for name, content := range defaultRuleFiles {
-		fp := filepath.Join(rulesDir, name)
-		if err := os.WriteFile(fp, []byte(content), 0644); err != nil {
-			return written, fmt.Errorf("write %s: %w", name, err)
-		}
-		written++
-	}
-	if err := cleanupLegacyRuleArtifacts(root); err != nil {
-		return written, err
-	}
-	return written, nil
-}
-
-func cleanupLegacyRuleArtifacts(root string) error {
-	rulesDir := filepath.Join(ResolveAgentsDir(root), "rules")
-	legacyPaths := []string{
-		filepath.Join(rulesDir, "build-verification.md"),
-		filepath.Join(root, ".build-hash"),
-	}
-	for _, path := range legacyPaths {
-		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("remove legacy rule artifact %s: %w", path, err)
-		}
-	}
-	return nil
+	return SyncRulesDirV2(root)
 }
 
 // providerFileTag is the tag used for injecting rules references into provider files.
@@ -824,17 +460,20 @@ func defaultProviderInstructions(root string) string {
 	b.WriteString("- MUST follow `" + rulesRel + "/context-management.md` for context-cleanup and index-first recovery whenever context drifts, phases change, or work resumes.\n")
 	b.WriteString("- MUST keep status updates concise.\n")
 	b.WriteString("- MUST obey `" + rulesRel + "/worktree.md` for branch and git safety.\n")
-	b.WriteString("- MUST read `" + rulesRel + "/project-commands.md` before running any project command.\n")
-	b.WriteString("- MUST follow `" + rulesRel + "/agent-team-commands.md` for worker lifecycle and generated-file boundaries.\n")
-	b.WriteString("- MUST follow `" + rulesRel + "/merge-workflow.md` for controller-side rebase and merge sequencing.\n")
+	b.WriteString("- MUST read `" + rulesRel + "/index.md` at task start and then open only the relevant files under `" + rulesRel + "/core/` and `" + rulesRel + "/project/`.\n")
+	b.WriteString("- MUST follow `" + rulesRel + "/core/context-management.md` for context-cleanup and index-first recovery whenever context drifts, phases change, or work resumes.\n")
+	b.WriteString("- MUST keep status updates concise.\n")
+	b.WriteString("- MUST obey `" + rulesRel + "/core/worktree.md` for branch and git safety.\n")
+	b.WriteString("- MUST follow `" + rulesRel + "/core/agent-team-commands.md` for worker lifecycle and generated-file boundaries.\n")
+	b.WriteString("- MUST follow `" + rulesRel + "/core/merge-workflow.md` for controller-side rebase and merge sequencing.\n")
 	b.WriteString("\n## Rules Reference\n\n")
 	b.WriteString("Load `" + rulesRel + "/index.md` first, then load only the matching rule files:\n\n")
-	b.WriteString("- `" + rulesRel + "/debugging.md` for bugs, flaky tests, runtime errors, or unexpected behavior\n")
-	b.WriteString("- `" + rulesRel + "/project-commands.md` before running any project command\n")
-	b.WriteString("- `" + rulesRel + "/agent-team-commands.md` for agent-team CLI boundaries and worker lifecycle operations\n")
-	b.WriteString("- `" + rulesRel + "/merge-workflow.md` for controller-side rebase, merge ordering, and generated file safety\n")
-	b.WriteString("- `" + rulesRel + "/context-management.md` for context-cleanup triggers, session reset boundaries, and index-first file recovery\n")
-	b.WriteString("- `" + rulesRel + "/worktree.md` for branch safety, worktree limits, and ignored path handling\n")
+	b.WriteString("- `" + rulesRel + "/core/debugging.md` for bugs, flaky tests, runtime errors, or unexpected behavior\n")
+	b.WriteString("- `" + rulesRel + "/core/agent-team-commands.md` for agent-team CLI boundaries and worker lifecycle operations\n")
+	b.WriteString("- `" + rulesRel + "/core/merge-workflow.md` for controller-side rebase, merge ordering, and generated file safety\n")
+	b.WriteString("- `" + rulesRel + "/core/context-management.md` for context-cleanup triggers, session reset boundaries, and index-first file recovery\n")
+	b.WriteString("- `" + rulesRel + "/core/worktree.md` for branch safety, worktree limits, and ignored path handling\n")
+	b.WriteString("- Read the relevant files under `" + rulesRel + "/project/` before running project-specific commands or workflows\n")
 	return b.String()
 }
 

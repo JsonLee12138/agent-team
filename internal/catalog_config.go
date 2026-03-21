@@ -44,9 +44,9 @@ func DefaultCatalogPipelineConfig() CatalogPipelineConfig {
 	}
 }
 
-// CatalogPipelineConfigPath returns the config path under .agents/.
+// CatalogPipelineConfigPath returns the config path under .agent-team/.
 func CatalogPipelineConfigPath(root string) string {
-	return filepath.Join(root, ".agents", "catalog-pipeline.yaml")
+	return filepath.Join(AgentTeamDir(root), "catalog-pipeline.yaml")
 }
 
 // LoadCatalogPipelineConfig loads config or returns defaults if missing.
