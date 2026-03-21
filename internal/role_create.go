@@ -39,7 +39,7 @@ type RoleConfig struct {
 	SystemGoal  string
 	InScope     []string
 	OutOfScope  []string
-	Skills      []string
+	Skills      []RoleSkillSpec
 }
 
 // GenerationResult describes what was created.
@@ -242,23 +242,31 @@ func CollectScope(values []string, fallback string) []string {
 
 // templateData is the struct passed to Go templates.
 type templateData struct {
-	RoleName       string
-	Description    string
+	RoleName        string
+	Description     string
 	DescriptionYAML string
-	SystemGoal     string
-	InScopeMD      string
-	OutOfScopeMD   string
-	InScopeSummary string
-	SkillsMD       string
-	InScopeYAML    string
-	OutOfScopeYAML string
-	SkillsField    string
+	SystemGoal      string
+	InScopeMD       string
+	OutOfScopeMD    string
+	InScopeSummary  string
+	SkillsMD        string
+	InScopeYAML     string
+	OutOfScopeYAML  string
+	SkillsField     string
 }
 
 func mdBullets(items []string) string {
 	lines := make([]string, len(items))
 	for i, item := range items {
 		lines[i] = "- " + item
+	}
+	return strings.Join(lines, "\n")
+}
+
+func roleSkillBullets(skills []RoleSkillSpec) string {
+	lines := make([]string, len(skills))
+	for i, skill := range skills {
+		lines[i] = "- " + skill.Name + ": " + skill.Description
 	}
 	return strings.Join(lines, "\n")
 }
@@ -277,11 +285,52 @@ func yamlList(items []string, indent int) string {
 	return strings.Join(lines, "\n")
 }
 
-func renderSkillsField(skills []string) string {
+func normalizeSkillDescription(description, shortName string) string {
+	description = strings.TrimSpace(description)
+	if description == "" {
+		return "Skill support for " + shortName
+	}
+	return strings.Join(strings.Fields(description), " ")
+}
+
+func BuildRoleSkillSpecs(root string, skillNames []string) []RoleSkillSpec {
+	if len(skillNames) == 0 {
+		return []RoleSkillSpec{}
+	}
+	specs := make([]RoleSkillSpec, 0, len(skillNames))
+	for _, raw := range skillNames {
+		trimmed := strings.TrimSpace(raw)
+		shortName := parseSkillName(trimmed)
+		if shortName == "" {
+			continue
+		}
+		description := ""
+		if skillPath := findSkillPath(root, trimmed); skillPath != "" {
+			description = extractSkillTrigger(skillPath)
+		}
+		specs = append(specs, RoleSkillSpec{
+			Name:        shortName,
+			Description: normalizeSkillDescription(description, shortName),
+		})
+	}
+	if specs == nil {
+		return []RoleSkillSpec{}
+	}
+	return specs
+}
+
+func renderSkillsField(skills []RoleSkillSpec) string {
 	if len(skills) == 0 {
 		return "skills: []"
 	}
-	return "skills:\n" + yamlList(skills, 2)
+	lines := []string{"skills:"}
+	for _, skill := range skills {
+		lines = append(lines,
+			"  - name: "+yamlQuote(skill.Name),
+			"    description: "+yamlQuote(skill.Description),
+		)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // RenderFiles renders all three managed files and returns their contents.
@@ -294,7 +343,7 @@ func RenderFiles(config RoleConfig) (map[string]string, error) {
 		InScopeMD:       mdBullets(config.InScope),
 		OutOfScopeMD:    mdBullets(config.OutOfScope),
 		InScopeSummary:  strings.ToLower(strings.Join(config.InScope, ", ")),
-		SkillsMD:        mdBullets(config.Skills),
+		SkillsMD:        roleSkillBullets(config.Skills),
 		InScopeYAML:     yamlList(config.InScope, 4),
 		OutOfScopeYAML:  yamlList(config.OutOfScope, 4),
 		SkillsField:     renderSkillsField(config.Skills),

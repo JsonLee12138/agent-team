@@ -322,7 +322,7 @@ func TestInjectRolePromptSlim(t *testing.T) {
 	refDir := filepath.Join(roleDir, "references")
 	os.MkdirAll(refDir, 0755)
 	os.WriteFile(filepath.Join(roleDir, "system.md"), []byte("# System Prompt: dev\n\nA developer role.\n"), 0644)
-	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte("name: dev\ndescription: \"Full-stack developer\"\nskills:\n  - \"systematic-debugging\"\n"), 0644)
+	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte("name: dev\ndescription: \"Full-stack developer\"\nskills:\n  - name: \"systematic-debugging\"\n    description: \"Debugging workflow\"\n"), 0644)
 
 	// Create SKILL.md with frontmatter trigger
 	os.WriteFile(filepath.Join(roleDir, "SKILL.md"), []byte("---\nname: dev\ndescription: >\n  Full-stack dev skill.\n  Use when the user asks for dev work.\n---\n# dev\n"), 0644)

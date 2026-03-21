@@ -124,16 +124,21 @@
       "Bash(GOROOT=\"/Users/jsonlee/.gvm/gos/go1.24.2\" PATH=\"/Users/jsonlee/.gvm/gos/go1.24.2/bin:$PATH\" GOTOOLCHAIN=local /Users/jsonlee/.gvm/gos/go1.24.2/bin/go test ./internal -run 'Test\\(WorkerConfigPathHelpers|LoadWorkerConfigByID|InjectRolePromptWithPath_SlimMode|InjectRolePromptWithPath_RulesIndexInContent\\)' -count=1)",
       "Bash(browser-use doctor:*)",
       "Bash(browser-use:*)",
-      "Bash(open:*)"
+      "Bash(open:*)",
+      "Bash(status=$?)",
+      "Read(//tmp/**)",
+      "Bash(exit $status)"
     ]
   },
   "hooks": {
-    "UserPromptSubmit": [
+    "SessionStart": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "printf '%s\\n' '{\"systemMessage\":\"injected ok\",\"hookSpecificOutput\":{\"hookEventName\":\"UserPromptSubmit\",\"additionalContext\":\"ok\"}}'"
+            "command": "./scripts/session-start-record-main-pane.sh",
+            "timeout": 10000
           }
         ]
       }

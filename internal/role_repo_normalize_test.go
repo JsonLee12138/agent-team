@@ -194,6 +194,42 @@ func TestNormalizeWorkerInvalidYAML(t *testing.T) {
 	}
 }
 
+func TestNormalizeWorkerLegacySkillFormatIsInvalid(t *testing.T) {
+	roleYAML := "name: frontend\ndescription: Frontend development role\nskills:\n  - vitest\n"
+	encodedYAML := base64.StdEncoding.EncodeToString([]byte(roleYAML))
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/acme/roles", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]string{"default_branch": "main"})
+	})
+	mux.HandleFunc("/repos/acme/roles/git/trees/main", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{
+			"tree": []map[string]string{{"path": "skills/frontend/references/role.yaml", "type": "blob", "sha": "sha-role-yaml"}},
+		})
+	})
+	mux.HandleFunc("/repos/acme/roles/git/blobs/sha-role-yaml", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]string{"content": encodedYAML, "encoding": "base64"})
+	})
+
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	client := NewRoleRepoGitHubClientForTest(server.URL, server.Client(), "test-token")
+	worker := &NormalizeWorker{Client: client, NowFn: func() time.Time { return time.Now() }}
+	catalog := &RoleRepoCatalog{Version: RoleRepoCatalogVersion, Entries: []RoleRepoCatalogEntry{{Name: "frontend", Source: "acme/roles", RolePath: "skills/frontend", Status: CatalogStatusDiscovered}}}
+
+	results := worker.NormalizeAll(context.Background(), catalog)
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if results[0].Status != CatalogStatusInvalid {
+		t.Fatalf("expected invalid, got %s: %s", results[0].Status, results[0].Reason)
+	}
+	if !containsInsensitive(results[0].Reason, "legacy string format") {
+		t.Fatalf("unexpected reason: %s", results[0].Reason)
+	}
+}
+
 func TestNormalizeWorkerSkipsNonDiscovered(t *testing.T) {
 	client := NewRoleRepoGitHubClientForTest("http://unused", nil, "")
 	worker := &NormalizeWorker{

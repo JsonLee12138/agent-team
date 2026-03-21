@@ -208,7 +208,7 @@ func TestInjectRolePromptWithPath_DependencySkillsListed(t *testing.T) {
 	os.WriteFile(filepath.Join(rolePath, "system.md"),
 		[]byte("# System Prompt: full-role\n"), 0644)
 	os.WriteFile(filepath.Join(refDir, "role.yaml"),
-		[]byte("name: full-role\nskills:\n  - \"git-commit\"\n  - \"systematic-debugging\"\n"), 0644)
+		[]byte("name: full-role\nskills:\n  - name: \"git-commit\"\n    description: \"Git commit workflow\"\n  - name: \"systematic-debugging\"\n    description: \"Systematic debugging workflow\"\n"), 0644)
 
 	wtPath := filepath.Join(root, ".worktrees", "full-role-001")
 	os.MkdirAll(wtPath, 0755)

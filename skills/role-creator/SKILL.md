@@ -51,7 +51,7 @@ Target directory options:
 2. Show recommendation list and let user select desired skills.
 3. Ask for manual additions after selection.
 4. Merge selected + manual additions with de-duplication, then confirm final list.
-5. Final skills may be empty — will be persisted as `skills: []` in `references/role.yaml`.
+5. Final skills may be empty — will be persisted as `skills: []` in `references/role.yaml`; otherwise persist `skills[{name, description}]`.
 
 If `find-skills` is unavailable or returns empty, skip recommendations and ask for manual additions only.
 
@@ -123,7 +123,7 @@ Verify three files against actual template structure:
    - `scope.in_scope` — list of in-scope items
    - `scope.out_of_scope` — list of out-of-scope items
    - `constraints.single_role_focus: true`
-   - `skills` — list of selected skills (may be empty `[]`)
+   - `skills` — selected skills as objects with `name` and `description` (or empty `[]`)
 3. **`system.md`** — contains system goal and operating constraints.
 
 If any file is missing or contains unexpected content, report the discrepancy and offer to regenerate.
@@ -139,8 +139,8 @@ If any file is missing or contains unexpected content, report the discrepancy an
 Generated roles should follow this behavior at runtime:
 
 1. When a role receives a task that requires a skill not listed in its `references/role.yaml`, it should invoke `find-skills` to search for a matching skill.
-2. If a suitable skill is found, ask the user whether to install globally or project-level before installing.
-3. If the user does not specify, default to global installation.
-4. Install the selected skill and use it to complete the task.
-5. After successful use, suggest adding the skill to the role's `references/role.yaml` for future sessions.
+2. If a suitable skill is found, it may only attempt project-level installation.
+3. Global installation is not allowed for worker/runtime resolution.
+4. If project-level installation fails, emit a warning with the reason and suggested next step, then continue with best-effort execution.
+5. After successful use, suggest adding the skill to the role's `references/role.yaml` for future sessions by regenerating the role.
 6. If `find-skills` is unavailable or returns no match, the role should notify the user and proceed with best-effort execution.

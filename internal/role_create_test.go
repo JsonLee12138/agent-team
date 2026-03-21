@@ -17,7 +17,10 @@ func newTestConfig(roleName string) RoleConfig {
 		SystemGoal:  "Ship accessible and maintainable UI work",
 		InScope:     []string{"Implement UI components", "Improve page accessibility"},
 		OutOfScope:  []string{"Database migrations", "Backend API ownership"},
-		Skills:      []string{"vitest", "ui-ux-pro-max"},
+		Skills: []RoleSkillSpec{
+			{Name: "vitest", Description: "Unit testing with Vitest"},
+			{Name: "ui-ux-pro-max", Description: "UI/UX design and implementation support"},
+		},
 	}
 }
 
@@ -94,6 +97,17 @@ func assertStringSlice(t *testing.T, got, want []string) {
 	}
 }
 
+func testSkills(names ...string) []RoleSkillSpec {
+	skills := make([]RoleSkillSpec, 0, len(names))
+	for _, name := range names {
+		skills = append(skills, RoleSkillSpec{
+			Name:        name,
+			Description: "Skill support for " + name,
+		})
+	}
+	return skills
+}
+
 // --- Test #1: ValidateRoleName ---
 
 func TestValidateRoleName_InvalidIncludesSuggestion(t *testing.T) {
@@ -134,7 +148,7 @@ func TestRenderFiles_SystemPromptIncludesSkillPolicy(t *testing.T) {
 		SystemGoal:  "Ship accessible and maintainable UI work",
 		InScope:     []string{"Implement UI components"},
 		OutOfScope:  []string{"Backend API ownership"},
-		Skills:      []string{"vitest"},
+		Skills:      testSkills("vitest"),
 	}
 	rendered, err := RenderFiles(config)
 	if err != nil {
@@ -142,9 +156,9 @@ func TestRenderFiles_SystemPromptIncludesSkillPolicy(t *testing.T) {
 	}
 	systemMD := rendered["system.md"]
 	checks := []string{
-		"If a required skill is missing at runtime, use `find-skills` to recommend installable skills for this role.",
-		"Before any installation, ask the user whether to install globally or project-level.",
-		"If the user does not specify, default to global installation.",
+		"If a required skill is missing at runtime, use `find-skills` to search for a matching skill.",
+		"Only project-level installation is allowed for runtime skill resolution.",
+		"Never trigger global installation from this role.",
 	}
 	for _, want := range checks {
 		if !strings.Contains(systemMD, want) {
@@ -172,7 +186,7 @@ func TestCreateOrUpdateRole_OverwriteReplacesFiles(t *testing.T) {
 		SystemGoal:  "Ship accessible and maintainable UI work",
 		InScope:     []string{"Implement UI components"},
 		OutOfScope:  []string{"Own backend services"},
-		Skills:      []string{"vitest"},
+		Skills:      testSkills("vitest"),
 	}
 
 	result, err := CreateOrUpdateRole(repoRoot, config, "yes", nil, "skills")
@@ -219,7 +233,7 @@ func TestRenderFiles_EmptySkillsYAMLArray(t *testing.T) {
 		SystemGoal:  "Ship UI",
 		InScope:     []string{"Build components"},
 		OutOfScope:  []string{"Own backend"},
-		Skills:      []string{},
+		Skills:      testSkills(),
 	}
 	rendered, err := RenderFiles(config)
 	if err != nil {
@@ -239,13 +253,13 @@ func TestRenderFiles_NonEmptySkillsYAMLList(t *testing.T) {
 		SystemGoal:  "Ship UI",
 		InScope:     []string{"Build components"},
 		OutOfScope:  []string{"Own backend"},
-		Skills:      []string{"vitest", "ui-ux-pro-max"},
+		Skills:      testSkills("vitest", "ui-ux-pro-max"),
 	}
 	rendered, err := RenderFiles(config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "skills:\n  - \"vitest\"\n  - \"ui-ux-pro-max\""
+	want := "skills:\n  - name: \"vitest\"\n    description: \"Skill support for vitest\"\n  - name: \"ui-ux-pro-max\"\n    description: \"Skill support for ui-ux-pro-max\""
 	if !strings.Contains(rendered["references/role.yaml"], want) {
 		t.Errorf("expected skills list in role.yaml:\n%s\ngot:\n%s", want, rendered["references/role.yaml"])
 	}
@@ -305,7 +319,7 @@ func TestCreateOrUpdateRole_HappyPath(t *testing.T) {
 		SystemGoal:  "Build reliable data pipelines",
 		InScope:     []string{"ETL jobs", "Data validation"},
 		OutOfScope:  []string{"Frontend work"},
-		Skills:      []string{"vitest"},
+		Skills:      testSkills("vitest"),
 	}
 	result, err := CreateOrUpdateRole(repoRoot, config, "ask", nil, "skills")
 	if err != nil {
@@ -338,7 +352,7 @@ func TestCreateOrUpdateRole_OverwriteModeNoError(t *testing.T) {
 		SystemGoal:  "Do stuff",
 		InScope:     []string{"Task A"},
 		OutOfScope:  []string{"Task B"},
-		Skills:      []string{},
+		Skills:      testSkills(),
 	}
 	_, err := CreateOrUpdateRole(repoRoot, config, "no", nil, "skills")
 	if err == nil {
@@ -389,7 +403,7 @@ func TestCreateOrUpdateRole_TargetDirVariants(t *testing.T) {
 			SystemGoal:  "Build reliable backend services",
 			InScope:     []string{"API design", "Database queries"},
 			OutOfScope:  []string{"Frontend work"},
-			Skills:      []string{"vitest"},
+			Skills:      testSkills("vitest"),
 		}
 		result, err := CreateOrUpdateRole(repoRoot, config, "ask", nil, ".agent-team/teams")
 		if err != nil {
@@ -413,7 +427,7 @@ func TestCreateOrUpdateRole_TargetDirVariants(t *testing.T) {
 			SystemGoal:  "Do custom work",
 			InScope:     []string{"Custom tasks"},
 			OutOfScope:  []string{"Other tasks"},
-			Skills:      []string{},
+			Skills:      testSkills(),
 		}
 		result, err := CreateOrUpdateRole(repoRoot, config, "ask", nil, "my-custom-dir")
 		if err != nil {

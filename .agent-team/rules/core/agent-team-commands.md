@@ -7,7 +7,7 @@ Apply this rule whenever a worker session needs project workflow operations such
 ## Command Boundary
 
 - MUST use the `agent-team` CLI for worker lifecycle and task lifecycle operations when the repository provides it.
-- MUST NOT bypass `agent-team worker open`, `agent-team worker assign`, or `agent-team reply-main` with ad hoc shell commands.
+- MUST NOT bypass `agent-team worker open`, `agent-team task assign`, or `agent-team reply-main` with ad hoc shell commands.
 - MUST treat worker bootstrap files and provider prompt files as controller-managed artifacts.
 
 ## Generated File Safety

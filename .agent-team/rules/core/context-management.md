@@ -15,7 +15,7 @@ Apply this rule whenever context grows, the task changes phase, or resumed work 
 
 - Context cleanup resets session context; it MUST NOT rewrite, compress, or discard file artifacts.
 - Context cleanup is NOT a synonym for `/compact`.
-- Controller/main MUST read `.agents/rules/index.md` first, then open only the matching rule files, then the current workflow/task artifacts.
+- Controller/main MUST read `.agent-team/rules/index.md` first, then open only the matching rule files, then the current workflow/task artifacts.
 - Worker MUST read `worker.yaml` first, then `task.yaml`, and only then read `context.md` or referenced materials when needed.
 - NEVER jump directly to rule bodies, `context.md`, or other detail files before reading the required entry file.
 - NEVER default to scanning every context file; expand only what the index or current task explicitly requires.

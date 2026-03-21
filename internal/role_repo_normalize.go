@@ -157,6 +157,9 @@ func (w *NormalizeWorker) validateRoleYAML(ctx context.Context, source RoleRepoS
 	if strings.TrimSpace(roleYAML.Description) == "" {
 		return fmt.Errorf("role.yaml missing required field: description")
 	}
+	if _, err := readRoleSkillSpecs(data); err != nil {
+		return err
+	}
 	return nil
 }
 

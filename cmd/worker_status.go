@@ -39,7 +39,9 @@ func (a *App) RunWorkerStatus() error {
 		// Count skills
 		skillsSummary := "-"
 		skills, err := internal.ReadRoleSkills(root, w.Role)
-		if err == nil {
+		if err != nil {
+			skillsSummary = "invalid"
+		} else {
 			total := len(skills)
 			// Check how many are actually found
 			found := 0

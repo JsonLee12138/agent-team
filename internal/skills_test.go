@@ -4,6 +4,7 @@ package internal
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -43,7 +44,7 @@ func TestReadRoleSkills(t *testing.T) {
 	t.Run("reads skills list", func(t *testing.T) {
 		roleDir := filepath.Join(dir, ".agent-team", "teams", "dev", "references")
 		os.MkdirAll(roleDir, 0755)
-		content := "name: dev\nskills:\n  - vite\n  - antfu/skills@vitest\n"
+		content := "name: dev\nskills:\n  - name: vite\n    description: Vite support\n  - name: antfu/skills@vitest\n    description: Vitest support\n"
 		os.WriteFile(filepath.Join(roleDir, "role.yaml"), []byte(content), 0644)
 
 		skills, err := ReadRoleSkills(dir, "dev")
@@ -70,6 +71,21 @@ func TestReadRoleSkills(t *testing.T) {
 		}
 		if len(skills) != 0 {
 			t.Errorf("expected 0 skills, got %d", len(skills))
+		}
+	})
+
+	t.Run("legacy string skills returns error", func(t *testing.T) {
+		roleDir := filepath.Join(dir, ".agent-team", "teams", "legacy-role", "references")
+		os.MkdirAll(roleDir, 0755)
+		content := "name: legacy-role\nskills:\n  - vitest\n"
+		os.WriteFile(filepath.Join(roleDir, "role.yaml"), []byte(content), 0644)
+
+		_, err := ReadRoleSkills(dir, "legacy-role")
+		if err == nil {
+			t.Fatal("expected error")
+		}
+		if !strings.Contains(err.Error(), "legacy string format") {
+			t.Fatalf("unexpected error: %v", err)
 		}
 	})
 }
@@ -176,7 +192,7 @@ func TestCopySkillsToWorktree(t *testing.T) {
 	os.WriteFile(filepath.Join(depDir, "SKILL.md"), []byte("# vitest\n"), 0644)
 
 	// Write role.yaml with skills
-	roleYAML := "name: dev\nskills:\n  - vitest\n"
+	roleYAML := "name: dev\nskills:\n  - name: vitest\n    description: Vitest support\n"
 	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte(roleYAML), 0644)
 
 	err := CopySkillsToWorktree(wtPath, dir, "dev")
@@ -246,7 +262,7 @@ func TestCopySkillsToWorktreeScopedName(t *testing.T) {
 	os.MkdirAll(viteDir, 0755)
 	os.WriteFile(filepath.Join(viteDir, "SKILL.md"), []byte("# vite\n"), 0644)
 
-	roleYAML := "name: arch\nskills:\n  - \"antfu/skills@vite\"\n"
+	roleYAML := "name: arch\nskills:\n  - name: \"antfu/skills@vite\"\n    description: Vite support\n"
 	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte(roleYAML), 0644)
 
 	err := CopySkillsToWorktree(wtPath, dir, "arch")
@@ -342,7 +358,7 @@ func TestInstallSkillsForWorkerLocalOnly(t *testing.T) {
 	os.WriteFile(filepath.Join(depDir, "SKILL.md"), []byte("# vitest\n"), 0644)
 
 	// Write role.yaml with plain skills only (no scoped, so no npx calls)
-	roleYAML := "name: dev\nskills:\n  - vitest\n"
+	roleYAML := "name: dev\nskills:\n  - name: vitest\n    description: Vitest support\n"
 	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte(roleYAML), 0644)
 
 	err := InstallSkillsForWorker(wtPath, dir, "dev", "claude")
@@ -516,7 +532,7 @@ func TestInstallSkillsForWorkerSymlink(t *testing.T) {
 	os.MkdirAll(depDir, 0755)
 	os.WriteFile(filepath.Join(depDir, "SKILL.md"), []byte("# vitest\n"), 0644)
 
-	roleYAML := "name: dev\nskills:\n  - vitest\n"
+	roleYAML := "name: dev\nskills:\n  - name: vitest\n    description: Vitest support\n"
 	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte(roleYAML), 0644)
 
 	err := InstallSkillsForWorkerFromPath(wtPath, dir, "dev", roleDir, "claude", false)

@@ -19,6 +19,7 @@ var requiredCoreRuleFiles = []string{
 	"merge-workflow.md",
 	"context-management.md",
 	"worktree.md",
+	"skill-resolution.md",
 }
 
 var defaultCoreRuleFiles = map[string]string{
@@ -138,6 +139,20 @@ Apply this rule for any git command, branch action, file placement decision, or 
 - MUST stage only files required for the assigned change.
 - NEVER use blanket staging commands that may capture unrelated work.
 `,
+	"skill-resolution.md": `# Skill Resolution Rules
+
+## Trigger
+
+Apply this rule whenever a role needs a skill that is missing locally at runtime.
+
+## Required Flow
+
+1. MUST run ` + "`find-skills`" + ` first to search for a matching skill.
+2. MUST allow only project-level installation for runtime skill resolution.
+3. MUST NOT trigger any global skill installation path from a worker/runtime flow.
+4. If project-level installation fails, MUST print a warning with the failure reason and a suggested next step, then continue the current task.
+5. After the task, MAY suggest regenerating the role with ` + "`agent-team role create`" + ` so the skill is declared in ` + "`references/role.yaml`" + `.
+`,
 }
 
 var defaultRuleFiles = map[string]string{
@@ -155,6 +170,7 @@ Read this file first. It is the single entry point for project rules.
 - ` + "`core/merge-workflow.md`" + `: use for controller-side rebase, synchronization, and merge sequencing.
 - ` + "`core/context-management.md`" + `: use for context-cleanup, index-first recovery, and resume rules.
 - ` + "`core/worktree.md`" + `: use for branch safety, worktree limits, and file placement.
+- ` + "`core/skill-resolution.md`" + `: use when runtime skill lookup or installation is needed.
 
 ## Project Rules
 
@@ -539,6 +555,9 @@ func ValidateRules(root string) error {
 		}
 		if !strings.Contains(indexText, "project/") {
 			issues = append(issues, RulesValidationIssue{Path: filepath.ToSlash(filepath.Join(".agent-team", "rules", "index.md")), Message: "missing project/ entry hint"})
+		}
+		if !strings.Contains(indexText, "core/skill-resolution.md") {
+			issues = append(issues, RulesValidationIssue{Path: filepath.ToSlash(filepath.Join(".agent-team", "rules", "index.md")), Message: "missing reference to core/skill-resolution.md"})
 		}
 		validateMarkdownMetrics(indexPath, filepath.ToSlash(filepath.Join(".agent-team", "rules", "index.md")), 80, 4000, 8, &issues)
 	}

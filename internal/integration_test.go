@@ -34,9 +34,12 @@ func TestWorkerFlowSkillSurvival(t *testing.T) {
 	roleYAMLContent := `name: dev-role
 description: "Test role for integration testing"
 skills:
-  - "vite-tool"
-  - "antfu/skills@vitest"
-  - "jsonlee12138/prompts@eslint-config"
+  - name: "vite-tool"
+    description: "Vite tool support"
+  - name: "antfu/skills@vitest"
+    description: "Vitest support"
+  - name: "jsonlee12138/prompts@eslint-config"
+    description: "ESLint config support"
 `
 	if err := os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte(roleYAMLContent), 0644); err != nil {
 		t.Fatalf("write role.yaml: %v", err)
@@ -264,7 +267,8 @@ func TestWorkerFlowGlobalSkillCopy(t *testing.T) {
 
 	roleYAMLContent := `name: test-role
 skills:
-  - "design-patterns"
+  - name: "design-patterns"
+    description: "Design patterns guide"
 `
 	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte(roleYAMLContent), 0644)
 
@@ -322,8 +326,10 @@ func TestWorkerFlowMissingSkillWarning(t *testing.T) {
 
 	roleYAMLContent := `name: partial-role
 skills:
-  - "existing-skill"
-  - "nonexistent-skill"
+  - name: "existing-skill"
+    description: "Existing local skill"
+  - name: "nonexistent-skill"
+    description: "Missing skill for warning path"
 `
 	os.WriteFile(filepath.Join(refDir, "role.yaml"), []byte(roleYAMLContent), 0644)
 

@@ -89,7 +89,7 @@ func newRoleCreateCmd() *cobra.Command {
 				SystemGoal:  strings.TrimSpace(systemGoal),
 				InScope:     internal.CollectScope(inScope, strings.TrimSpace(description)),
 				OutOfScope:  internal.CollectScope(outOfScope, "Tasks outside this role responsibilities"),
-				Skills:      finalSkills,
+				Skills:      internal.BuildRoleSkillSpecs(root, finalSkills),
 			}
 
 			confirmFn := func(targetDirPath string) (bool, error) {

@@ -96,7 +96,7 @@ func (a *App) RunWorkerOpen(workerID, provider, model string, newWindow, persist
 	if usedCompatProviderFallback {
 		fmt.Println("  worker.yaml has no provider; using claude for this launch only")
 	}
-	fmt.Printf("  Syncing skills for role '%s'...\n", cfg.Role)
+	fmt.Printf("  Resolving local skills for role '%s'...\n", cfg.Role)
 	rolePath := cfg.RolePath
 	if rolePath == "" {
 		rolePath = internal.RoleDir(root, cfg.Role)

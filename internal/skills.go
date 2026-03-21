@@ -15,12 +15,81 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// roleYAML is the minimal struct to extract skills from role.yaml.
-type roleYAML struct {
-	Skills []string `yaml:"skills"`
+// RoleSkillSpec is the persisted role skill reference shape in references/role.yaml.
+type RoleSkillSpec struct {
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
 }
 
-// ReadRoleSkillsFromPath reads the skills list from a role's references/role.yaml at the given path.
+func readRoleSkillSpecs(data []byte) ([]RoleSkillSpec, error) {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+	if len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
+		return nil, nil
+	}
+	root := doc.Content[0]
+	skillsNode := yamlMappingValue(root, "skills")
+	if skillsNode == nil {
+		return nil, nil
+	}
+	if skillsNode.Kind != yaml.SequenceNode {
+		return nil, fmt.Errorf("skills must be a list")
+	}
+	if len(skillsNode.Content) == 0 {
+		return []RoleSkillSpec{}, nil
+	}
+
+	skills := make([]RoleSkillSpec, 0, len(skillsNode.Content))
+	for i, item := range skillsNode.Content {
+		idx := i + 1
+		if item.Kind != yaml.MappingNode {
+			if item.Kind == yaml.ScalarNode {
+				return nil, fmt.Errorf("skills[%d] uses the legacy string format; recreate this role with `agent-team role create <role-name> ...`", idx)
+			}
+			return nil, fmt.Errorf("skills[%d] must be an object", idx)
+		}
+		nameNode := yamlMappingValue(item, "name")
+		if nameNode == nil || strings.TrimSpace(nameNode.Value) == "" {
+			return nil, fmt.Errorf("skills[%d].name is required", idx)
+		}
+		descriptionNode := yamlMappingValue(item, "description")
+		if descriptionNode == nil || strings.TrimSpace(descriptionNode.Value) == "" {
+			return nil, fmt.Errorf("skills[%d].description is required", idx)
+		}
+		skills = append(skills, RoleSkillSpec{
+			Name:        strings.TrimSpace(nameNode.Value),
+			Description: strings.TrimSpace(descriptionNode.Value),
+		})
+	}
+	return skills, nil
+}
+
+func yamlMappingValue(node *yaml.Node, key string) *yaml.Node {
+	if node == nil || node.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value == key {
+			return node.Content[i+1]
+		}
+	}
+	return nil
+}
+
+func roleSkillNames(skills []RoleSkillSpec) []string {
+	if len(skills) == 0 {
+		return []string{}
+	}
+	names := make([]string, 0, len(skills))
+	for _, skill := range skills {
+		names = append(names, skill.Name)
+	}
+	return names
+}
+
+// ReadRoleSkillsFromPath reads the skill names from a role's references/role.yaml at the given path.
 func ReadRoleSkillsFromPath(rolePath string) ([]string, error) {
 	yamlPath := filepath.Join(rolePath, "references", "role.yaml")
 	data, err := os.ReadFile(yamlPath)
@@ -30,11 +99,11 @@ func ReadRoleSkillsFromPath(rolePath string) ([]string, error) {
 		}
 		return nil, fmt.Errorf("read role.yaml: %w", err)
 	}
-	var ry roleYAML
-	if err := yaml.Unmarshal(data, &ry); err != nil {
+	skills, err := readRoleSkillSpecs(data)
+	if err != nil {
 		return nil, fmt.Errorf("parse role.yaml: %w", err)
 	}
-	return ry.Skills, nil
+	return roleSkillNames(skills), nil
 }
 
 // ReadRoleSkills reads the skills list from a role's references/role.yaml.
@@ -246,8 +315,8 @@ func backgroundSkillCheck(root, provider string) {
 	})
 }
 
-// InstallSkillsForWorkerFromPath installs role skills into the worktree using symlinks
-// to project-level cache. When fresh is true, cached skills are re-installed.
+// InstallSkillsForWorkerFromPath installs role skills into the worktree using symlinks.
+// Runtime resolution only links already-available local/project-level skills and never performs global installs.
 func InstallSkillsForWorkerFromPath(wtPath, root, roleName, rolePath, provider string, fresh bool) error {
 	// 1. Symlink the role skill itself (always local)
 	if _, err := os.Stat(rolePath); err == nil {
@@ -289,54 +358,20 @@ func InstallSkillsForWorkerFromPath(wtPath, root, roleName, rolePath, provider s
 			if err := symlinkSkill(wtPath, provider, shortName, cachePath); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: symlink cached skill '%s' failed: %v\n", shortName, err)
 			}
-		} else if isScopedSkill(skillName) {
-			// Scoped: npx skills add to project root, then move to cache, then symlink
-			fmt.Printf("  Installing skill '%s' via npx (project cache)...\n", skillName)
-			if err := runNpxSkillsAdd(root, skillName, provider); err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: npx skills add '%s' failed: %v\n", skillName, err)
-				continue
-			}
-			// Move from npx output (<root>/.<provider>/skills/) to project cache
-			if err := moveNpxResultToCache(root, provider, shortName); err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: move skill '%s' to cache failed: %v\n", shortName, err)
-				continue
-			}
-			if _, err := os.Stat(cachePath); err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: npx installed '%s' but expected path not found: %s\n", skillName, cachePath)
-				continue
-			}
-			if err := symlinkSkill(wtPath, provider, shortName, cachePath); err != nil {
+			continue
+		}
+
+		// Plain: try local search first
+		skillPath := findSkillPath(root, skillName)
+		if skillPath != "" {
+			// Found locally: symlink directly to source
+			if err := symlinkSkill(wtPath, provider, shortName, skillPath); err != nil {
 				fmt.Fprintf(os.Stderr, "Warning: symlink skill '%s' failed: %v\n", shortName, err)
 			}
-		} else {
-			// Plain: try local search first
-			skillPath := findSkillPath(root, skillName)
-			if skillPath != "" {
-				// Found locally: symlink directly to source
-				if err := symlinkSkill(wtPath, provider, shortName, skillPath); err != nil {
-					fmt.Fprintf(os.Stderr, "Warning: symlink skill '%s' failed: %v\n", shortName, err)
-				}
-			} else {
-				// Fallback: npx skills add to project root, then move to cache, then symlink
-				fmt.Printf("  Skill '%s' not found locally, trying npx (project cache)...\n", skillName)
-				if err := runNpxSkillsAdd(root, skillName, provider); err != nil {
-					fmt.Fprintf(os.Stderr, "Error: skill '%s' not found locally and npx install failed: %v\n", skillName, err)
-					continue
-				}
-				// Move from npx output to project cache
-				if err := moveNpxResultToCache(root, provider, shortName); err != nil {
-					fmt.Fprintf(os.Stderr, "Warning: move skill '%s' to cache failed: %v\n", shortName, err)
-					continue
-				}
-				if _, err := os.Stat(cachePath); err != nil {
-					fmt.Fprintf(os.Stderr, "Warning: npx installed '%s' but expected path not found: %s\n", skillName, cachePath)
-					continue
-				}
-				if err := symlinkSkill(wtPath, provider, shortName, cachePath); err != nil {
-					fmt.Fprintf(os.Stderr, "Warning: symlink skill '%s' failed: %v\n", shortName, err)
-				}
-			}
+			continue
 		}
+
+		fmt.Fprintf(os.Stderr, "Warning: skill '%s' is missing locally. Run find-skills and install it at project level if needed. Global installation is not allowed for workers.\n", skillName)
 	}
 
 	// Background update check: if any skills were served from cache, silently check for updates

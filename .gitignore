@@ -26,5 +26,5 @@ docs/marketing
 .agents/.cache/
 
 # Project-local session metadata
-.agent-team/
 .tmp
+*.tar.gz
