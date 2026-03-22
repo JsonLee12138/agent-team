@@ -28,3 +28,4 @@ docs/marketing
 # Project-local session metadata
 .tmp
 *.tar.gz
+.claude/settings.local.json
