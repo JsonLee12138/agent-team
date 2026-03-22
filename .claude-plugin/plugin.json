@@ -1,7 +1,7 @@
 {
   "name": "agent-team",
   "description": "AI team role and worker manager for multi-agent development workflows.",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "author": {
     "name": "JsonLee",
     "url": "https://github.com/JsonLee12138"
