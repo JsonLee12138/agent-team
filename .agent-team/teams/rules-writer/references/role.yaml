@@ -1,0 +1,20 @@
+name: rules-writer
+description: 规则文件与 Provider 文件编写者，负责 .agents/rules/*.md、CLAUDE.md、AGENTS.md、GEMINI.md 的内容编写与维护
+system_prompt_file: system.md
+scope:
+  in_scope:
+  - Markdown 规则文件编写 (.agents/rules/)
+  - Provider 文件编写 (CLAUDE.md/AGENTS.md/GEMINI.md)
+  - 规则索引维护
+  - 上下文管理规则设计
+  - 任务协议文档编写
+  out_of_scope:
+  - Go 代码开发
+  - CLI 命令实现
+  - 测试编写
+  - 数据库设计
+constraints:
+  single_role_focus: true
+skills:
+- name: jsonlee12138/prompts@git-commit
+  description: 'Execute git commit with conventional commit message analysis, intelligent staging, and message generation. Use when user asks to commit changes, create a git commit, or mentions "/commit". Supports: (1) Auto-detecting type and scope from changes, (2) Generating conventional commit messages from diff, (3) Interactive commit with optional type/scope/description overrides, (4) Intelligent file staging for logical grouping'

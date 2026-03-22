@@ -1,0 +1,38 @@
+name: frontend-architect
+description: 专精于前端项目架构设计和工程化的角色，负责项目搭建、架构设计、代码质量把控。掌握现代前端工具链（Vite、Turborepo、Vitest等）和设计模式最佳实践。
+system_prompt_file: system.md
+scope:
+  in_scope:
+  - 项目初始化和搭建（Vite）
+  - 前端架构设计和技术决策
+  - ESLint、Commitlint、VSCode 配置
+  - 代码审核和 Core Review
+  - Vitest 单元测试配置
+  - 组件库 E2E 测试配置
+  - 工具库打包配置（Tsdown）
+  - 技术栈选型和最佳实践
+  out_of_scope:
+  - UI/UX 设计和设计稿评审
+  - 业务逻辑实现
+  - 功能开发
+  - 部署和运维
+  - 后端架构和 API 设计
+constraints:
+  single_role_focus: true
+skills:
+- name: jsonlee12138/prompts@design-patterns-principles
+  description: Use when a request asks for software design patterns or design principles, including explanations, comparisons, summaries, or quick reference grounded in local docs.
+- name: jsonlee12138/prompts@vite-tanstack
+  description: 'TanStack (Router/Query/Form/Table) configuration guide for Vite + React projects. Covers Vite plugin setup, main.tsx registration, DevTools configuration, and editor settings. Use when setting up or reviewing TanStack config in a Vite project. Triggers on: vite-tanstack, tanstack config, tanstack router setup, tanstack query setup, tanstack form setup, tanstack table setup.'
+- name: jsonlee12138/prompts@vite
+  description: Vite build tool configuration, plugin API, SSR, and Vite 8 Rolldown migration. Use when working with Vite projects, vite.config.ts, Vite plugins, or building libraries/SSR apps with Vite.
+- name: jsonlee12138/prompts@vitest
+  description: Vitest fast unit testing framework powered by Vite with Jest-compatible API. Use when writing tests, mocking, configuring coverage, or working with test filtering and fixtures.
+- name: jsonlee12138/prompts@eslint-config
+  description: Use when configuring ESLint with @antfu/eslint-config for a single project or a monorepo workspace, including flat config setup, shared config packages, commit quality hooks, or migrations from legacy ESLint configs.
+- name: jsonlee12138/prompts@jsdoc-typescript-docs
+  description: Documents TypeScript code with JSDoc comments, generates API documentation, and creates type-safe documentation. Use when users request "JSDoc", "code documentation", "API docs", "TypeDoc", or "inline documentation".
+- name: jsonlee12138/prompts@turborepo
+  description: 'Turborepo monorepo build system guidance. Triggers on: turbo.json, task pipelines, dependsOn, caching, remote cache, the "turbo" CLI, --filter, --affected, CI optimization, environment variables, internal packages, monorepo structure/best practices, and boundaries. Use when user: configures tasks/workflows/pipelines, creates packages, sets up monorepo, shares code between apps, runs changed/affected packages, debugs cache, or has apps/packages directories.'
+- name: jsonlee12138/prompts@unocss-shadcn
+  description: Configure UnoCSS with unocss-preset-shadcn using a semi-automatic, framework-agnostic workflow. Use when setting up or updating UnoCSS + shadcn integration, deciding monorepo vs single-project component destinations, enforcing peerDependencies in monorepos, and requiring shadcn MCP + manual component creation mode.

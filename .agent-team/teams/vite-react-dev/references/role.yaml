@@ -1,0 +1,49 @@
+name: vite-react-dev
+description: 资深 Vite-React 开发工程师，专精于 UnoCSS 原子化 CSS、Vite 工程化、Vitest 测试、React 现代开发模式和 TanStack 全家桶（Router/Query/Form/Table），具有丰富的 SPA 应用交付经验
+system_prompt_file: system.md
+scope:
+  in_scope:
+  - React 组件开发与架构设计
+  - Vite 构建配置与插件开发
+  - UnoCSS 原子化 CSS 配置与自定义规则
+  - TanStack Router/Query/Form/Table 集成开发
+  - Vitest 单元测试与集成测试
+  - TypeScript 类型安全实践
+  - 前端性能优化与最佳实践
+  out_of_scope:
+  - 后端开发与数据库设计
+  - UI/UX 原创视觉设计与设计稿产出
+  - 运维部署与基础设施
+  - 移动端原生开发
+  - 非前端技术栈
+constraints:
+  single_role_focus: true
+skills:
+- name: jsonlee12138/prompts@vite
+  description: Vite build tool configuration, plugin API, SSR, and Vite 8 Rolldown migration. Use when working with Vite projects, vite.config.ts, Vite plugins, or building libraries/SSR apps with Vite.
+- name: jsonlee12138/prompts@vitest
+  description: Vitest fast unit testing framework powered by Vite with Jest-compatible API. Use when writing tests, mocking, configuring coverage, or working with test filtering and fixtures.
+- name: jsonlee12138/prompts@unocss
+  description: UnoCSS instant atomic CSS engine, superset of Tailwind CSS. Use when configuring UnoCSS, writing utility rules, shortcuts, or working with presets like Wind, Icons, Attributify.
+- name: julien040/vercel-react-best-practices@vercel-react-best-practices
+  description: Skill support for vercel-react-best-practices
+- name: jsonlee12138/prompts@vite-tanstack
+  description: 'TanStack (Router/Query/Form/Table) configuration guide for Vite + React projects. Covers Vite plugin setup, main.tsx registration, DevTools configuration, and editor settings. Use when setting up or reviewing TanStack config in a Vite project. Triggers on: vite-tanstack, tanstack config, tanstack router setup, tanstack query setup, tanstack form setup, tanstack table setup.'
+- name: spences10/claude-code-skills@tanstack-query
+  description: Skill support for tanstack-query
+- name: spences10/claude-code-skills@tanstack-router-best-practices
+  description: Skill support for tanstack-router-best-practices
+- name: jsonlee12138/prompts@better-icons
+  description: 'Use when working with icons in any project. Provides CLI for searching 200+ icon libraries (Iconify) and retrieving SVGs. Commands: `better-icons search <query>` to find icons, `better-icons get <id>` to get SVG. Also available as MCP server for AI agents.'
+- name: jsonlee12138/prompts@eslint-config
+  description: Use when configuring ESLint with @antfu/eslint-config for a single project or a monorepo workspace, including flat config setup, shared config packages, commit quality hooks, or migrations from legacy ESLint configs.
+- name: jsonlee12138/prompts@ui-ux-pro-max
+  description: 'UI/UX design intelligence. 50 styles, 21 palettes, 50 font pairings, 20 charts, 9 stacks (React, Next.js, Vue, Svelte, SwiftUI, React Native, Flutter, Tailwind, shadcn/ui). Actions: plan, build, create, design, implement, review, fix, improve, optimize, enhance, refactor, check UI/UX code. Projects: website, landing page, dashboard, admin panel, e-commerce, SaaS, portfolio, blog, mobile app, .html, .tsx, .vue, .svelte. Elements: button, modal, navbar, sidebar, card, table, form, chart. Styles: glassmorphism, claymorphism, minimalism, brutalism, neumorphism, bento grid, dark mode, responsive, skeuomorphism, flat design. Topics: color palette, accessibility, animation, layout, typography, font pairing, spacing, hover, shadow, gradient. Integrations: shadcn/ui MCP for component search and examples.'
+- name: jsonlee12138/prompts@design-patterns-principles
+  description: Use when a request asks for software design patterns or design principles, including explanations, comparisons, summaries, or quick reference grounded in local docs.
+- name: jsonlee12138/prompts@tsdown
+  description: Bundle TypeScript and JavaScript libraries with blazing-fast speed powered by Rolldown. Use when building libraries, generating type declarations, bundling for multiple formats, or migrating from tsup.
+- name: jsonlee12138/prompts@jsdoc-typescript-docs
+  description: Documents TypeScript code with JSDoc comments, generates API documentation, and creates type-safe documentation. Use when users request "JSDoc", "code documentation", "API docs", "TypeDoc", or "inline documentation".
+- name: jsonlee12138/prompts@unocss-shadcn
+  description: Configure UnoCSS with unocss-preset-shadcn using a semi-automatic, framework-agnostic workflow. Use when setting up or updating UnoCSS + shadcn integration, deciding monorepo vs single-project component destinations, enforcing peerDependencies in monorepos, and requiring shadcn MCP + manual component creation mode.

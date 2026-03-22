@@ -1,0 +1,121 @@
+name: pd
+description: 产品总监角色，精通产品战略、用户研究、优先级排序、路线图规划、SaaS 指标分析、研讨会引导和团队领导力发展，覆盖从发现到交付的完整产品管理生命周期
+system_prompt_file: system.md
+scope:
+  in_scope:
+  - 产品战略与定位
+  - 用户研究与客户发现
+  - 优先级排序与路线图
+  - SaaS 指标与财务分析
+  - 用户故事与 Epic 管理
+  - 竞品分析与市场评估
+  - 研讨会引导与协作
+  - PM 到 Director/VP/CPO 职业发展教练
+  - 定价策略
+  - 创新冲刺与验证实验
+  out_of_scope:
+  - 代码实现与技术架构
+  - UI/UX 视觉设计稿
+  - 数据库管理与运维
+  - DevOps 与 CI/CD 流水线
+  - 法务合同审核
+  - 财务审计与合规
+constraints:
+  single_role_focus: true
+skills:
+- name: deanpeters/Product-Manager-Skills@acquisition-channel-advisor
+  description: Skill support for acquisition-channel-advisor
+- name: deanpeters/Product-Manager-Skills@ai-shaped-readiness-advisor
+  description: Skill support for ai-shaped-readiness-advisor
+- name: deanpeters/Product-Manager-Skills@altitude-horizon-framework
+  description: Skill support for altitude-horizon-framework
+- name: deanpeters/Product-Manager-Skills@business-health-diagnostic
+  description: Skill support for business-health-diagnostic
+- name: deanpeters/Product-Manager-Skills@company-research
+  description: Skill support for company-research
+- name: deanpeters/Product-Manager-Skills@context-engineering-advisor
+  description: Skill support for context-engineering-advisor
+- name: deanpeters/Product-Manager-Skills@customer-journey-map
+  description: Skill support for customer-journey-map
+- name: deanpeters/Product-Manager-Skills@customer-journey-mapping-workshop
+  description: Skill support for customer-journey-mapping-workshop
+- name: deanpeters/Product-Manager-Skills@director-readiness-advisor
+  description: Skill support for director-readiness-advisor
+- name: deanpeters/Product-Manager-Skills@discovery-interview-prep
+  description: Skill support for discovery-interview-prep
+- name: deanpeters/Product-Manager-Skills@discovery-process
+  description: Skill support for discovery-process
+- name: deanpeters/Product-Manager-Skills@eol-message
+  description: Skill support for eol-message
+- name: deanpeters/Product-Manager-Skills@epic-breakdown-advisor
+  description: Skill support for epic-breakdown-advisor
+- name: deanpeters/Product-Manager-Skills@epic-hypothesis
+  description: Skill support for epic-hypothesis
+- name: deanpeters/Product-Manager-Skills@executive-onboarding-playbook
+  description: Skill support for executive-onboarding-playbook
+- name: deanpeters/Product-Manager-Skills@feature-investment-advisor
+  description: Skill support for feature-investment-advisor
+- name: deanpeters/Product-Manager-Skills@finance-based-pricing-advisor
+  description: Skill support for finance-based-pricing-advisor
+- name: deanpeters/Product-Manager-Skills@finance-metrics-quickref
+  description: Skill support for finance-metrics-quickref
+- name: deanpeters/Product-Manager-Skills@jobs-to-be-done
+  description: Skill support for jobs-to-be-done
+- name: deanpeters/Product-Manager-Skills@lean-ux-canvas
+  description: Skill support for lean-ux-canvas
+- name: deanpeters/Product-Manager-Skills@opportunity-solution-tree
+  description: Skill support for opportunity-solution-tree
+- name: deanpeters/Product-Manager-Skills@pestel-analysis
+  description: Skill support for pestel-analysis
+- name: deanpeters/Product-Manager-Skills@pol-probe-advisor
+  description: Skill support for pol-probe-advisor
+- name: deanpeters/Product-Manager-Skills@pol-probe
+  description: Skill support for pol-probe
+- name: deanpeters/Product-Manager-Skills@positioning-statement
+  description: Skill support for positioning-statement
+- name: deanpeters/Product-Manager-Skills@positioning-workshop
+  description: Skill support for positioning-workshop
+- name: deanpeters/Product-Manager-Skills@prd-development
+  description: Skill support for prd-development
+- name: deanpeters/Product-Manager-Skills@press-release
+  description: Skill support for press-release
+- name: deanpeters/Product-Manager-Skills@prioritization-advisor
+  description: Skill support for prioritization-advisor
+- name: deanpeters/Product-Manager-Skills@problem-framing-canvas
+  description: Skill support for problem-framing-canvas
+- name: deanpeters/Product-Manager-Skills@problem-statement
+  description: Skill support for problem-statement
+- name: deanpeters/Product-Manager-Skills@product-strategy-session
+  description: Skill support for product-strategy-session
+- name: deanpeters/Product-Manager-Skills@proto-persona
+  description: Skill support for proto-persona
+- name: deanpeters/Product-Manager-Skills@recommendation-canvas
+  description: Skill support for recommendation-canvas
+- name: deanpeters/Product-Manager-Skills@roadmap-planning
+  description: Skill support for roadmap-planning
+- name: deanpeters/Product-Manager-Skills@saas-economics-efficiency-metrics
+  description: Skill support for saas-economics-efficiency-metrics
+- name: deanpeters/Product-Manager-Skills@saas-revenue-growth-metrics
+  description: Skill support for saas-revenue-growth-metrics
+- name: deanpeters/Product-Manager-Skills@skill-authoring-workflow
+  description: Skill support for skill-authoring-workflow
+- name: deanpeters/Product-Manager-Skills@storyboard
+  description: Skill support for storyboard
+- name: deanpeters/Product-Manager-Skills@tam-sam-som-calculator
+  description: Skill support for tam-sam-som-calculator
+- name: deanpeters/Product-Manager-Skills@user-story-mapping-workshop
+  description: Skill support for user-story-mapping-workshop
+- name: deanpeters/Product-Manager-Skills@user-story-mapping
+  description: Skill support for user-story-mapping
+- name: deanpeters/Product-Manager-Skills@user-story-splitting
+  description: Skill support for user-story-splitting
+- name: deanpeters/Product-Manager-Skills@user-story
+  description: Skill support for user-story
+- name: deanpeters/Product-Manager-Skills@vp-cpo-readiness-advisor
+  description: Skill support for vp-cpo-readiness-advisor
+- name: deanpeters/Product-Manager-Skills@workshop-facilitation
+  description: Skill support for workshop-facilitation
+- name: JsonLee12138/agent-team@brainstorming
+  description: Use when users explicitly ask to brainstorm, shape requirements, compare approaches, or produce a planning/design document before implementation. Turn rough ideas into validated brainstorming/design docs through focused dialogue, role-based analysis, and explicit user approval. Do not trigger this skill for straightforward implementation requests that do not need dedicated design exploration.
+- name: fleurytian/awesome-claude-skills@mckinsey-consultant
+  description: 'McKinsey-style business consultant for hypothesis-driven problem solving, structured analysis, and strategic recommendations Use when the user asks for mckinsey-consultant-related work such as: business problem structuring, mece issue tree decomposition, hypothesis formation and testing, market sizing and estimation, competitive analysis, strategic recommendation development, executive summary and report writing, data-driven insight synthesis, stakeholder communication frameworks.'

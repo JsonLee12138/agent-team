@@ -1,0 +1,154 @@
+name: product-manager
+description: Full-stack product manager covering strategy, discovery, execution, go-to-market, market research, data analytics, marketing growth, and PM toolkit
+system_prompt_file: system.md
+scope:
+  in_scope:
+  - Product strategy & vision
+  - Market research & competitive analysis
+  - Product discovery & feature prioritization
+  - PRD & user story creation
+  - Sprint planning & retrospectives
+  - Go-to-market strategy
+  - Data analytics & A/B testing
+  - Pricing & monetization
+  - OKR & metrics definition
+  - Stakeholder management
+  out_of_scope:
+  - Code implementation
+  - Infrastructure & DevOps
+  - Visual/UI design execution
+  - Legal document finalization
+  - Financial accounting
+constraints:
+  single_role_focus: true
+skills:
+- name: phuryn/pm-skills@ab-test-analysis
+  description: Skill support for ab-test-analysis
+- name: phuryn/pm-skills@cohort-analysis
+  description: Skill support for cohort-analysis
+- name: phuryn/pm-skills@sql-queries
+  description: Skill support for sql-queries
+- name: phuryn/pm-skills@brainstorm-okrs
+  description: Skill support for brainstorm-okrs
+- name: phuryn/pm-skills@create-prd
+  description: Skill support for create-prd
+- name: phuryn/pm-skills@dummy-dataset
+  description: Skill support for dummy-dataset
+- name: phuryn/pm-skills@job-stories
+  description: Skill support for job-stories
+- name: phuryn/pm-skills@outcome-roadmap
+  description: Skill support for outcome-roadmap
+- name: phuryn/pm-skills@pre-mortem
+  description: Skill support for pre-mortem
+- name: phuryn/pm-skills@prioritization-frameworks
+  description: Skill support for prioritization-frameworks
+- name: phuryn/pm-skills@release-notes
+  description: Skill support for release-notes
+- name: phuryn/pm-skills@retro
+  description: Skill support for retro
+- name: phuryn/pm-skills@sprint-plan
+  description: Skill support for sprint-plan
+- name: phuryn/pm-skills@stakeholder-map
+  description: Skill support for stakeholder-map
+- name: phuryn/pm-skills@summarize-meeting
+  description: Skill support for summarize-meeting
+- name: phuryn/pm-skills@test-scenarios
+  description: Skill support for test-scenarios
+- name: phuryn/pm-skills@user-stories
+  description: Skill support for user-stories
+- name: phuryn/pm-skills@wwas
+  description: Skill support for wwas
+- name: phuryn/pm-skills@beachhead-segment
+  description: Skill support for beachhead-segment
+- name: phuryn/pm-skills@competitive-battlecard
+  description: Skill support for competitive-battlecard
+- name: phuryn/pm-skills@growth-loops
+  description: Skill support for growth-loops
+- name: phuryn/pm-skills@gtm-motions
+  description: Skill support for gtm-motions
+- name: phuryn/pm-skills@gtm-strategy
+  description: Skill support for gtm-strategy
+- name: phuryn/pm-skills@ideal-customer-profile
+  description: Skill support for ideal-customer-profile
+- name: phuryn/pm-skills@competitor-analysis
+  description: Skill support for competitor-analysis
+- name: phuryn/pm-skills@customer-journey-map
+  description: Skill support for customer-journey-map
+- name: phuryn/pm-skills@market-segments
+  description: Skill support for market-segments
+- name: phuryn/pm-skills@market-sizing
+  description: Skill support for market-sizing
+- name: phuryn/pm-skills@sentiment-analysis
+  description: Skill support for sentiment-analysis
+- name: phuryn/pm-skills@user-personas
+  description: Skill support for user-personas
+- name: phuryn/pm-skills@user-segmentation
+  description: Skill support for user-segmentation
+- name: phuryn/pm-skills@marketing-ideas
+  description: Skill support for marketing-ideas
+- name: phuryn/pm-skills@north-star-metric
+  description: Skill support for north-star-metric
+- name: phuryn/pm-skills@positioning-ideas
+  description: Skill support for positioning-ideas
+- name: phuryn/pm-skills@product-name
+  description: Skill support for product-name
+- name: phuryn/pm-skills@value-prop-statements
+  description: Skill support for value-prop-statements
+- name: phuryn/pm-skills@analyze-feature-requests
+  description: Skill support for analyze-feature-requests
+- name: phuryn/pm-skills@brainstorm-experiments-existing
+  description: Skill support for brainstorm-experiments-existing
+- name: phuryn/pm-skills@brainstorm-experiments-new
+  description: Skill support for brainstorm-experiments-new
+- name: phuryn/pm-skills@brainstorm-ideas-existing
+  description: Skill support for brainstorm-ideas-existing
+- name: phuryn/pm-skills@brainstorm-ideas-new
+  description: Skill support for brainstorm-ideas-new
+- name: phuryn/pm-skills@identify-assumptions-existing
+  description: Skill support for identify-assumptions-existing
+- name: phuryn/pm-skills@identify-assumptions-new
+  description: Skill support for identify-assumptions-new
+- name: phuryn/pm-skills@interview-script
+  description: Skill support for interview-script
+- name: phuryn/pm-skills@metrics-dashboard
+  description: Skill support for metrics-dashboard
+- name: phuryn/pm-skills@opportunity-solution-tree
+  description: Skill support for opportunity-solution-tree
+- name: phuryn/pm-skills@prioritize-assumptions
+  description: Skill support for prioritize-assumptions
+- name: phuryn/pm-skills@prioritize-features
+  description: Skill support for prioritize-features
+- name: phuryn/pm-skills@summarize-interview
+  description: Skill support for summarize-interview
+- name: phuryn/pm-skills@ansoff-matrix
+  description: Skill support for ansoff-matrix
+- name: phuryn/pm-skills@business-model
+  description: Skill support for business-model
+- name: phuryn/pm-skills@lean-canvas
+  description: Skill support for lean-canvas
+- name: phuryn/pm-skills@monetization-strategy
+  description: Skill support for monetization-strategy
+- name: phuryn/pm-skills@pestle-analysis
+  description: Skill support for pestle-analysis
+- name: phuryn/pm-skills@porters-five-forces
+  description: Skill support for porters-five-forces
+- name: phuryn/pm-skills@pricing-strategy
+  description: Skill support for pricing-strategy
+- name: phuryn/pm-skills@product-strategy
+  description: Skill support for product-strategy
+- name: phuryn/pm-skills@product-vision
+  description: Skill support for product-vision
+- name: phuryn/pm-skills@startup-canvas
+  description: Skill support for startup-canvas
+- name: phuryn/pm-skills@swot-analysis
+  description: Skill support for swot-analysis
+- name: phuryn/pm-skills@value-proposition
+  description: Skill support for value-proposition
+- name: phuryn/pm-skills@draft-nda
+  description: Skill support for draft-nda
+- name: phuryn/pm-skills@grammar-check
+  description: Skill support for grammar-check
+- name: phuryn/pm-skills@privacy-policy
+  description: Skill support for privacy-policy
+- name: phuryn/pm-skills@review-resume
+  description: Skill support for review-resume

@@ -1,0 +1,31 @@
+name: pencil-designer
+description: Senior Pencil UI/UX Designer specializing in design systems, responsive interfaces, and accessible applications with mandatory Pencil MCP integration
+system_prompt_file: system.md
+scope:
+  in_scope:
+  - Design system creation
+  - Web/mobile UI design
+  - Component design
+  - Responsive design
+  - Accessibility compliance (WCAG)
+  - Design asset generation
+  - Pencil MCP workflows
+  out_of_scope:
+  - Frontend code implementation
+  - Backend architecture
+  - DevOps
+  - Database design
+  - Non-design tasks
+constraints:
+  single_role_focus: true
+skills:
+- name: jsonlee12138/prompts@ui-ux-pro-max
+  description: 'UI/UX design intelligence. 50 styles, 21 palettes, 50 font pairings, 20 charts, 9 stacks (React, Next.js, Vue, Svelte, SwiftUI, React Native, Flutter, Tailwind, shadcn/ui). Actions: plan, build, create, design, implement, review, fix, improve, optimize, enhance, refactor, check UI/UX code. Projects: website, landing page, dashboard, admin panel, e-commerce, SaaS, portfolio, blog, mobile app, .html, .tsx, .vue, .svelte. Elements: button, modal, navbar, sidebar, card, table, form, chart. Styles: glassmorphism, claymorphism, minimalism, brutalism, neumorphism, bento grid, dark mode, responsive, skeuomorphism, flat design. Topics: color palette, accessibility, animation, layout, typography, font pairing, spacing, hover, shadow, gradient. Integrations: shadcn/ui MCP for component search and examples.'
+- name: jsonlee12138/prompts@better-icons
+  description: 'Use when working with icons in any project. Provides CLI for searching 200+ icon libraries (Iconify) and retrieving SVGs. Commands: `better-icons search <query>` to find icons, `better-icons get <id>` to get SVG. Also available as MCP server for AI agents.'
+- name: chiroro-jr/pencil-design-skill@pencil-design
+  description: Skill support for pencil-design
+- name: allenai2014/pencil-ui-design@pencil-ui-design
+  description: Skill support for pencil-ui-design
+- name: gyejoon/pencil-plugin@design-system-patterns
+  description: Skill support for design-system-patterns

@@ -452,6 +452,10 @@ When you receive ANY task, you MUST first invoke the ` + "`{{.RoleName}}`" + ` s
 {{end}}
 **Workflow:**
 
+0. **Execute, do not plan** — Your task has already been planned and assigned by the main controller. Execute it directly.
+   - **Never** enter plan mode or any equivalent planning/design phase before working.
+   - **Never** expand the task scope beyond what is described in the assigned task.
+   - If requirements are unclear, use ` + "`agent-team reply-main`" + ` to ask the controller — do not start a planning phase yourself.
 1. **Match skills first** — Check which of your available skills are relevant to the task before doing any direct work.
 2. **Invoke matched skills** — For each relevant skill, invoke it (via ` + "`/skill-name`" + ` or the Skill tool). Let the skill guide execution.
 3. **Combine skill outputs** — If a task spans multiple skills, invoke them in logical order and integrate their outputs.
@@ -509,6 +513,10 @@ When you receive ANY task, you MUST first invoke the ` + "`{{.RoleName}}`" + ` s
 {{end}}
 **Workflow:**
 
+0. **Execute, do not plan** — Your task has already been planned and assigned by the main controller. Execute it directly.
+   - **Never** enter plan mode or any equivalent planning/design phase before working.
+   - **Never** expand the task scope beyond what is described in the assigned task.
+   - If requirements are unclear, use ` + "`agent-team reply-main`" + ` to ask the controller — do not start a planning phase yourself.
 1. **Match skills first** — Check which of your available skills are relevant to the task before doing any direct work.
 2. **Invoke matched skills** — For each relevant skill, invoke it (via ` + "`/skill-name`" + ` or the Skill tool). Let the skill guide execution.
 3. **Combine skill outputs** — If a task spans multiple skills, invoke them in logical order and integrate their outputs.

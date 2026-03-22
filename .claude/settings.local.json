@@ -130,7 +130,10 @@
       "Bash(\"/Users/jsonlee/Projects/agent-team/output/agent-team\" --help)",
       "Bash(\"/Users/jsonlee/Projects/agent-team/output/agent-team\" setup:*)",
       "Bash(\"/Users/jsonlee/Projects/agent-team/output/agent-team\" init:*)",
-      "Bash(make:*)"
+      "Bash(make:*)",
+      "Bash(GOCACHE=\"/Users/jsonlee/Projects/agent-team/.tmp/gocache\" GOROOT=\"$HOME/.gvm/gos/go1.24.2\" \"$HOME/.gvm/gos/go1.24.2/bin/go\" test ./internal -run 'Test\\(BuildRoleSkillSpecs|RenderFiles|CreateOrUpdateRole\\)' -count=1)",
+      "Bash(GOCACHE=\"/Users/jsonlee/Projects/agent-team/.tmp/gocache\" GOROOT=\"$HOME/.gvm/gos/go1.24.2\" \"$HOME/.gvm/gos/go1.24.2/bin/go\" test ./internal -run 'Test\\(BuildRoleSkillSpecs_PreservesScopedNameAndDescription|RenderFiles_PreservesScopedSkillNameInRoleYAML|CreateOrUpdateRole_TargetDirVariants\\)' -count=1)",
+      "Bash(GOCACHE=\"/Users/jsonlee/Projects/agent-team/.tmp/gocache\" GOROOT=\"$HOME/.gvm/gos/go1.24.2\" \"$HOME/.gvm/gos/go1.24.2/bin/go\" test ./... -run 'Test\\(BuildRoleSkillSpecs_PreservesScopedNameAndDescription|RenderFiles_PreservesScopedSkillNameInRoleYAML|CreateOrUpdateRole_TargetDirVariants\\)' -count=1)"
     ]
   }
 }
