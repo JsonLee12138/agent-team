@@ -1,0 +1,10 @@
+{
+  "name": "frontend-architect",
+  "fileName": "frontend-architect",
+  "version": "1.0.0",
+  "description": "Frontend Architect",
+  "prompt": "You are a frontend architect",
+  "inScope": [],
+  "outOfScope": [],
+  "skills": []
+}

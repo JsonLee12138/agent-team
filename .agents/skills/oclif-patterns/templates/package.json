@@ -1,0 +1,92 @@
+{
+  "name": "{{CLI_NAME}}",
+  "version": "1.0.0",
+  "description": "{{DESCRIPTION}}",
+  "author": "{{AUTHOR}}",
+  "license": "MIT",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "bin": {
+    "{{CLI_BIN}}": "./bin/run.js"
+  },
+  "files": [
+    "/bin",
+    "/lib",
+    "/oclif.manifest.json"
+  ],
+  "keywords": [
+    "oclif",
+    "cli",
+    "{{CLI_NAME}}"
+  ],
+  "oclif": {
+    "bin": "{{CLI_BIN}}",
+    "dirname": "{{CLI_BIN}}",
+    "commands": "./lib/commands",
+    "plugins": [
+      "@oclif/plugin-help",
+      "@oclif/plugin-plugins"
+    ],
+    "topicSeparator": ":",
+    "topics": {
+      "config": {
+        "description": "Manage CLI configuration"
+      }
+    },
+    "hooks": {
+      "init": "./lib/hooks/init",
+      "prerun": "./lib/hooks/prerun"
+    },
+    "additionalHelpFlags": ["-h"],
+    "additionalVersionFlags": ["-v"]
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "rm -rf lib && rm -f tsconfig.tsbuildinfo",
+    "dev": "ts-node src/index.ts",
+    "lint": "eslint . --ext .ts",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "postpack": "rm -f oclif.manifest.json",
+    "prepack": "npm run build && oclif manifest && oclif readme",
+    "test": "mocha --forbid-only \"test/**/*.test.ts\"",
+    "test:watch": "mocha --watch \"test/**/*.test.ts\"",
+    "test:coverage": "nyc npm test",
+    "version": "oclif readme && git add README.md",
+    "posttest": "npm run lint"
+  },
+  "dependencies": {
+    "@oclif/core": "^3.0.0",
+    "@oclif/plugin-help": "^6.0.0",
+    "@oclif/plugin-plugins": "^4.0.0",
+    "fs-extra": "^11.0.0"
+  },
+  "devDependencies": {
+    "@oclif/test": "^3.0.0",
+    "@types/chai": "^4",
+    "@types/fs-extra": "^11",
+    "@types/mocha": "^10",
+    "@types/node": "^18",
+    "@typescript-eslint/eslint-plugin": "^6",
+    "@typescript-eslint/parser": "^6",
+    "chai": "^4",
+    "eslint": "^8",
+    "eslint-config-oclif": "^5",
+    "eslint-config-oclif-typescript": "^3",
+    "mocha": "^10",
+    "nyc": "^15",
+    "oclif": "^4.0.0",
+    "ts-node": "^10",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/{{GITHUB_USER}}/{{CLI_NAME}}.git"
+  },
+  "bugs": {
+    "url": "https://github.com/{{GITHUB_USER}}/{{CLI_NAME}}/issues"
+  },
+  "homepage": "https://github.com/{{GITHUB_USER}}/{{CLI_NAME}}#readme"
+}

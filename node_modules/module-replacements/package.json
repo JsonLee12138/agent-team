@@ -1,0 +1,66 @@
+{
+  "name": "module-replacements",
+  "description": "This package provides a set of manifests which each define a mapping of JS modules to their suggested replacements.",
+  "version": "2.11.0",
+  "main": "./dist/commonjs/main.js",
+  "scripts": {
+    "build": "npm run clean && npm run build:types",
+    "build:types": "tsc --noEmit",
+    "build:update-manifest-paths": "node scripts/update-manifests-dist-path.js",
+    "clean": "node -e \"fs.rmSync('./dist', {force: true, recursive: true})\"",
+    "format": "prettier --write \"./src/**/*.ts\" \"./manifests/**/*.json\"",
+    "generate-schema": "node scripts/generate-schema.js",
+    "prepare": "tshy && npm run build:update-manifest-paths",
+    "test:validate": "node scripts/validate-modules.js",
+    "sort-manifests": "node scripts/sort-manifests.js"
+  },
+  "tshy": {
+    "exports": {
+      ".": "./src/main.ts",
+      "./package.json": "./package.json",
+      "./manifests/micro-utilities.json": "./manifests/micro-utilities.json",
+      "./manifests/native.json": "./manifests/native.json",
+      "./manifests/preferred.json": "./manifests/preferred.json"
+    }
+  },
+  "files": [
+    "dist",
+    "manifests"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/es-tooling/module-replacements.git"
+  },
+  "author": "James Garbutt (https://github.com/43081j)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/es-tooling/module-replacements/issues"
+  },
+  "homepage": "https://github.com/es-tooling/module-replacements#readme",
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "ajv": "^8.16.0",
+    "prettier": "^3.2.4",
+    "ts-json-schema-generator": "^2.3.0",
+    "tshy": "^1.11.0",
+    "typescript": "^5.3.3"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/main.d.ts",
+        "default": "./dist/esm/main.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/main.d.ts",
+        "default": "./dist/commonjs/main.js"
+      }
+    },
+    "./package.json": "./package.json",
+    "./manifests/micro-utilities.json": "./manifests/micro-utilities.json",
+    "./manifests/native.json": "./manifests/native.json",
+    "./manifests/preferred.json": "./manifests/preferred.json"
+  },
+  "types": "./dist/commonjs/main.d.ts",
+  "type": "module"
+}

@@ -1,0 +1,71 @@
+{
+  "name": "@mycli/plugin-{{PLUGIN_NAME}}",
+  "version": "1.0.0",
+  "description": "{{DESCRIPTION}}",
+  "author": "{{AUTHOR}}",
+  "license": "MIT",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "files": [
+    "/lib",
+    "/oclif.manifest.json"
+  ],
+  "keywords": [
+    "oclif-plugin",
+    "cli",
+    "{{PLUGIN_NAME}}"
+  ],
+  "oclif": {
+    "commands": "./lib/commands",
+    "bin": "mycli",
+    "devPlugins": [
+      "@oclif/plugin-help"
+    ],
+    "topics": {
+      "{{PLUGIN_NAME}}": {
+        "description": "{{DESCRIPTION}}"
+      }
+    },
+    "hooks": {
+      "init": "./lib/hooks/init"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "rm -rf lib && rm -f tsconfig.tsbuildinfo",
+    "lint": "eslint . --ext .ts",
+    "postpack": "rm -f oclif.manifest.json",
+    "prepack": "npm run build && oclif manifest && oclif readme",
+    "test": "mocha --forbid-only \"test/**/*.test.ts\"",
+    "test:coverage": "nyc npm test",
+    "version": "oclif readme && git add README.md"
+  },
+  "dependencies": {
+    "@oclif/core": "^3.0.0"
+  },
+  "devDependencies": {
+    "@oclif/test": "^3.0.0",
+    "@types/chai": "^4",
+    "@types/mocha": "^10",
+    "@types/node": "^18",
+    "@typescript-eslint/eslint-plugin": "^6",
+    "@typescript-eslint/parser": "^6",
+    "chai": "^4",
+    "eslint": "^8",
+    "mocha": "^10",
+    "nyc": "^15",
+    "oclif": "^4.0.0",
+    "ts-node": "^10",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/{{GITHUB_USER}}/{{PLUGIN_NAME}}.git"
+  },
+  "bugs": {
+    "url": "https://github.com/{{GITHUB_USER}}/{{PLUGIN_NAME}}/issues"
+  }
+}

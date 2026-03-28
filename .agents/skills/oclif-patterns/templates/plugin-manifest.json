@@ -1,0 +1,41 @@
+{
+  "name": "@mycli/plugin-{{PLUGIN_NAME}}",
+  "version": "1.0.0",
+  "description": "{{DESCRIPTION}}",
+  "commands": {
+    "{{PLUGIN_NAME}}:{{COMMAND_NAME}}": {
+      "id": "{{PLUGIN_NAME}}:{{COMMAND_NAME}}",
+      "description": "{{COMMAND_DESCRIPTION}}",
+      "pluginName": "@mycli/plugin-{{PLUGIN_NAME}}",
+      "pluginType": "core",
+      "aliases": [],
+      "examples": [
+        "<%= config.bin %> {{PLUGIN_NAME}}:{{COMMAND_NAME}} --option value"
+      ],
+      "flags": {
+        "option": {
+          "name": "option",
+          "type": "option",
+          "char": "o",
+          "description": "Plugin-specific option",
+          "multiple": false
+        },
+        "verbose": {
+          "name": "verbose",
+          "type": "boolean",
+          "char": "v",
+          "description": "Verbose output",
+          "allowNo": false
+        }
+      },
+      "args": {}
+    }
+  },
+  "hooks": {
+    "init": [
+      {
+        "file": "./lib/hooks/init.js"
+      }
+    ]
+  }
+}

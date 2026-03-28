@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "oclif-patterns": {
+      "source": "vanman2024/cli-builder",
+      "sourceType": "github",
+      "computedHash": "12a8b76599a274fe5552ebeb35589337ec09956e60396c1fd8f06edbb79be96e"
+    },
+    "zod": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "computedHash": "e5d8e35002d0d6b03db0b0daad54e1b82c9c10804f8a745025c07db5ea685655"
+    }
+  }
+}
